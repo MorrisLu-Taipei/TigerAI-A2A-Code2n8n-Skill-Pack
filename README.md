@@ -7,6 +7,40 @@
 
 ---
 
+## 🤖 這是一個 Agentic Engineering Example
+
+> **本專案完全使用 AI Agentic IDE（Antigravity / Claude Code）撰寫，從規格到 n8n Workflow 全程由 AI 代理人協作完成。**
+
+這個 Skill Pack 本身就是「AI 代理工程（Agentic Engineering）」的實作示範：
+
+| 維度 | 傳統做法 | 本專案做法（Agentic） |
+|---|---|---|
+| **規格撰寫** | 工程師逐字打 spec | 跟 AI 對話 → AI 產出 SDD（Spec-Driven Design） |
+| **n8n Workflow 開發** | 在畫布上手動拖節點 | 黃色便利貼寫需求 → AI 直接產出可執行 JSON |
+| **Skill / Plugin 製作** | 翻文件、寫範本 | Claude Code Skills + Antigravity `.agent/workflows/` 自動編排 |
+| **驗收測試** | 手動跑 case、寫報告 | AI 自跑 8 情境 → 自動產出 [`tests/REPORT-3.md`](tests/REPORT-3.md) |
+| **文件 / README / CHANGELOG** | 開發完才補 | AI 與程式碼同步生成 |
+| **第三方授權合規** | 人工審查 | AI 偵測密鑰外洩、scrub、產生 `THIRD_PARTY_NOTICES.md` |
+
+### 你會在這個 repo 看到的 Agentic 痕跡
+
+- **`skills/`** — 13 個 Claude Code / Antigravity Skill，每個 SKILL.md 都是 AI 與人共筆
+- **`.agent/workflows/`** — Antigravity 專屬的 agentic workflow（如 `/install-n8n-pack` 一鍵安裝）
+- **`cookbook/`** — 8 個自然語言 → workflow 的對照範例，示範如何「對 AI 講話」
+- **`spec/sticky-note-three-layer.md`** — 三層結構規範，強制 AI 產出可 review 的 workflow
+- **`research/patterns.md`** — AI 從 2,061 個真實 workflow 歸納出 7 大骨架 + 反模式
+- **`reference-workflows/`** — AI 對照語料（[Zie619/n8n-workflows](https://github.com/Zie619/n8n-workflows) MIT，已 scrub 密鑰）
+
+### 適合誰參考這個專案
+
+- 想學「**怎麼把 AI Agent 當工程同事用**」的開發者 / PM
+- 評估「**Antigravity / Claude Code 能否取代手寫 Skill / Workflow**」的團隊
+- 想看「**人 + AI 協作的真實工程產出長什麼樣**」的好奇者
+
+> 💡 換句話說：這不只是「給 n8n 用的 Skill Pack」，更是一份**「AI Agent 怎麼蓋產品」的開源教材**。
+
+---
+
 ## 📖 閱讀順序（強烈建議照順序看）
 
 | # | 檔案 | 適合誰 / 看多久 |

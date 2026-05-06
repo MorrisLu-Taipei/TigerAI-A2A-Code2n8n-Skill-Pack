@@ -7,6 +7,40 @@
 
 ---
 
+## 🤖 This is an Agentic Engineering Example
+
+> **This entire project was authored using AI Agentic IDEs (Antigravity / Claude Code) — from spec to n8n workflows, every artifact was produced through human-AI agent collaboration.**
+
+This Skill Pack is itself a working demo of **Agentic Engineering**:
+
+| Dimension | Traditional way | This project (Agentic) |
+|---|---|---|
+| **Spec writing** | Engineer types every word | Chat with AI → AI produces SDD (Spec-Driven Design) |
+| **n8n workflow dev** | Drag nodes on canvas | Write a yellow sticky note → AI emits runnable JSON |
+| **Skill / plugin authoring** | Read docs, copy templates | Claude Code Skills + Antigravity `.agent/workflows/` orchestration |
+| **Acceptance testing** | Run cases by hand, write report | AI runs 8 scenarios → auto-emits [`tests/REPORT-3.en.md`](tests/REPORT-3.en.md) |
+| **Docs / README / CHANGELOG** | Backfilled after coding | Generated alongside code |
+| **Third-party license compliance** | Manual review | AI detects leaked secrets, scrubs them, generates `THIRD_PARTY_NOTICES.md` |
+
+### Agentic footprints in this repo
+
+- **`skills/`** — 13 Claude Code / Antigravity skills; each `SKILL.md` is co-authored by humans and AI
+- **`.agent/workflows/`** — Antigravity-native agentic workflows (e.g. `/install-n8n-pack` one-shot installer)
+- **`cookbook/`** — 8 natural-language → workflow examples showing how to "talk to" the AI
+- **`spec/sticky-note-three-layer.md`** — Three-layer structure spec that forces reviewable AI output
+- **`research/patterns.md`** — 7 canonical skeletons + anti-patterns mined by AI from 2,061 real workflows
+- **`reference-workflows/`** — AI training corpus ([Zie619/n8n-workflows](https://github.com/Zie619/n8n-workflows), MIT, secrets scrubbed)
+
+### Who should study this project
+
+- Developers / PMs learning **how to use an AI agent as an engineering teammate**
+- Teams evaluating **whether Antigravity / Claude Code can replace hand-written skills / workflows**
+- Anyone curious **what real human-AI co-authored engineering output looks like**
+
+> 💡 In other words: this isn't just "a Skill Pack for n8n" — it's also an open **case study of how AI agents build a real product**.
+
+---
+
 ## 📖 Reading order (strongly recommended)
 
 | # | File | Audience / Time |
