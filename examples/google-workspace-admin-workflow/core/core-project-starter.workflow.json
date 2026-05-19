@@ -1,0 +1,503 @@
+{
+  "name": "GW-Admin / Core / Project Starter",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [-1200, 0]
+    },
+    {
+      "parameters": {
+        "content": "## Project Starter — Core sub-workflow (native nodes)\n\nInput: `{ data, config }` from an entry workflow (Form Trigger or Webhook).\n\n**data** — the form response, keyed by Apps Script field name (專案名稱, 承辦處室, …).\n**config** — `{ ROOT_FOLDER_ID, CONTROL_SHEET_ID, CALENDAR_ID, ADMIN_EMAIL, TIMEZONE }`.\n\nDoes:\n1. Validate required fields, build project code + sanitized folder name\n2. Create project folder under `03_專案資料夾` + 11 subfolders (Google Drive node)\n3. Create empty 9-section project record Doc (Google Docs node), then apply Heading styles via HTTP `documents.batchUpdate` ⚠️\n4. Create 待辦追蹤表 spreadsheet (Google Sheets), append 10 default tasks (Google Sheets), apply dropdown + format via HTTP `spreadsheets.batchUpdate` ⚠️\n5. Create 成果檢核表 similarly\n6. Move all 3 generated files into `99_系統產生文件` (Google Drive)\n7. Create Calendar all-day events (Google Calendar node)\n8. Append row to 行政專案總控表 (Google Sheets)\n9. Email the 承辦人 (Gmail)\n10. Return summary to caller\n\n**Credentials needed** (5 separate, see `docs/google-credentials.md`):\n- `googleDriveOAuth2Api`\n- `googleDocsOAuth2Api`\n- `googleSheetsOAuth2Api`\n- `googleCalendarOAuth2Api`\n- `gmailOAuth2`\n+ 1 generic `googleApi` for the 3 batchUpdate HTTP nodes (Drive scope unused, just needs Docs + Sheets scope).",
+        "height": 600,
+        "width": 540,
+        "color": 4
+      },
+      "id": "sticky-overview",
+      "name": "Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-1200, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// =========================================================================\n// PREPARE — validate input, compute every value the downstream nodes need.\n// No external API calls; pure data transformation.\n// =========================================================================\n\nconst input = $input.first().json;\nconst data = input.data || {};\nconst config = input.config || {};\n\n// ---- 1. Validate required fields -----------------------------------------\nconst REQUIRED = ['專案名稱','專案年度','承辦處室','承辦人','承辦人Email'];\nfor (const f of REQUIRED) {\n  if (!data[f] || String(data[f]).trim() === '') {\n    throw new Error('缺少必填欄位：' + f);\n  }\n}\nfor (const c of ['ROOT_FOLDER_ID','CONTROL_SHEET_ID','CALENDAR_ID','TIMEZONE']) {\n  if (!config[c]) throw new Error('Missing config: ' + c);\n}\n\n// ---- 2. Helpers ----------------------------------------------------------\nfunction sanitize(name) {\n  return String(name || '')\n    .replace(/[\\\\/:*?\"<>|#%{}~&]/g, '_')\n    .replace(/\\s+/g, '_')\n    .substring(0, 180);\n}\nfunction formatTs(date, tz, fmt) {\n  const parts = new Intl.DateTimeFormat('en-CA', {\n    timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',\n    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false\n  }).formatToParts(date).reduce((o, p) => (o[p.type] = p.value, o), {});\n  const yyyy = parts.year, MM = parts.month, dd = parts.day;\n  const HH = parts.hour === '24' ? '00' : parts.hour, mm = parts.minute, ss = parts.second;\n  return fmt.replace('yyyy', yyyy).replace('MM', MM).replace('dd', dd).replace('HH', HH).replace('mm', mm).replace('ss', ss);\n}\nfunction parseDate(value) {\n  if (!value) return null;\n  if (value instanceof Date) return new Date(value.getTime());\n  const d = new Date(String(value).trim().replace(/-/g, '/'));\n  return isNaN(d.getTime()) ? null : d;\n}\nfunction offsetDate(value, days) {\n  const d = parseDate(value); if (!d) return null;\n  d.setDate(d.getDate() + Number(days || 0)); return d;\n}\nfunction toIsoDate(d) {\n  if (!d) return null;\n  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');\n}\n\n// ---- 3. Project identity ------------------------------------------------\nconst now = new Date();\nconst tz = config.TIMEZONE;\nconst projectCode = (data['專案年度'] || '000') + '-' + (data['承辦處室'] || '未分類') + '-' + formatTs(now, tz, 'MMddHHmmss');\nconst createdAt = formatTs(now, tz, 'yyyy/MM/dd HH:mm');\nconst folderName = sanitize(`${data['專案年度']}_${data['承辦處室']}_${data['專案名稱']}`);\nconst docName = sanitize(`${data['專案年度']}_${data['承辦處室']}_${data['專案名稱']}_專案紀錄`);\nconst taskSheetName = sanitize(`${data['專案年度']}_${data['承辦處室']}_${data['專案名稱']}_待辦追蹤表`);\nconst checklistSheetName = sanitize(`${data['專案年度']}_${data['承辦處室']}_${data['專案名稱']}_成果檢核表`);\n\nconst SUBFOLDERS = [\n  '00_原始公文與附件','01_計畫書與核定資料','02_工作分工與會議紀錄','03_表單與回覆資料',\n  '04_經費與採購核銷','05_活動照片與照片說明','06_成果資料與成果報告','07_公告通知與對外文字',\n  '08_簡報與成果展示','09_檢討與下次改進','99_系統產生文件'\n];\n\n// ---- 4. Project record Doc — heading plan (for HTTP batchUpdate) -------\nfunction kv(k, v) { return `${k}：${v || ''}`; }\nconst docPlan = [\n  { text: '行政專案紀錄文件', style: 'TITLE' },\n  { text: '一、基本資料', style: 'HEADING_1' },\n  { text: kv('公文主旨', data['公文主旨']) },\n  { text: kv('來文單位', data['來文單位']) },\n  { text: kv('公文日期', data['公文日期']) },\n  { text: kv('公文文號', data['公文文號']) },\n  { text: kv('專案名稱', data['專案名稱']) },\n  { text: kv('專案年度', data['專案年度']) },\n  { text: kv('承辦處室', data['承辦處室']) },\n  { text: kv('承辦人', data['承辦人']) },\n  { text: kv('承辦人Email', data['承辦人Email']) },\n  { text: kv('協辦人員', data['協辦人員']) },\n  { text: '二、重要期限', style: 'HEADING_1' },\n  { text: kv('活動日期', data['活動日期']) },\n  { text: kv('成果繳交期限', data['成果繳交期限']) },\n  { text: kv('經費核銷期限', data['經費核銷期限']) },\n  { text: '三、經費資訊', style: 'HEADING_1' },\n  { text: kv('是否有經費', data['是否有經費']) },\n  { text: kv('核定或預估金額', data['核定或預估金額']) },\n  { text: '四、公文要求摘要', style: 'HEADING_1' },\n  { text: '請後續使用 NotebookLM 或 Gemini 整理後補入。' },\n  { text: '五、執行紀錄', style: 'HEADING_1' },\n  { text: '日期｜事項｜處理情形｜負責人' },\n  { text: '六、成果資料', style: 'HEADING_1' },\n  { text: '照片：' }, { text: '簽到表：' }, { text: '回饋表：' }, { text: '成果報告：' }, { text: '經費附件：' },\n  { text: '七、缺漏檢查', style: 'HEADING_1' },\n  { text: '尚缺資料：' }, { text: '需要補件：' }, { text: '需人工確認：' },\n  { text: '八、檢討與下次建議', style: 'HEADING_1' },\n  { text: '本次問題：' }, { text: '下次改善：' }, { text: '可沿用資料：' },\n  { text: '九、NotebookLM 建議提問', style: 'HEADING_1' },\n  { text: '請根據本專案來源資料，整理公文要求、重要期限、成果報告要求、目前缺漏資料與需要人工確認的地方。' }\n];\nlet docFullText = '';\nconst docStyleSpans = [];\nfor (const p of docPlan) {\n  const start = docFullText.length + 1;\n  docFullText += p.text + '\\n';\n  const end = docFullText.length + 1;\n  if (p.style) docStyleSpans.push({ start, end, style: p.style });\n}\nconst docRequests = [\n  { insertText: { location: { index: 1 }, text: docFullText } },\n  ...docStyleSpans.map(s => ({\n    updateParagraphStyle: {\n      range: { startIndex: s.start, endIndex: s.end },\n      paragraphStyle: { namedStyleType: s.style },\n      fields: 'namedStyleType'\n    }\n  }))\n];\n\n// ---- 5. 待辦追蹤表 — rows + validation/format requests -----------------\nconst owner = data['承辦人'] || '';\nconst eventDate = data['活動日期'] || '';\nconst resultDeadline = data['成果繳交期限'] || '';\nconst budgetDeadline = data['經費核銷期限'] || '';\nconst taskHeaders = ['任務編號','階段','任務名稱','任務說明','負責人','協助單位','期限','提醒日期','狀態','需要附件','附件位置','備註'];\nconst taskRowsArr = [\n  ['T001','公文','整理公文要求','確認辦理依據、期限、成果要求與附件',owner,'','','','未開始','否','',''],\n  ['T002','公文','建立 NotebookLM 筆記本','將公文與附件加入專案 Notebook，並把連結貼回總控表',owner,'','','','未開始','否','',''],\n  ['T003','籌備','撰寫或修正計畫書','依公文要求完成校內計畫草案',owner,'','','','未開始','是','',''],\n  ['T004','籌備','建立報名或回覆表單','確認是否需收教師、家長或學生回覆',owner,'','','','未開始','否','',''],\n  ['T005','執行','收集活動照片','活動期間收集照片並補上照片說明',owner,'',eventDate,eventDate,'未開始','是','',''],\n  ['T006','執行','整理簽到表或參與名冊','建立人數與參與對象統計',owner,'',eventDate,eventDate,'未開始','是','',''],\n  ['T007','經費','整理經費明細與憑證','確認支出項目、憑證與核銷資料',owner,'會計',budgetDeadline,budgetDeadline,'未開始','是','',''],\n  ['T008','成果','撰寫成果報告草稿','使用 NotebookLM 與 Gemini 協助整理成果報告',owner,'',resultDeadline,resultDeadline,'未開始','是','',''],\n  ['T009','成果','檢查成果附件是否齊全','確認照片、簽到、回饋、經費與公文附件',owner,'',resultDeadline,resultDeadline,'未開始','是','',''],\n  ['T010','結案','建立下次改進建議','整理檢討與交接注意事項',owner,'','','','未開始','否','','']\n];\n// All 11 rows (header + 10 tasks) for `values.append` in one call\nconst taskAllValues = [taskHeaders, ...taskRowsArr];\n// Native node items shape: one object per row keyed by header\nconst taskItemsForNative = taskRowsArr.map(row => {\n  const obj = {}; taskHeaders.forEach((h, i) => obj[h] = row[i]); return obj;\n});\nconst taskBatchUpdate = {\n  requests: [\n    { setDataValidation: {\n        range: { sheetId: 0, startRowIndex: 1, endRowIndex: 1000, startColumnIndex: 8, endColumnIndex: 9 },\n        rule: { condition: { type: 'ONE_OF_LIST', values: ['未開始','進行中','待確認','完成'].map(v => ({ userEnteredValue: v })) }, showCustomUi: true, strict: true }\n    }},\n    { repeatCell: {\n        range: { sheetId: 0, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: taskHeaders.length },\n        cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.92, green: 0.95, blue: 1 } } },\n        fields: 'userEnteredFormat(textFormat,backgroundColor)'\n    }},\n    { updateSheetProperties: {\n        properties: { sheetId: 0, gridProperties: { frozenRowCount: 1 } },\n        fields: 'gridProperties.frozenRowCount'\n    }}\n  ]\n};\n\n// ---- 6. 成果檢核表 -----------------------------------------------------\nconst checklistHeaders = ['項目','是否需要','目前狀態','存放位置','負責人','備註'];\nconst checklistRowsArr = [\n  ['原始公文','是','待整理','00_原始公文與附件',owner,''],\n  ['計畫書或核定資料','建議','待整理','01_計畫書與核定資料',owner,''],\n  ['會議紀錄或工作分工','建議','待整理','02_工作分工與會議紀錄',owner,''],\n  ['表單回覆或名冊', data['是否需要收家長或教師回覆'] || '不確定','待整理','03_表單與回覆資料',owner,''],\n  ['經費明細與憑證', data['是否有經費'] || '不確定','待整理','04_經費與採購核銷',owner,'需會計或主任人工確認'],\n  ['活動照片與照片說明', data['是否需要活動照片'] || '不確定','待整理','05_活動照片與照片說明',owner,''],\n  ['成果報告', data['是否需要成果報告'] || '不確定','待整理','06_成果資料與成果報告',owner,''],\n  ['公告通知與對外文字','建議','待整理','07_公告通知與對外文字',owner,'正式公告需人工確認'],\n  ['成果簡報或展示資料','視需要','待整理','08_簡報與成果展示',owner,''],\n  ['檢討與下次改進','建議','待整理','09_檢討與下次改進',owner,'']\n];\nconst checklistAllValues = [checklistHeaders, ...checklistRowsArr];\nconst checklistItemsForNative = checklistRowsArr.map(row => {\n  const obj = {}; checklistHeaders.forEach((h, i) => obj[h] = row[i]); return obj;\n});\nconst checklistBatchUpdate = {\n  requests: [\n    { setDataValidation: {\n        range: { sheetId: 0, startRowIndex: 1, endRowIndex: 1000, startColumnIndex: 2, endColumnIndex: 3 },\n        rule: { condition: { type: 'ONE_OF_LIST', values: ['待整理','進行中','已完成','不需要','需人工確認'].map(v => ({ userEnteredValue: v })) }, showCustomUi: true, strict: true }\n    }},\n    { repeatCell: {\n        range: { sheetId: 0, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: checklistHeaders.length },\n        cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.92, green: 0.95, blue: 1 } } },\n        fields: 'userEnteredFormat(textFormat,backgroundColor)'\n    }},\n    { updateSheetProperties: {\n        properties: { sheetId: 0, gridProperties: { frozenRowCount: 1 } },\n        fields: 'gridProperties.frozenRowCount'\n    }}\n  ]\n};\n\n// ---- 7. Calendar events specs ------------------------------------------\nconst calendarEventSpecs = [];\nconst projectLabel = `${data['專案年度']}_${data['承辦處室']}_${data['專案名稱']}`;\nif (data['活動日期']) {\n  const d = toIsoDate(parseDate(data['活動日期']));\n  if (d) calendarEventSpecs.push({ title: `【活動日】${projectLabel}`, date: d, kind: 'event' });\n}\nif (data['成果繳交期限']) {\n  const d = toIsoDate(parseDate(data['成果繳交期限']));\n  if (d) calendarEventSpecs.push({ title: `【成果期限】${projectLabel}`, date: d, kind: 'result' });\n  const r = toIsoDate(offsetDate(data['成果繳交期限'], -7));\n  if (r) calendarEventSpecs.push({ title: `【成果前7天提醒】${data['專案名稱']}`, date: r, kind: 'result-remind' });\n}\nif (data['經費核銷期限']) {\n  const d = toIsoDate(parseDate(data['經費核銷期限']));\n  if (d) calendarEventSpecs.push({ title: `【經費核銷期限】${projectLabel}`, date: d, kind: 'budget' });\n  const r = toIsoDate(offsetDate(data['經費核銷期限'], -7));\n  if (r) calendarEventSpecs.push({ title: `【經費前7天提醒】${data['專案名稱']}`, date: r, kind: 'budget-remind' });\n}\n\n// ---- 8. Control sheet row ----------------------------------------------\nconst controlHeaders = ['專案編號','專案名稱','年度','承辦處室','承辦人','承辦人Email','Drive資料夾連結','專案紀錄Docs連結','待辦追蹤表連結','成果檢核表連結','NotebookLM筆記本連結','專案狀態','備註','來文單位','公文文號','建立日期','活動日期','成果期限','經費期限','是否有經費'];\nconst controlRowTemplate = {\n  '專案編號': projectCode,\n  '專案名稱': data['專案名稱'] || '',\n  '年度': data['專案年度'] || '',\n  '承辦處室': data['承辦處室'] || '',\n  '承辦人': data['承辦人'] || '',\n  '承辦人Email': data['承辦人Email'] || '',\n  'Drive資料夾連結': '', '專案紀錄Docs連結': '', '待辦追蹤表連結': '', '成果檢核表連結': '',\n  'NotebookLM筆記本連結': '', '專案狀態': '籌備中',\n  '備註': data['備註'] || '',\n  '來文單位': data['來文單位'] || '',\n  '公文文號': data['公文文號'] || '',\n  '建立日期': createdAt,\n  '活動日期': data['活動日期'] || '',\n  '成果期限': data['成果繳交期限'] || '',\n  '經費期限': data['經費核銷期限'] || '',\n  '是否有經費': data['是否有經費'] || ''\n};\n\nreturn [{\n  json: {\n    config, data, projectCode, createdAt, folderName, docName,\n    taskSheetName, checklistSheetName, SUBFOLDERS,\n    docRequests, taskHeaders, taskItemsForNative, taskBatchUpdate,\n    checklistHeaders, checklistItemsForNative, checklistBatchUpdate,\n    calendarEventSpecs, controlHeaders, controlRowTemplate\n  }\n}];\n"
+      },
+      "id": "prepare",
+      "name": "Prepare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-960, 0]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "=name='03_專案資料夾' and mimeType='application/vnd.google-apps.folder' and '{{ $json.config.ROOT_FOLDER_ID }}' in parents and trashed=false",
+        "filter": { "driveScope": "user" },
+        "options": {}
+      },
+      "id": "find-03",
+      "name": "Find 03_專案資料夾",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [-720, 0],
+      "credentials": { "googleDriveOAuth2Api": { "id": "REPLACE_GOOGLE_DRIVE_CRED_ID", "name": "Google Drive account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Prepare').first().json;\nconst items = $input.all();\nconst found = items.find(it => it.json.mimeType === 'application/vnd.google-apps.folder' || it.json.id);\nif (!found) throw new Error('找不到「03_專案資料夾」子資料夾，請先執行 core-setup workflow 建立目錄結構。');\nreturn [{ json: { ...prep, projectsParentFolderId: found.json.id } }];\n"
+      },
+      "id": "resolve-03",
+      "name": "Resolve 03 folder id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-500, 0]
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $json.folderName }}",
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "__rl": true, "mode": "id", "value": "={{ $json.projectsParentFolderId }}" },
+        "options": {}
+      },
+      "id": "create-project-folder",
+      "name": "Create project folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [-260, 0],
+      "credentials": { "googleDriveOAuth2Api": { "id": "REPLACE_GOOGLE_DRIVE_CRED_ID", "name": "Google Drive account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Resolve 03 folder id').first().json;\nconst pf = $input.first().json;\nreturn [{ json: { ...prep, projectFolderId: pf.id, projectFolderUrl: pf.webViewLink || `https://drive.google.com/drive/folders/${pf.id}` } }];\n"
+      },
+      "id": "carry-project-folder",
+      "name": "Carry project folder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-40, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { SUBFOLDERS } = $input.first().json;\nconst base = $input.first().json;\nreturn SUBFOLDERS.map(name => ({ json: { ...base, subfolderName: name } }));\n"
+      },
+      "id": "explode-subfolders",
+      "name": "Explode subfolder list",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [200, 0]
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $json.subfolderName }}",
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "__rl": true, "mode": "id", "value": "={{ $json.projectFolderId }}" },
+        "options": {}
+      },
+      "id": "create-subfolder",
+      "name": "Create subfolder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [440, 0],
+      "credentials": { "googleDriveOAuth2Api": { "id": "REPLACE_GOOGLE_DRIVE_CRED_ID", "name": "Google Drive account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const all = $input.all();\nconst byName = {};\nfor (const it of all) { byName[it.json.name] = it.json.id; }\nconst base = $('Carry project folder').first().json;\nreturn [{ json: { ...base, subfolderIdByName: byName, systemFolderId: byName['99_系統產生文件'] } }];\n"
+      },
+      "id": "collect-subfolders",
+      "name": "Collect subfolder ids",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 0]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "title": "={{ $json.docName }}"
+      },
+      "id": "create-doc",
+      "name": "Create project Doc",
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [920, 0],
+      "credentials": { "googleDocsOAuth2Api": { "id": "REPLACE_GOOGLE_DOCS_CRED_ID", "name": "Google Docs account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Collect subfolder ids').first().json;\nconst doc = $input.first().json;\nreturn [{ json: { ...prep, docId: doc.documentId || doc.id } }];\n"
+      },
+      "id": "carry-doc",
+      "name": "Carry Doc id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1160, 0]
+    },
+    {
+      "parameters": {
+        "content": "### ⚠️ HTTP fallback — Docs heading styles\n\nThe native **Google Docs** node (`n8n-nodes-base.googleDocs`) only exposes `insertText` and `replaceText` actions — it has **no operation for applying paragraph styles** (HEADING_1 / TITLE).\n\nWe call `POST https://docs.googleapis.com/v1/documents/{docId}:batchUpdate` directly with an `updateParagraphStyle` request per heading span (precomputed in the `Prepare` node as `docRequests`).\n\nThis is the only way to recreate the upstream Apps Script behaviour `body.appendParagraph(...).setHeading(...)`.\n\nSame Google account; just needs Docs scope. Credential type: `googleApi` (generic OAuth2) so we don't have to add a 7th credential type.",
+        "height": 360,
+        "width": 480,
+        "color": 5
+      },
+      "id": "sticky-doc-http",
+      "name": "Why HTTP: Doc styles",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1400, -360]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://docs.googleapis.com/v1/documents/{{ $json.docId }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"requests\": {{ JSON.stringify($json.docRequests) }}\n}",
+        "options": {}
+      },
+      "id": "doc-batch-update",
+      "name": "Doc batchUpdate (HTTP — heading styles)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 0],
+      "credentials": { "googleApi": { "id": "REPLACE_GOOGLE_GENERIC_CRED_ID", "name": "Google API (generic)" } }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "move",
+        "fileId": { "__rl": true, "mode": "id", "value": "={{ $json.docId }}" },
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "__rl": true, "mode": "id", "value": "={{ $json.systemFolderId }}" }
+      },
+      "id": "move-doc",
+      "name": "Move Doc to 99_系統產生文件",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1640, 0],
+      "credentials": { "googleDriveOAuth2Api": { "id": "REPLACE_GOOGLE_DRIVE_CRED_ID", "name": "Google Drive account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Carry Doc id').first().json;\nreturn [{ json: { ...prep, docUrl: `https://docs.google.com/document/d/${prep.docId}/edit` } }];\n"
+      },
+      "id": "carry-doc-url",
+      "name": "Carry Doc URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1880, 0]
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "create",
+        "title": "={{ $json.taskSheetName }}",
+        "sheetsUi": { "sheetValues": [ { "title": "待辦追蹤" } ] },
+        "options": {}
+      },
+      "id": "create-task-sheet",
+      "name": "Create 待辦追蹤表",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2120, 0],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_GOOGLE_SHEETS_CRED_ID", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Carry Doc URL').first().json;\nconst sh = $input.first().json;\nreturn [{ json: { ...prep, taskSheetId: sh.spreadsheetId, taskSheetUrl: sh.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${sh.spreadsheetId}/edit` } }];\n"
+      },
+      "id": "carry-task-sheet",
+      "name": "Carry task sheet id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2360, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Emit headers + 10 task rows as separate items so native append node writes them all.\nconst prep = $input.first().json;\nconst out = [];\nconst headerRow = {}; prep.taskHeaders.forEach(h => headerRow[h] = h);\nout.push({ json: { _carry: prep, ...headerRow } });\nfor (const r of prep.taskItemsForNative) out.push({ json: { _carry: prep, ...r } });\nreturn out;\n"
+      },
+      "id": "fanout-task-rows",
+      "name": "Fan out task rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2600, 0]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "={{ $('Carry task sheet id').first().json.taskSheetId }}" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "待辦追蹤" },
+        "dataMode": "autoMapInputData",
+        "options": {}
+      },
+      "id": "append-task-rows",
+      "name": "Append task rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2840, 0],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_GOOGLE_SHEETS_CRED_ID", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "content": "### ⚠️ HTTP fallback — Sheets dropdown + header format\n\nThe native **Google Sheets** node has no operation for:\n- `setDataValidation` (the 狀態 column dropdown — required by upstream behaviour)\n- `repeatCell` formatting (bold + light-blue header row)\n- `updateSheetProperties` (frozen row count)\n\nWe call `POST https://sheets.googleapis.com/v4/spreadsheets/{id}:batchUpdate` with all 3 requests in one body (precomputed as `taskBatchUpdate` in `Prepare`).\n\nSame Google account; needs Sheets scope. Reuses the same generic `googleApi` credential as the Doc batchUpdate call.",
+        "height": 320,
+        "width": 480,
+        "color": 5
+      },
+      "id": "sticky-sheet-http",
+      "name": "Why HTTP: Sheet validation",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [3080, -360]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Carry task sheet id').first().json.taskSheetId }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Carry task sheet id').first().json.taskBatchUpdate) }}",
+        "options": {}
+      },
+      "id": "task-batch-update",
+      "name": "Task sheet batchUpdate (HTTP — validation + format)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3080, 0],
+      "credentials": { "googleApi": { "id": "REPLACE_GOOGLE_GENERIC_CRED_ID", "name": "Google API (generic)" } }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "move",
+        "fileId": { "__rl": true, "mode": "id", "value": "={{ $('Carry task sheet id').first().json.taskSheetId }}" },
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "__rl": true, "mode": "id", "value": "={{ $('Carry task sheet id').first().json.systemFolderId }}" }
+      },
+      "id": "move-task-sheet",
+      "name": "Move task sheet to 99",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [3320, 0],
+      "credentials": { "googleDriveOAuth2Api": { "id": "REPLACE_GOOGLE_DRIVE_CRED_ID", "name": "Google Drive account" } }
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "create",
+        "title": "={{ $('Carry task sheet id').first().json.checklistSheetName }}",
+        "sheetsUi": { "sheetValues": [ { "title": "成果檢核" } ] },
+        "options": {}
+      },
+      "id": "create-checklist-sheet",
+      "name": "Create 成果檢核表",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [3560, 0],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_GOOGLE_SHEETS_CRED_ID", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Carry task sheet id').first().json;\nconst sh = $input.first().json;\nreturn [{ json: { ...prep, checklistSheetId: sh.spreadsheetId, checklistSheetUrl: sh.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${sh.spreadsheetId}/edit` } }];\n"
+      },
+      "id": "carry-checklist-sheet",
+      "name": "Carry checklist sheet id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3800, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $input.first().json;\nconst out = [];\nconst headerRow = {}; prep.checklistHeaders.forEach(h => headerRow[h] = h);\nout.push({ json: { _carry: prep, ...headerRow } });\nfor (const r of prep.checklistItemsForNative) out.push({ json: { _carry: prep, ...r } });\nreturn out;\n"
+      },
+      "id": "fanout-checklist-rows",
+      "name": "Fan out checklist rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4040, 0]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "={{ $('Carry checklist sheet id').first().json.checklistSheetId }}" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "成果檢核" },
+        "dataMode": "autoMapInputData",
+        "options": {}
+      },
+      "id": "append-checklist-rows",
+      "name": "Append checklist rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [4280, 0],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_GOOGLE_SHEETS_CRED_ID", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $('Carry checklist sheet id').first().json.checklistSheetId }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Carry checklist sheet id').first().json.checklistBatchUpdate) }}",
+        "options": {}
+      },
+      "id": "checklist-batch-update",
+      "name": "Checklist batchUpdate (HTTP — validation + format)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [4520, 0],
+      "credentials": { "googleApi": { "id": "REPLACE_GOOGLE_GENERIC_CRED_ID", "name": "Google API (generic)" } }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "move",
+        "fileId": { "__rl": true, "mode": "id", "value": "={{ $('Carry checklist sheet id').first().json.checklistSheetId }}" },
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "__rl": true, "mode": "id", "value": "={{ $('Carry checklist sheet id').first().json.systemFolderId }}" }
+      },
+      "id": "move-checklist-sheet",
+      "name": "Move checklist to 99",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [4760, 0],
+      "credentials": { "googleDriveOAuth2Api": { "id": "REPLACE_GOOGLE_DRIVE_CRED_ID", "name": "Google Drive account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Carry checklist sheet id').first().json;\nconst { calendarEventSpecs, projectFolderUrl, taskSheetUrl, checklistSheetUrl, data, config } = prep;\nconst description = [\n  '專案名稱：' + (data['專案名稱'] || ''),\n  '承辦處室：' + (data['承辦處室'] || ''),\n  '承辦人：' + (data['承辦人'] || ''),\n  '',\n  '請確認以下資料：',\n  '1. 公文與附件',\n  '2. 待辦追蹤表',\n  '3. 成果檢核表',\n  '4. 經費與憑證',\n  '5. 活動照片與照片說明',\n  '',\n  'Drive 專案資料夾：' + projectFolderUrl,\n  '待辦追蹤表：' + taskSheetUrl,\n  '成果檢核表：' + checklistSheetUrl,\n  '',\n  '提醒：正式公告、經費核銷與成果送出仍需人工確認。'\n].join('\\n');\nif (!calendarEventSpecs.length) return [{ json: { ...prep, _noEvents: true } }];\nreturn calendarEventSpecs.map(spec => ({\n  json: {\n    ...prep,\n    _eventTitle: spec.title,\n    _eventDate: spec.date,\n    _eventDateEndExclusive: (() => { const d = new Date(spec.date); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); })(),\n    _eventDescription: description,\n    _calendarId: config.CALENDAR_ID\n  }\n}));\n"
+      },
+      "id": "expand-events",
+      "name": "Expand calendar events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [5000, 0]
+    },
+    {
+      "parameters": {
+        "calendar": { "__rl": true, "mode": "id", "value": "={{ $json._calendarId }}" },
+        "start": "={{ $json._eventDate }}T00:00:00",
+        "end":   "={{ $json._eventDate }}T23:59:59",
+        "additionalFields": {
+          "allday": "yes",
+          "summary": "={{ $json._eventTitle }}",
+          "description": "={{ $json._eventDescription }}"
+        }
+      },
+      "id": "create-calendar-event",
+      "name": "Create Calendar event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [5240, 0],
+      "credentials": { "googleCalendarOAuth2Api": { "id": "REPLACE_GOOGLE_CALENDAR_CRED_ID", "name": "Google Calendar account" } },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst prep = $('Carry checklist sheet id').first().json;\nconst eventIds = items.map(it => it.json.id).filter(Boolean);\nreturn [{ json: { ...prep, calendarEventIds: eventIds } }];\n"
+      },
+      "id": "collect-events",
+      "name": "Collect event ids",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [5480, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $input.first().json;\nconst row = { ...prep.controlRowTemplate };\nrow['Drive資料夾連結'] = prep.projectFolderUrl || '';\nrow['專案紀錄Docs連結'] = prep.docUrl || '';\nrow['待辦追蹤表連結'] = prep.taskSheetUrl || '';\nrow['成果檢核表連結'] = prep.checklistSheetUrl || '';\nreturn [{ json: { _carry: prep, ...row } }];\n"
+      },
+      "id": "build-control-row",
+      "name": "Build control row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [5720, 0]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "={{ $json._carry.config.CONTROL_SHEET_ID }}" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "行政專案總控表" },
+        "dataMode": "autoMapInputData",
+        "options": {}
+      },
+      "id": "append-control",
+      "name": "Append to 總控表",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [5960, 0],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_GOOGLE_SHEETS_CRED_ID", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Build control row').first().json._carry.data['承辦人Email'] }}",
+        "subject": "=【行政專案已建立】{{ $('Build control row').first().json._carry.data['專案名稱'] }}",
+        "emailType": "text",
+        "message": "={{ ($('Build control row').first().json._carry.data['承辦人'] || '') }} 老師您好：\n\n系統已建立行政專案工作資料夾。\n\n專案編號：{{ $('Build control row').first().json._carry.projectCode }}\n專案名稱：{{ $('Build control row').first().json._carry.data['專案名稱'] || '' }}\n承辦處室：{{ $('Build control row').first().json._carry.data['承辦處室'] || '' }}\n成果繳交期限：{{ $('Build control row').first().json._carry.data['成果繳交期限'] || '未填' }}\n經費核銷期限：{{ $('Build control row').first().json._carry.data['經費核銷期限'] || '未填' }}\n\nDrive 專案資料夾：\n{{ $('Build control row').first().json._carry.projectFolderUrl }}\n\n專案紀錄 Docs：\n{{ $('Build control row').first().json._carry.docUrl }}\n\n待辦追蹤表：\n{{ $('Build control row').first().json._carry.taskSheetUrl }}\n\n成果檢核表：\n{{ $('Build control row').first().json._carry.checklistSheetUrl }}\n\n建議下一步：\n1. 將公文與附件上傳到專案資料夾中的「00_原始公文與附件」。\n2. 若本案重要，手動建立 NotebookLM 筆記本。\n3. 將 NotebookLM 連結貼回行政專案總控表。\n4. 使用 Gemini 協助整理公文要求、待辦與成果草稿。\n5. 正式公告、經費與成果送出前仍需人工確認。\n\n此信由行政專案半自動工作流系統產生。",
+        "options": {}
+      },
+      "id": "send-mail",
+      "name": "Notify 承辦人",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [6200, 0],
+      "credentials": { "gmailOAuth2": { "id": "REPLACE_GMAIL_CRED_ID", "name": "Gmail account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Build control row').first().json._carry;\nreturn [{\n  json: {\n    ok: true,\n    projectCode: prep.projectCode,\n    projectName: prep.data['專案名稱'],\n    folderUrl: prep.projectFolderUrl,\n    docUrl: prep.docUrl,\n    taskSheetUrl: prep.taskSheetUrl,\n    checklistSheetUrl: prep.checklistSheetUrl,\n    calendarEventIds: prep.calendarEventIds || []\n  }\n}];\n"
+      },
+      "id": "summary",
+      "name": "Return summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [6440, 0]
+    }
+  ],
+  "connections": {
+    "When Called":                              { "main": [[{ "node": "Prepare", "type": "main", "index": 0 }]] },
+    "Prepare":                                  { "main": [[{ "node": "Find 03_專案資料夾", "type": "main", "index": 0 }]] },
+    "Find 03_專案資料夾":                       { "main": [[{ "node": "Resolve 03 folder id", "type": "main", "index": 0 }]] },
+    "Resolve 03 folder id":                     { "main": [[{ "node": "Create project folder", "type": "main", "index": 0 }]] },
+    "Create project folder":                    { "main": [[{ "node": "Carry project folder", "type": "main", "index": 0 }]] },
+    "Carry project folder":                     { "main": [[{ "node": "Explode subfolder list", "type": "main", "index": 0 }]] },
+    "Explode subfolder list":                   { "main": [[{ "node": "Create subfolder", "type": "main", "index": 0 }]] },
+    "Create subfolder":                         { "main": [[{ "node": "Collect subfolder ids", "type": "main", "index": 0 }]] },
+    "Collect subfolder ids":                    { "main": [[{ "node": "Create project Doc", "type": "main", "index": 0 }]] },
+    "Create project Doc":                       { "main": [[{ "node": "Carry Doc id", "type": "main", "index": 0 }]] },
+    "Carry Doc id":                             { "main": [[{ "node": "Doc batchUpdate (HTTP — heading styles)", "type": "main", "index": 0 }]] },
+    "Doc batchUpdate (HTTP — heading styles)":  { "main": [[{ "node": "Move Doc to 99_系統產生文件", "type": "main", "index": 0 }]] },
+    "Move Doc to 99_系統產生文件":              { "main": [[{ "node": "Carry Doc URL", "type": "main", "index": 0 }]] },
+    "Carry Doc URL":                            { "main": [[{ "node": "Create 待辦追蹤表", "type": "main", "index": 0 }]] },
+    "Create 待辦追蹤表":                        { "main": [[{ "node": "Carry task sheet id", "type": "main", "index": 0 }]] },
+    "Carry task sheet id":                      { "main": [[{ "node": "Fan out task rows", "type": "main", "index": 0 }]] },
+    "Fan out task rows":                        { "main": [[{ "node": "Append task rows", "type": "main", "index": 0 }]] },
+    "Append task rows":                         { "main": [[{ "node": "Task sheet batchUpdate (HTTP — validation + format)", "type": "main", "index": 0 }]] },
+    "Task sheet batchUpdate (HTTP — validation + format)": { "main": [[{ "node": "Move task sheet to 99", "type": "main", "index": 0 }]] },
+    "Move task sheet to 99":                    { "main": [[{ "node": "Create 成果檢核表", "type": "main", "index": 0 }]] },
+    "Create 成果檢核表":                        { "main": [[{ "node": "Carry checklist sheet id", "type": "main", "index": 0 }]] },
+    "Carry checklist sheet id":                 { "main": [[{ "node": "Fan out checklist rows", "type": "main", "index": 0 }]] },
+    "Fan out checklist rows":                   { "main": [[{ "node": "Append checklist rows", "type": "main", "index": 0 }]] },
+    "Append checklist rows":                    { "main": [[{ "node": "Checklist batchUpdate (HTTP — validation + format)", "type": "main", "index": 0 }]] },
+    "Checklist batchUpdate (HTTP — validation + format)": { "main": [[{ "node": "Move checklist to 99", "type": "main", "index": 0 }]] },
+    "Move checklist to 99":                     { "main": [[{ "node": "Expand calendar events", "type": "main", "index": 0 }]] },
+    "Expand calendar events":                   { "main": [[{ "node": "Create Calendar event", "type": "main", "index": 0 }]] },
+    "Create Calendar event":                    { "main": [[{ "node": "Collect event ids", "type": "main", "index": 0 }]] },
+    "Collect event ids":                        { "main": [[{ "node": "Build control row", "type": "main", "index": 0 }]] },
+    "Build control row":                        { "main": [[{ "node": "Append to 總控表", "type": "main", "index": 0 }]] },
+    "Append to 總控表":                         { "main": [[{ "node": "Notify 承辦人", "type": "main", "index": 0 }]] },
+    "Notify 承辦人":                            { "main": [[{ "node": "Return summary", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {}
+}

@@ -1,0 +1,74 @@
+{
+  "name": "GW-Admin / Entry (Google Forms) / Milestone",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gw-admin-milestone",
+        "responseMode": "responseNode",
+        "options": { "responsePropertyName": "body" }
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-800, 0],
+      "webhookId": "gw-admin-gf-milestone"
+    },
+    {
+      "parameters": {
+        "content": "## Google Forms entry — Milestone\n\nWebhook receives JSON from `apps-script-bridge.gs` deployed on your 專案階段日期新增表 response spreadsheet, and forwards to the shared core sub-workflow.",
+        "height": 220,
+        "width": 460,
+        "color": 4
+      },
+      "id": "sticky",
+      "name": "Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-800, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = {\n  ROOT_FOLDER_ID: 'YOUR_GOOGLE_DRIVE_ROOT_FOLDER_ID',\n  CONTROL_SHEET_ID: 'YOUR_CONTROL_SHEET_ID_FROM_SETUP',\n  CALENDAR_ID: 'primary',\n  ADMIN_EMAIL: 'admin@example.com',\n  TIMEZONE: 'Asia/Taipei'\n};\nconst body = $input.first().json.body || $input.first().json;\nconst data = body.data || {};\nconst expected = 'CHANGE_ME_SHARED_SECRET';\nif (body.token && body.token !== expected) throw new Error('Invalid token in webhook payload');\nif (Array.isArray(data['提醒設定'])) data['提醒設定'] = data['提醒設定'].join(', ');\nreturn [{ json: { data, config } }];\n"
+      },
+      "id": "config",
+      "name": "Config + normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-560, 0]
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "REPLACE_WITH_CORE_MILESTONE_WORKFLOW_ID", "mode": "id" },
+        "workflowInputs": { "mappingMode": "passThrough" },
+        "options": {}
+      },
+      "id": "call-core",
+      "name": "Call core",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [-320, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"added\", \"projectCode\": \"{{ $json.projectCode }}\", \"calendarEventIds\": {{ JSON.stringify($json.calendarEventIds || []) }} }",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-80, 0]
+    }
+  ],
+  "connections": {
+    "Webhook":            { "main": [[{ "node": "Config + normalize", "type": "main", "index": 0 }]] },
+    "Config + normalize": { "main": [[{ "node": "Call core", "type": "main", "index": 0 }]] },
+    "Call core":          { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {}
+}

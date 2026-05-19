@@ -1,0 +1,109 @@
+{
+  "name": "GW-Admin / Entry (n8n Form) / Milestone",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "專案階段日期新增表",
+        "formDescription": "用於既有行政專案後續新增重要日期、階段任務與 Calendar 提醒。請先從行政專案總控表確認專案編號。",
+        "formFields": {
+          "values": [
+            { "fieldLabel": "專案編號", "placeholder": "請填行政專案總控表中的專案編號", "requiredField": true },
+            { "fieldLabel": "專案名稱", "requiredField": true },
+            { "fieldLabel": "日期類型", "fieldType": "dropdown", "requiredField": true, "fieldOptions": { "values": [
+              { "option": "校內協調會" },
+              { "option": "第一次會議" },
+              { "option": "報名開始日" },
+              { "option": "報名截止日" },
+              { "option": "資料回收期限" },
+              { "option": "採購期限" },
+              { "option": "經費核銷期限" },
+              { "option": "活動前檢查日" },
+              { "option": "正式活動日期" },
+              { "option": "照片與成果資料回收日" },
+              { "option": "成果報告初稿期限" },
+              { "option": "成果送出期限" },
+              { "option": "結案檢討日" },
+              { "option": "其他" }
+            ] } },
+            { "fieldLabel": "日期", "fieldType": "date", "requiredField": true },
+            { "fieldLabel": "提醒設定", "fieldType": "dropdown", "multiselect": true, "fieldOptions": { "values": [
+              { "option": "當天提醒" },
+              { "option": "前1天提醒" },
+              { "option": "前3天提醒" },
+              { "option": "前7天提醒" },
+              { "option": "前14天提醒" }
+            ] } },
+            { "fieldLabel": "負責人", "requiredField": true },
+            { "fieldLabel": "負責人Email", "fieldType": "email", "requiredField": true },
+            { "fieldLabel": "是否寫入待辦追蹤表", "fieldType": "dropdown", "requiredField": true, "fieldOptions": { "values": [{ "option": "是" }, { "option": "否" }] } },
+            { "fieldLabel": "是否建立Calendar提醒", "fieldType": "dropdown", "requiredField": true, "fieldOptions": { "values": [{ "option": "是" }, { "option": "否" }] } },
+            { "fieldLabel": "說明", "fieldType": "textarea" },
+            { "fieldLabel": "備註", "fieldType": "textarea" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "form",
+      "name": "專案階段日期新增表",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2,
+      "position": [-800, 0],
+      "webhookId": "gw-admin-milestone"
+    },
+    {
+      "parameters": {
+        "content": "## n8n Form Trigger entry — Milestone\n\nForwards to `GW-Admin / Core / Milestone`. Fill `Config` with the same IDs you used for project-starter.",
+        "height": 200,
+        "width": 460,
+        "color": 4
+      },
+      "id": "sticky",
+      "name": "Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-800, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = {\n  ROOT_FOLDER_ID: 'YOUR_GOOGLE_DRIVE_ROOT_FOLDER_ID',\n  CONTROL_SHEET_ID: 'YOUR_CONTROL_SHEET_ID_FROM_SETUP',\n  CALENDAR_ID: 'primary',\n  ADMIN_EMAIL: 'admin@example.com',\n  TIMEZONE: 'Asia/Taipei'\n};\nconst data = { ...$input.first().json };\ndelete data.submittedAt;\ndelete data.formMode;\n// Multi-select 提醒設定 may come back as array; join into comma-separated to match Apps Script behaviour.\nif (Array.isArray(data['提醒設定'])) data['提醒設定'] = data['提醒設定'].join(', ');\nreturn [{ json: { data, config } }];\n"
+      },
+      "id": "config",
+      "name": "Config + normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-560, 0]
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "REPLACE_WITH_CORE_MILESTONE_WORKFLOW_ID", "mode": "id" },
+        "workflowInputs": {
+          "mappingMode": "passThrough"
+        },
+        "options": {}
+      },
+      "id": "call-core",
+      "name": "Call core",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [-320, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nreturn [{ json: { status: 'added', ...r } }];\n"
+      },
+      "id": "done",
+      "name": "Done",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-80, 0]
+    }
+  ],
+  "connections": {
+    "專案階段日期新增表": { "main": [[{ "node": "Config + normalize", "type": "main", "index": 0 }]] },
+    "Config + normalize": { "main": [[{ "node": "Call core", "type": "main", "index": 0 }]] },
+    "Call core":         { "main": [[{ "node": "Done", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {}
+}

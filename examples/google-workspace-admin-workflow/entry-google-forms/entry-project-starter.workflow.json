@@ -1,0 +1,74 @@
+{
+  "name": "GW-Admin / Entry (Google Forms) / Project Starter",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gw-admin-project-starter",
+        "responseMode": "responseNode",
+        "options": { "responsePropertyName": "body" }
+      },
+      "id": "webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-800, 0],
+      "webhookId": "gw-admin-gf-project-starter"
+    },
+    {
+      "parameters": {
+        "content": "## Google Forms entry — Project Starter\n\nWebhook receives the JSON payload posted by `apps-script-bridge.gs` (deployed on your Google Forms response spreadsheet).\n\nExpected request body:\n\n```json\n{\n  \"formName\": \"公文專案啟動表\",\n  \"data\": { \"專案名稱\": \"...\", \"承辦處室\": \"...\", ... },\n  \"submittedAt\": \"2026-05-20T10:00:00+08:00\",\n  \"submitterEmail\": \"user@example.com\"\n}\n```\n\nThe Config node merges in your IDs, then forwards to the shared core sub-workflow.",
+        "height": 360,
+        "width": 460,
+        "color": 4
+      },
+      "id": "sticky",
+      "name": "Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-800, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const config = {\n  ROOT_FOLDER_ID: 'YOUR_GOOGLE_DRIVE_ROOT_FOLDER_ID',\n  CONTROL_SHEET_ID: 'YOUR_CONTROL_SHEET_ID_FROM_SETUP',\n  CALENDAR_ID: 'primary',\n  ADMIN_EMAIL: 'admin@example.com',\n  TIMEZONE: 'Asia/Taipei'\n};\nconst body = $input.first().json.body || $input.first().json;\nconst data = body.data || {};\n// Verify a shared-secret token if you set one in the Apps Script bridge.\nconst expected = 'CHANGE_ME_SHARED_SECRET';\nif (body.token && body.token !== expected) {\n  throw new Error('Invalid token in webhook payload');\n}\nreturn [{ json: { data, config } }];\n"
+      },
+      "id": "config",
+      "name": "Config + normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-560, 0]
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "REPLACE_WITH_CORE_PROJECT_STARTER_WORKFLOW_ID", "mode": "id" },
+        "workflowInputs": { "mappingMode": "passThrough" },
+        "options": {}
+      },
+      "id": "call-core",
+      "name": "Call core",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [-320, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"created\", \"projectCode\": \"{{ $json.projectCode }}\", \"projectFolderUrl\": \"{{ $json.folderUrl }}\" }",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-80, 0]
+    }
+  ],
+  "connections": {
+    "Webhook":            { "main": [[{ "node": "Config + normalize", "type": "main", "index": 0 }]] },
+    "Config + normalize": { "main": [[{ "node": "Call core", "type": "main", "index": 0 }]] },
+    "Call core":          { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {}
+}

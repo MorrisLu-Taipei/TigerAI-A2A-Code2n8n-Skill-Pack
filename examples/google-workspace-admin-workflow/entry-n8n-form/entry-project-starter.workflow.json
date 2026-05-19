@@ -1,0 +1,96 @@
+{
+  "name": "GW-Admin / Entry (n8n Form) / Project Starter",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "公文專案啟動表",
+        "formDescription": "收到需要追蹤的公文或行政任務時，請填寫本表。送出後，系統會建立專案資料夾、專案紀錄、待辦追蹤表、成果檢核表與期限提醒。公文與附件請在專案建立完成後，自行上傳到專案資料夾的「00_原始公文與附件」。",
+        "formFields": {
+          "values": [
+            { "fieldLabel": "專案年度", "placeholder": "例如：115", "requiredField": true },
+            { "fieldLabel": "承辦處室", "placeholder": "例如：教務處、學務處、總務處、資訊組", "requiredField": true },
+            { "fieldLabel": "專案名稱", "placeholder": "例如：AI融入教學研習", "requiredField": true },
+            { "fieldLabel": "承辦人", "requiredField": true },
+            { "fieldLabel": "承辦人Email", "fieldType": "email", "requiredField": true },
+            { "fieldLabel": "協辦人員", "fieldType": "textarea" },
+            { "fieldLabel": "公文主旨" },
+            { "fieldLabel": "來文單位" },
+            { "fieldLabel": "公文日期", "fieldType": "date" },
+            { "fieldLabel": "公文文號" },
+            { "fieldLabel": "活動日期", "fieldType": "date" },
+            { "fieldLabel": "成果繳交期限", "fieldType": "date" },
+            { "fieldLabel": "經費核銷期限", "fieldType": "date" },
+            { "fieldLabel": "是否有經費", "fieldType": "dropdown", "fieldOptions": { "values": [{ "option": "是" }, { "option": "否" }, { "option": "不確定" }] } },
+            { "fieldLabel": "核定或預估金額" },
+            { "fieldLabel": "是否需要收家長或教師回覆", "fieldType": "dropdown", "fieldOptions": { "values": [{ "option": "是" }, { "option": "否" }, { "option": "不確定" }] } },
+            { "fieldLabel": "是否需要活動照片", "fieldType": "dropdown", "fieldOptions": { "values": [{ "option": "是" }, { "option": "否" }, { "option": "不確定" }] } },
+            { "fieldLabel": "是否需要成果報告", "fieldType": "dropdown", "fieldOptions": { "values": [{ "option": "是" }, { "option": "否" }, { "option": "不確定" }] } },
+            { "fieldLabel": "備註", "fieldType": "textarea" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "form",
+      "name": "公文專案啟動表",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2,
+      "position": [-800, 0],
+      "webhookId": "gw-admin-project-starter"
+    },
+    {
+      "parameters": {
+        "content": "## n8n Form Trigger entry — Project Starter\n\nFill the **Config** node with your Google IDs, then activate this workflow. Submitters fill the Form Trigger's public URL.\n\nForward to the shared core sub-workflow `GW-Admin / Core / Project Starter`.",
+        "height": 220,
+        "width": 460,
+        "color": 4
+      },
+      "id": "sticky",
+      "name": "Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-800, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fill these once and forget. Get IDs from `core-setup.workflow.json` first run.\nconst config = {\n  ROOT_FOLDER_ID: 'YOUR_GOOGLE_DRIVE_ROOT_FOLDER_ID',\n  CONTROL_SHEET_ID: 'YOUR_CONTROL_SHEET_ID_FROM_SETUP',\n  CALENDAR_ID: 'primary',\n  ADMIN_EMAIL: 'admin@example.com',\n  TIMEZONE: 'Asia/Taipei'\n};\n// Form Trigger output uses the field label as the JSON key, which already matches\n// Apps Script's namedValues keys exactly. So we pass it straight through.\nconst data = { ...$input.first().json };\n// Strip n8n's submitted-at fields if present\ndelete data.submittedAt;\ndelete data.formMode;\nreturn [{ json: { data, config } }];\n"
+      },
+      "id": "config",
+      "name": "Config + normalize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-560, 0]
+    },
+    {
+      "parameters": {
+        "workflowId": { "__rl": true, "value": "REPLACE_WITH_CORE_PROJECT_STARTER_WORKFLOW_ID", "mode": "id" },
+        "workflowInputs": {
+          "mappingMode": "passThrough"
+        },
+        "options": {}
+      },
+      "id": "call-core",
+      "name": "Call core",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [-320, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Optional: log to console / forward to monitoring channel.\nconst r = $input.first().json;\nreturn [{ json: { status: 'created', ...r } }];\n"
+      },
+      "id": "done",
+      "name": "Done",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-80, 0]
+    }
+  ],
+  "connections": {
+    "公文專案啟動表":   { "main": [[{ "node": "Config + normalize", "type": "main", "index": 0 }]] },
+    "Config + normalize": { "main": [[{ "node": "Call core", "type": "main", "index": 0 }]] },
+    "Call core":         { "main": [[{ "node": "Done", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {}
+}

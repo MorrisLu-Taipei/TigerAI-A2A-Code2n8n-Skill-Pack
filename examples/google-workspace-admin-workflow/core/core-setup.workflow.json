@@ -1,0 +1,302 @@
+{
+  "name": "GW-Admin / Core / One-time Setup",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger",
+      "name": "Manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-1000, 0]
+    },
+    {
+      "parameters": {
+        "content": "## One-time Setup (native nodes)\n\nRun this ONCE before activating any other workflow.\n\nWhat it does (matches `setupAdminWorkflow` minus form creation):\n\n1. Ensures these subfolders exist under your `ROOT_FOLDER_ID` (Google Drive nodes):\n   - `01_公文專案啟動表`\n   - `02_專案總控表`\n   - `03_專案資料夾`\n   - `04_專案階段日期新增表`\n   - `06_Apps Script`\n2. Creates `行政專案總控表` spreadsheet with sheets `行政專案總控表` and `專案階段日期紀錄` (Google Sheets node).\n3. Appends header rows to both sheets (Google Sheets append).\n4. Applies bold + light-blue formatting + frozen row to both header rows ⚠️ via HTTP `spreadsheets.batchUpdate`.\n5. Moves the control sheet into `02_專案總控表` (Google Drive move).\n6. Returns: `{ CONTROL_SHEET_ID, CONTROL_SHEET_URL, projectsParentFolderId }`.\n\nBefore running: fill the **Config** node with your `ROOT_FOLDER_ID`.",
+        "height": 480,
+        "width": 540,
+        "color": 4
+      },
+      "id": "sticky-overview",
+      "name": "Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-1000, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fill in ROOT_FOLDER_ID before running.\nconst config = {\n  ROOT_FOLDER_ID: 'YOUR_GOOGLE_DRIVE_ROOT_FOLDER_ID',\n  TIMEZONE: 'Asia/Taipei'\n};\nif (!config.ROOT_FOLDER_ID || config.ROOT_FOLDER_ID.startsWith('YOUR_')) {\n  throw new Error('請先在 Config 節點填入 ROOT_FOLDER_ID');\n}\nconst ROOT_SUBFOLDERS = [\n  '01_公文專案啟動表',\n  '02_專案總控表',\n  '03_專案資料夾',\n  '04_專案階段日期新增表',\n  '06_Apps Script'\n];\nconst controlHeaders = ['專案編號','專案名稱','年度','承辦處室','承辦人','承辦人Email','Drive資料夾連結','專案紀錄Docs連結','待辦追蹤表連結','成果檢核表連結','NotebookLM筆記本連結','專案狀態','備註','來文單位','公文文號','建立日期','活動日期','成果期限','經費期限','是否有經費'];\nconst milestoneHeaders = ['紀錄編號','新增時間','建立者Email','專案編號','專案名稱','日期類型','日期','提醒設定','負責人','負責人Email','是否寫入待辦追蹤表','是否建立Calendar提醒','說明','Calendar事件ID','對應待辦追蹤表連結','狀態','備註'];\nfunction headerRow(headers) { const o={}; for (const h of headers) o[h]=h; return o; }\nreturn [{ json: { config, ROOT_SUBFOLDERS, controlHeaders, milestoneHeaders, controlHeaderRow: headerRow(controlHeaders), milestoneHeaderRow: headerRow(milestoneHeaders) } }];\n"
+      },
+      "id": "config",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-760, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const { config, ROOT_SUBFOLDERS } = $input.first().json;\nconst base = $input.first().json;\nreturn ROOT_SUBFOLDERS.map(name => ({ json: { ...base, folderName: name } }));\n"
+      },
+      "id": "explode",
+      "name": "Explode subfolders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-520, 0]
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "=name='{{ $json.folderName }}' and mimeType='application/vnd.google-apps.folder' and '{{ $json.config.ROOT_FOLDER_ID }}' in parents and trashed=false",
+        "filter": { "driveScope": "user" },
+        "options": {}
+      },
+      "id": "search-folder",
+      "name": "Search subfolder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [-280, 0],
+      "credentials": { "googleDriveOAuth2Api": { "id": "REPLACE_GOOGLE_DRIVE_CRED_ID", "name": "Google Drive account" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            { "id": "exists", "leftValue": "={{ $items().length }}", "rightValue": 0, "operator": { "type": "number", "operation": "equals" } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-missing",
+      "name": "If missing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-40, 0]
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $('Explode subfolders').item.json.folderName }}",
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "__rl": true, "mode": "id", "value": "={{ $('Explode subfolders').item.json.config.ROOT_FOLDER_ID }}" },
+        "options": {}
+      },
+      "id": "create-missing",
+      "name": "Create missing folder",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [200, -160],
+      "credentials": { "googleDriveOAuth2Api": { "id": "REPLACE_GOOGLE_DRIVE_CRED_ID", "name": "Google Drive account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge results — each item is either an existing search hit or a freshly-created folder.\nconst all = $input.all();\nconst byName = {};\nfor (const it of all) {\n  const j = it.json;\n  if (j.name && j.id) byName[j.name] = j.id;\n}\nconst config = $('Config').first().json.config;\nconst base = $('Config').first().json;\nreturn [{ json: { ...base, rootSubfolderIds: byName, controlFolderId: byName['02_專案總控表'] } }];\n"
+      },
+      "id": "merge-rootfolders",
+      "name": "Collect root folders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "operation": "create",
+        "title": "行政專案總控表",
+        "sheetsUi": { "sheetValues": [ { "title": "行政專案總控表" }, { "title": "專案階段日期紀錄" } ] },
+        "options": {}
+      },
+      "id": "create-control-sheet",
+      "name": "Create 行政專案總控表",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [680, 0],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_GOOGLE_SHEETS_CRED_ID", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const created = $input.first().json;\nconst base = $('Collect root folders').first().json;\nreturn [{ json: { ...base, controlSheetId: created.spreadsheetId, controlSheetUrl: created.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${created.spreadsheetId}/edit` } }];\n"
+      },
+      "id": "carry-control",
+      "name": "Carry control sheet id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 0]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "={{ $json.controlSheetId }}" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "行政專案總控表" },
+        "dataMode": "autoMapInputData",
+        "fieldsUi": { "fieldValues": [] },
+        "options": {}
+      },
+      "id": "header-control",
+      "name": "Write 總控表 header row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1160, 0],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_GOOGLE_SHEETS_CRED_ID", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Feed header row as data items so autoMapInputData writes a row with header names as values.\nconst prep = $('Carry control sheet id').first().json;\nreturn [{ json: { ...prep, ...prep.controlHeaderRow } }];\n"
+      },
+      "id": "feed-control-headers",
+      "name": "Feed 總控表 header data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1160, -200]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "={{ $('Carry control sheet id').first().json.controlSheetId }}" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "專案階段日期紀錄" },
+        "dataMode": "autoMapInputData",
+        "fieldsUi": { "fieldValues": [] },
+        "options": {}
+      },
+      "id": "header-milestone",
+      "name": "Write 階段紀錄 header row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1400, 0],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_GOOGLE_SHEETS_CRED_ID", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Carry control sheet id').first().json;\nreturn [{ json: { ...prep, ...prep.milestoneHeaderRow } }];\n"
+      },
+      "id": "feed-milestone-headers",
+      "name": "Feed 階段紀錄 header data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, -200]
+    },
+    {
+      "parameters": {
+        "content": "### ⚠️ HTTP fallback — Sheets header bold + bg colour + frozen row\n\nNeeded because the native Google Sheets node has no operation for `repeatCell` (header formatting) or `updateSheetProperties` (frozen rows).\n\nThis call applies the standard light-blue bold header to BOTH sheets (`行政專案總控表` + `專案階段日期紀錄`) in one batchUpdate. Same fallback pattern as the project-starter core.",
+        "height": 280,
+        "width": 480,
+        "color": 5
+      },
+      "id": "sticky-format-http",
+      "name": "Why HTTP: Header format",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1640, -360]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build a batchUpdate body that needs the two sheets' internal numeric sheetIds.\n// We need the actual sheetIds (Google internally assigns them). Fetch via Drive? No —\n// use the Sheets API metadata: a separate GET would be cleaner; instead we encode by index.\n// In the freshly-created spreadsheet, sheet 0 = 行政專案總控表, sheet 1 = 專案階段日期紀錄\n// but Google sometimes assigns non-zero ids. Safer: refer by sheet *title*.\nconst prep = $('Carry control sheet id').first().json;\n// We'll use a small lookup pass via Sheets metadata in the next node.\nreturn [{ json: prep }];\n"
+      },
+      "id": "before-format",
+      "name": "Prep format body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1640, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $json.controlSheetId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "fields", "value": "sheets(properties(sheetId,title))" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-sheet-ids",
+      "name": "Get sheet numeric ids (HTTP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1880, 0],
+      "credentials": { "googleApi": { "id": "REPLACE_GOOGLE_GENERIC_CRED_ID", "name": "Google API (generic)" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Carry control sheet id').first().json;\nconst meta = $input.first().json;\nconst byTitle = {};\nfor (const s of (meta.sheets || [])) byTitle[s.properties.title] = s.properties.sheetId;\nconst controlSheetIdNum = byTitle['行政專案總控表'];\nconst milestoneSheetIdNum = byTitle['專案階段日期紀錄'];\nfunction headerFormatRequests(sheetId, columnCount) {\n  return [\n    { repeatCell: { range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: columnCount }, cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.92, green: 0.95, blue: 1 } } }, fields: 'userEnteredFormat(textFormat,backgroundColor)' } },\n    { updateSheetProperties: { properties: { sheetId, gridProperties: { frozenRowCount: 1 } }, fields: 'gridProperties.frozenRowCount' } }\n  ];\n}\nconst body = { requests: [\n  ...headerFormatRequests(controlSheetIdNum, prep.controlHeaders.length),\n  ...headerFormatRequests(milestoneSheetIdNum, prep.milestoneHeaders.length)\n]};\nreturn [{ json: { ...prep, _formatBody: body } }];\n"
+      },
+      "id": "build-format-body",
+      "name": "Build format batchUpdate body",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2120, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $json.controlSheetId }}:batchUpdate",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json._formatBody) }}",
+        "options": {}
+      },
+      "id": "format-headers",
+      "name": "Apply header formatting (HTTP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2360, 0],
+      "credentials": { "googleApi": { "id": "REPLACE_GOOGLE_GENERIC_CRED_ID", "name": "Google API (generic)" } }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "move",
+        "fileId": { "__rl": true, "mode": "id", "value": "={{ $('Carry control sheet id').first().json.controlSheetId }}" },
+        "driveId": { "__rl": true, "mode": "list", "value": "My Drive" },
+        "folderId": { "__rl": true, "mode": "id", "value": "={{ $('Carry control sheet id').first().json.controlFolderId }}" }
+      },
+      "id": "move-control",
+      "name": "Move control sheet to 02",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [2600, 0],
+      "credentials": { "googleDriveOAuth2Api": { "id": "REPLACE_GOOGLE_DRIVE_CRED_ID", "name": "Google Drive account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Carry control sheet id').first().json;\nreturn [{\n  json: {\n    ok: true,\n    CONTROL_SHEET_ID: prep.controlSheetId,\n    CONTROL_SHEET_URL: prep.controlSheetUrl,\n    rootSubfolderIds: prep.rootSubfolderIds,\n    nextSteps: [\n      '1. 把上面的 CONTROL_SHEET_ID 填回 entry-* workflow 的 Config 節點。',\n      '2. 之後送出公文專案啟動表會自動寫入這張總控表。',\n      '3. 若使用 Google Forms 入口，記得把 apps-script-bridge.gs 部署到對應的 Form 試算表。'\n    ]\n  }\n}];\n"
+      },
+      "id": "summary",
+      "name": "Return setup result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2840, 0]
+    }
+  ],
+  "connections": {
+    "Manual":                  { "main": [[{ "node": "Config", "type": "main", "index": 0 }]] },
+    "Config":                  { "main": [[{ "node": "Explode subfolders", "type": "main", "index": 0 }]] },
+    "Explode subfolders":      { "main": [[{ "node": "Search subfolder", "type": "main", "index": 0 }]] },
+    "Search subfolder":        { "main": [[{ "node": "If missing?", "type": "main", "index": 0 }]] },
+    "If missing?":             { "main": [
+                                   [{ "node": "Create missing folder", "type": "main", "index": 0 }],
+                                   [{ "node": "Collect root folders", "type": "main", "index": 0 }]
+                                ] },
+    "Create missing folder":   { "main": [[{ "node": "Collect root folders", "type": "main", "index": 0 }]] },
+    "Collect root folders":    { "main": [[{ "node": "Create 行政專案總控表", "type": "main", "index": 0 }]] },
+    "Create 行政專案總控表":   { "main": [[{ "node": "Carry control sheet id", "type": "main", "index": 0 }]] },
+    "Carry control sheet id":  { "main": [[{ "node": "Feed 總控表 header data", "type": "main", "index": 0 }]] },
+    "Feed 總控表 header data": { "main": [[{ "node": "Write 總控表 header row", "type": "main", "index": 0 }]] },
+    "Write 總控表 header row": { "main": [[{ "node": "Feed 階段紀錄 header data", "type": "main", "index": 0 }]] },
+    "Feed 階段紀錄 header data": { "main": [[{ "node": "Write 階段紀錄 header row", "type": "main", "index": 0 }]] },
+    "Write 階段紀錄 header row": { "main": [[{ "node": "Prep format body", "type": "main", "index": 0 }]] },
+    "Prep format body":        { "main": [[{ "node": "Get sheet numeric ids (HTTP)", "type": "main", "index": 0 }]] },
+    "Get sheet numeric ids (HTTP)": { "main": [[{ "node": "Build format batchUpdate body", "type": "main", "index": 0 }]] },
+    "Build format batchUpdate body": { "main": [[{ "node": "Apply header formatting (HTTP)", "type": "main", "index": 0 }]] },
+    "Apply header formatting (HTTP)":{ "main": [[{ "node": "Move control sheet to 02", "type": "main", "index": 0 }]] },
+    "Move control sheet to 02":{ "main": [[{ "node": "Return setup result", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {}
+}

@@ -1,0 +1,247 @@
+{
+  "name": "GW-Admin / Core / Milestone",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trigger",
+      "name": "When Called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [-1200, 0]
+    },
+    {
+      "parameters": {
+        "content": "## Milestone — Core sub-workflow (native nodes)\n\nInput: `{ data, config }` from an entry workflow.\n\n**data** — milestone form fields: 專案編號, 專案名稱, 日期類型, 日期, 提醒設定, 負責人, 負責人Email, 是否寫入待辦追蹤表, 是否建立Calendar提醒, 說明, 備註, 建立者Email (optional).\n**config** — same as the project-starter core.\n\nDoes:\n1. Validate required fields, parse date + reminder offsets.\n2. Look up the project in 行政專案總控表 by 專案編號 (Google Sheets lookup).\n3. If 「是否寫入待辦追蹤表」=「是」, append a row to that project's 待辦追蹤表 (Google Sheets).\n4. If 「是否建立Calendar提醒」=「是」, create N Calendar events — one per checked reminder offset (Google Calendar).\n5. Append a row to 專案階段日期紀錄 (Google Sheets).\n6. Email the 負責人 (Gmail).\n\n**No HTTP fallback needed** — every operation is supported by a native node.\n\nAll behaviour matches `onMilestoneFormSubmit` in the Apps Script original.",
+        "height": 460,
+        "width": 540,
+        "color": 4
+      },
+      "id": "sticky-overview",
+      "name": "Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-1200, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// PREPARE — validate + parse + compute reminder offsets + select stage.\nconst input = $input.first().json;\nconst data = input.data || {};\nconst config = input.config || {};\nconst REQUIRED = ['專案編號','專案名稱','日期類型','日期','負責人','負責人Email'];\nfor (const f of REQUIRED) if (!data[f] || String(data[f]).trim()==='') throw new Error('缺少必填欄位：'+f);\nfor (const c of ['CONTROL_SHEET_ID','CALENDAR_ID','TIMEZONE']) if (!config[c]) throw new Error('Missing config: '+c);\n\nfunction formatTs(date, tz, fmt) {\n  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit', hour12: false }).formatToParts(date).reduce((o,p)=>(o[p.type]=p.value,o),{});\n  const HH = parts.hour === '24' ? '00' : parts.hour;\n  return fmt.replace('yyyy', parts.year).replace('MM', parts.month).replace('dd', parts.day).replace('HH', HH).replace('mm', parts.minute).replace('ss', parts.second);\n}\nfunction parseDate(v) { if (!v) return null; if (v instanceof Date) return new Date(v.getTime()); const d=new Date(String(v).trim().replace(/-/g,'/')); return isNaN(d.getTime())?null:d; }\nfunction offsetDate(v, days) { const d=parseDate(v); if(!d) return null; d.setDate(d.getDate()+Number(days||0)); return d; }\nfunction toIsoDate(d) { if(!d) return null; return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }\nfunction fmtSheet(v) { const d=parseDate(v); if(!d) return String(v||''); return d.getFullYear()+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0'); }\nfunction isAffirmative(v) { const t=String(v||'').trim(); return t===''||t==='是'||t.toLowerCase()==='yes'||t.toLowerCase()==='true'; }\nfunction determineStage(t) {\n  t=String(t||'').trim();\n  if (['報名開始日','報名截止日','資料回收期限'].includes(t)) return '表單收件';\n  if (['採購期限','經費核銷期限'].includes(t)) return '經費';\n  if (['正式活動日期','活動前檢查日','校內協調會','第一次會議'].includes(t)) return '執行';\n  if (['照片與成果資料回收日','成果報告初稿期限','成果送出期限'].includes(t)) return '成果';\n  if (t==='結案檢討日') return '結案';\n  return '其他';\n}\nfunction parseReminderOptions(v) {\n  const t=String(v||'').trim(); if(!t) return [];\n  const m={'當天提醒':0,'前1天提醒':-1,'前3天提醒':-3,'前7天提醒':-7,'前14天提醒':-14};\n  return t.split(/[,，\\n]/).map(s=>s.trim()).filter(s=>s&&m[s]!==undefined).map(s=>({label:s,days:m[s]}));\n}\n\nconst now = new Date();\nconst tz = config.TIMEZONE;\nconst createdAt = formatTs(now, tz, 'yyyy/MM/dd HH:mm');\nconst recordId = 'M-' + formatTs(now, tz, 'yyyyMMdd-HHmmss');\nconst taskId = 'M' + formatTs(now, tz, 'MMddHHmmss');\nconst milestoneDate = parseDate(data['日期']);\nif (!milestoneDate) throw new Error('日期無法解析：'+data['日期']);\nlet reminders = parseReminderOptions(data['提醒設定']);\nif (!reminders.length) reminders=[{label:'當天提醒',days:0}];\nlet earliest = milestoneDate;\nfor (const r of reminders) { const c=offsetDate(milestoneDate, r.days); if (c && c<earliest) earliest=c; }\n\nreturn [{\n  json: {\n    config, data, createdAt, recordId, taskId,\n    milestoneDateIso: toIsoDate(milestoneDate),\n    milestoneDateText: fmtSheet(milestoneDate),\n    reminderEarliestText: fmtSheet(earliest),\n    reminders,\n    writeToTaskSheet: isAffirmative(data['是否寫入待辦追蹤表']),\n    createCalendarReminders: isAffirmative(data['是否建立Calendar提醒']),\n    stage: determineStage(data['日期類型'])\n  }\n}];\n"
+      },
+      "id": "prepare",
+      "name": "Prepare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-960, 0]
+    },
+    {
+      "parameters": {
+        "operation": "lookup",
+        "documentId": { "__rl": true, "mode": "id", "value": "={{ $json.config.CONTROL_SHEET_ID }}" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "行政專案總控表" },
+        "lookupColumn": "專案編號",
+        "lookupValue": "={{ $json.data['專案編號'] }}",
+        "options": { "returnFirstMatch": true, "returnAllMatches": false }
+      },
+      "id": "lookup-project",
+      "name": "Lookup project in 總控表",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [-720, 0],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_GOOGLE_SHEETS_CRED_ID", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Prepare').first().json;\nconst row = $input.first().json;\nif (!row || (!row['專案編號'] && !row.專案編號)) throw new Error('找不到專案編號：'+prep.data['專案編號']);\nfunction parseSpreadsheetIdFromUrl(url) {\n  const text = String(url||'').trim(); if(!text) return '';\n  let m = text.match(/\\/d\\/([a-zA-Z0-9_-]+)/); if (m) return m[1];\n  m = text.match(/[?&]id=([a-zA-Z0-9_-]+)/);  if (m) return m[1];\n  m = text.match(/^([a-zA-Z0-9_-]{20,})$/);    return m ? m[1] : '';\n}\nconst project = {\n  projectCode: row['專案編號'],\n  projectName: row['專案名稱'] || prep.data['專案名稱'],\n  folderUrl: row['Drive資料夾連結'] || '',\n  projectDocUrl: row['專案紀錄Docs連結'] || '',\n  taskSheetUrl: row['待辦追蹤表連結'] || '',\n  taskSheetId: parseSpreadsheetIdFromUrl(row['待辦追蹤表連結'] || ''),\n  checklistSheetUrl: row['成果檢核表連結'] || '',\n  owner: row['承辦人'] || '',\n  ownerEmail: row['承辦人Email'] || '',\n  status: row['專案狀態'] || ''\n};\nreturn [{ json: { ...prep, project } }];\n"
+      },
+      "id": "find-project",
+      "name": "Resolve project",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-480, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            { "id": "c1", "leftValue": "={{ $json.writeToTaskSheet && $json.project.taskSheetId }}", "rightValue": "", "operator": { "type": "boolean", "operation": "true", "singleValue": true } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-write-task",
+      "name": "Write to 待辦追蹤表?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-240, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $input.first().json;\nconst row = {\n  '任務編號': prep.taskId,\n  '階段': prep.stage,\n  '任務名稱': '【' + prep.data['日期類型'] + '】' + (prep.project.projectName || prep.data['專案名稱'] || ''),\n  '任務說明': ['階段日期：'+prep.milestoneDateText,'提醒設定：'+(prep.data['提醒設定']||'當天提醒'),'說明：'+(prep.data['說明']||'')].join('\\n'),\n  '負責人': prep.data['負責人'] || '',\n  '協助單位': '',\n  '期限': prep.milestoneDateText,\n  '提醒日期': prep.reminderEarliestText,\n  '狀態': '未開始',\n  '需要附件': '否',\n  '附件位置': '',\n  '備註': prep.data['備註'] || ''\n};\nreturn [{ json: { _carry: prep, ...row } }];\n"
+      },
+      "id": "build-task-row",
+      "name": "Build task row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, -160]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "={{ $json._carry.project.taskSheetId }}" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "待辦追蹤" },
+        "dataMode": "autoMapInputData",
+        "options": {}
+      },
+      "id": "append-task",
+      "name": "Append to 待辦追蹤表",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [240, -160],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_GOOGLE_SHEETS_CRED_ID", "name": "Google Sheets account" } },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Resolve project').first().json;\nreturn [{ json: prep }];\n"
+      },
+      "id": "after-task",
+      "name": "After task branch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2 },
+          "conditions": [
+            { "id": "c2", "leftValue": "={{ $json.createCalendarReminders }}", "rightValue": "", "operator": { "type": "boolean", "operation": "true", "singleValue": true } }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-calendar",
+      "name": "Create Calendar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $input.first().json;\nconst { reminders, milestoneDateIso, project, data, config } = prep;\nfunction off(iso, days) { const d=new Date(iso); if (isNaN(d.getTime())) return null; d.setDate(d.getDate()+Number(days||0)); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }\nconst description = [\n  '專案編號：'+(project.projectCode||data['專案編號']||''),\n  '專案名稱：'+(project.projectName||data['專案名稱']||''),\n  '日期類型：'+(data['日期類型']||''),\n  '日期：'+prep.milestoneDateText,\n  '負責人：'+(data['負責人']||''),\n  '負責人Email：'+(data['負責人Email']||''),\n  '說明：'+(data['說明']||''),\n  '',\n  'Drive 專案資料夾：'+(project.folderUrl||''),\n  '待辦追蹤表：'+(project.taskSheetUrl||''),\n  '',\n  '提醒：正式公告、經費核銷與成果送出仍需人工確認。'\n].join('\\n');\nreturn reminders.map(r => {\n  const iso = off(milestoneDateIso, r.days);\n  const title = `【${r.label}｜${data['日期類型']||'階段日期'}】${project.projectName||data['專案名稱']||''}`;\n  return { json: { ...prep, _eventTitle: title, _eventDate: iso, _eventDescription: description, _calendarId: config.CALENDAR_ID } };\n});\n"
+      },
+      "id": "expand-reminders",
+      "name": "Expand reminders",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [960, -160]
+    },
+    {
+      "parameters": {
+        "calendar": { "__rl": true, "mode": "id", "value": "={{ $json._calendarId }}" },
+        "start": "={{ $json._eventDate }}T00:00:00",
+        "end":   "={{ $json._eventDate }}T23:59:59",
+        "additionalFields": {
+          "allday": "yes",
+          "summary": "={{ $json._eventTitle }}",
+          "description": "={{ $json._eventDescription }}"
+        }
+      },
+      "id": "create-event",
+      "name": "Create Calendar event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.2,
+      "position": [1200, -160],
+      "credentials": { "googleCalendarOAuth2Api": { "id": "REPLACE_GOOGLE_CALENDAR_CRED_ID", "name": "Google Calendar account" } },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const all = $input.all();\nconst prep = $('After task branch').first().json;\nconst eventIds = all.map(it => it.json.id).filter(Boolean);\nreturn [{ json: { ...prep, calendarEventIds: eventIds } }];\n"
+      },
+      "id": "collect-events",
+      "name": "Collect event ids",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1440, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $input.first().json;\nconst row = {\n  '紀錄編號': prep.recordId,\n  '新增時間': prep.createdAt,\n  '建立者Email': prep.data['建立者Email'] || prep.data['負責人Email'] || '',\n  '專案編號': prep.data['專案編號'] || '',\n  '專案名稱': prep.project.projectName || prep.data['專案名稱'] || '',\n  '日期類型': prep.data['日期類型'] || '',\n  '日期': prep.milestoneDateText,\n  '提醒設定': prep.data['提醒設定'] || '',\n  '負責人': prep.data['負責人'] || '',\n  '負責人Email': prep.data['負責人Email'] || '',\n  '是否寫入待辦追蹤表': prep.data['是否寫入待辦追蹤表'] || '是',\n  '是否建立Calendar提醒': prep.data['是否建立Calendar提醒'] || '是',\n  '說明': prep.data['說明'] || '',\n  'Calendar事件ID': (prep.calendarEventIds || []).join(', '),\n  '對應待辦追蹤表連結': prep.project.taskSheetUrl || '',\n  '狀態': '有效',\n  '備註': prep.data['備註'] || ''\n};\nreturn [{ json: { _carry: prep, ...row } }];\n"
+      },
+      "id": "build-record",
+      "name": "Build 階段紀錄 row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1680, 0]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "={{ $json._carry.config.CONTROL_SHEET_ID }}" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "專案階段日期紀錄" },
+        "dataMode": "autoMapInputData",
+        "options": {}
+      },
+      "id": "append-record",
+      "name": "Append to 階段日期紀錄",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1920, 0],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_GOOGLE_SHEETS_CRED_ID", "name": "Google Sheets account" } }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Build 階段紀錄 row').first().json._carry.data['負責人Email'] }}",
+        "subject": "=【專案階段日期已新增】{{ $('Build 階段紀錄 row').first().json._carry.project.projectName || $('Build 階段紀錄 row').first().json._carry.data['專案名稱'] || '' }}",
+        "emailType": "text",
+        "message": "={{ ($('Build 階段紀錄 row').first().json._carry.data['負責人'] || '') }} 老師您好：\n\n已新增專案階段日期。\n\n專案編號：{{ $('Build 階段紀錄 row').first().json._carry.project.projectCode || $('Build 階段紀錄 row').first().json._carry.data['專案編號'] || '' }}\n專案名稱：{{ $('Build 階段紀錄 row').first().json._carry.project.projectName || $('Build 階段紀錄 row').first().json._carry.data['專案名稱'] || '' }}\n日期類型：{{ $('Build 階段紀錄 row').first().json._carry.data['日期類型'] || '' }}\n日期：{{ $('Build 階段紀錄 row').first().json._carry.milestoneDateText }}\n提醒設定：{{ $('Build 階段紀錄 row').first().json._carry.data['提醒設定'] || '未設定' }}\nCalendar Event ID：{{ ($('Build 階段紀錄 row').first().json._carry.calendarEventIds || []).join(', ') || '未建立' }}\n\nDrive 專案資料夾：\n{{ $('Build 階段紀錄 row').first().json._carry.project.folderUrl || '' }}\n\n待辦追蹤表：\n{{ $('Build 階段紀錄 row').first().json._carry.project.taskSheetUrl || '' }}\n\n說明：\n{{ $('Build 階段紀錄 row').first().json._carry.data['說明'] || '' }}\n\n提醒：正式公告、經費核銷與成果送出仍需人工確認。",
+        "options": {}
+      },
+      "id": "send-mail",
+      "name": "Notify 負責人",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [2160, 0],
+      "credentials": { "gmailOAuth2": { "id": "REPLACE_GMAIL_CRED_ID", "name": "Gmail account" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const prep = $('Build 階段紀錄 row').first().json._carry;\nreturn [{\n  json: {\n    ok: true,\n    projectCode: prep.project.projectCode,\n    projectName: prep.project.projectName,\n    dateType: prep.data['日期類型'],\n    milestoneDate: prep.milestoneDateText,\n    calendarEventIds: prep.calendarEventIds || [],\n    recordId: prep.recordId\n  }\n}];\n"
+      },
+      "id": "summary",
+      "name": "Return summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2400, 0]
+    }
+  ],
+  "connections": {
+    "When Called":             { "main": [[{ "node": "Prepare", "type": "main", "index": 0 }]] },
+    "Prepare":                 { "main": [[{ "node": "Lookup project in 總控表", "type": "main", "index": 0 }]] },
+    "Lookup project in 總控表":{ "main": [[{ "node": "Resolve project", "type": "main", "index": 0 }]] },
+    "Resolve project":         { "main": [[{ "node": "Write to 待辦追蹤表?", "type": "main", "index": 0 }]] },
+    "Write to 待辦追蹤表?":    { "main": [
+                                  [{ "node": "Build task row", "type": "main", "index": 0 }],
+                                  [{ "node": "After task branch", "type": "main", "index": 0 }]
+                                ] },
+    "Build task row":          { "main": [[{ "node": "Append to 待辦追蹤表", "type": "main", "index": 0 }]] },
+    "Append to 待辦追蹤表":    { "main": [[{ "node": "After task branch", "type": "main", "index": 0 }]] },
+    "After task branch":       { "main": [[{ "node": "Create Calendar?", "type": "main", "index": 0 }]] },
+    "Create Calendar?":        { "main": [
+                                  [{ "node": "Expand reminders", "type": "main", "index": 0 }],
+                                  [{ "node": "Collect event ids", "type": "main", "index": 0 }]
+                                ] },
+    "Expand reminders":        { "main": [[{ "node": "Create Calendar event", "type": "main", "index": 0 }]] },
+    "Create Calendar event":   { "main": [[{ "node": "Collect event ids", "type": "main", "index": 0 }]] },
+    "Collect event ids":       { "main": [[{ "node": "Build 階段紀錄 row", "type": "main", "index": 0 }]] },
+    "Build 階段紀錄 row":      { "main": [[{ "node": "Append to 階段日期紀錄", "type": "main", "index": 0 }]] },
+    "Append to 階段日期紀錄":  { "main": [[{ "node": "Notify 負責人", "type": "main", "index": 0 }]] },
+    "Notify 負責人":           { "main": [[{ "node": "Return summary", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {}
+}
