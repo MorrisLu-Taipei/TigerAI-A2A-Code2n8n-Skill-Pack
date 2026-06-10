@@ -1,5 +1,39 @@
 # Changelog
 
+## v0.22.2 — on-prem 範例安全缺陷揭露（不修補，公開警告）
+
+由使用者主動指出後稽核：[`examples/line-ai-customer-service-onprem/`](examples/line-ai-customer-service-onprem/) 的上游 POC 程式碼**不是**可上線實作。**我們選擇公開揭露而不靜悄悄打補丁** — 因為這些缺陷本身就是 Code2n8n 的教學重點（AI 寫的能跑 ≠ 能上線），偷修會誤導讀者也偏離 CREDITS.md 寫的「Morris Lu 沒做這層硬化」事實。
+
+### 新增揭露文件：[`examples/line-ai-customer-service-onprem/SECURITY-CAVEATS.md`](examples/line-ai-customer-service-onprem/SECURITY-CAVEATS.md)
+
+逐項稽核 + 程式行號 + 重現方式：
+
+- ❌ `/api/auth/me` 永遠回 `{ authenticated: true }`，零 session/JWT 檢查（`auth.ts:27-30`）
+- ❌ Login 用**明文密碼** SQL 比對（`auth.ts:10`）
+- ❌ 所有 `/api/*` 資料路由完全裸奔：settings 讀寫、user_states 讀寫、reset-handover、logs add/search、upload、n8n credential listing、qdrant collections — 全無 auth middleware
+- ❌ **SQL identifier injection**：`updateSettings` 把 `req.body` 的 key 直接拼進 INSERT/UPDATE SQL（`db.ts:23-44`）— 攻擊者可從欄位名注入任意 SQL
+- ❌ 無 CSRF、無 rate limit、無 audit log、無 helmet、無 CORS 鎖定
+- ❌ `GET /api/settings/n8n/credentials` 外露 n8n credential 名稱清單
+
+包含 10 步硬化清單（middleware → session → bcrypt → SQL whitelist → CSRF → rate limit → audit log → 端點下架 / 縮窄 → 檔案上傳加固 → 金鑰 env / encryption），給想 fork 上線的人作為起點。
+
+### 周邊文件下修「企業上線」過度承諾
+
+- On-prem README 開頭加紅旗 banner + 速查清單
+- 「適合誰」欄改為「**不是**企業可上線版 — 安全層有重大缺陷」
+- 「Enterprise-grade real-world variant」字眼下修為「Real-world POC port」
+- CREDITS.md 新增「Security audit performed, NOT patched」段落，明確 pack 的立場：揭露 ≠ 修補
+- CODE2N8N.md 案例清單加 ⚠️ 提示與 SECURITY-CAVEATS 連結
+
+### Marquee skill 升級
+
+`code-to-workflow` SKILL.md：
+
+- **新硬規則 §3**「Audit auth + injection before calling the port 'enterprise-grade'」— 列出最常見 POC 認證 / 注入模式；若不修就**必須**寫 SECURITY-CAVEATS.md
+- **新步驟 1.5**「Security audit」— 10 項稽核 checklist（涵蓋 `/me` 真實檢查、middleware 覆蓋、密碼 hashing、identifier injection、CSRF、rate limit、audit log、secret 外露、檔案上傳）
+
+這次升級確保未來用 Code2n8n 做客戶案場移植時，安全稽核強制納入流程，避免重複本次「漂亮但裸奔」的失誤。
+
 ## v0.22.1 — 整套 pack 改授權為 MIT
 
 整個 repo 的授權從 *TigerAI Proprietary* 改為 **MIT**。原本就 MIT 的部分（vendor skills、reference-workflows、兩個從 MIT 上游衍生的 LINE CS 範例）維持原樣，這次是把「其餘 TigerAI 自製內容」也一起標成 MIT，整個 pack 一致。

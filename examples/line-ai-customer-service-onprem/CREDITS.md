@@ -46,8 +46,9 @@ upstream (cloud / Netlify + Supabase)
 
 - **Packager**: Morris Lu + Claude Code, 2026-06-10
 - **License**: MIT inheritance preserved; this `CREDITS.md` + the upstream `LICENSE` file remain in the example folder
-- **Sanitisation**: one hard-coded `OPENWEBUI_API_KEY` value in `docker-compose.yml` was replaced with an environment-variable placeholder before commit. No other secrets were detected in the copied files. The `n8n-backup/` folder (containing `creds_backup.json`) was **not** copied.
+- **Sanitisation**: one hard-coded `OPENWEBUI_API_KEY` value in `docker-compose.yml` was replaced with an environment-variable placeholder before commit. No other API key / secret values were detected in the copied files. The `n8n-backup/` folder (containing `creds_backup.json`) was **not** copied.
 - **Scope shipped**: docs, SDD, DEV_LOG, LESSON_LEARNED, WALKTHROUGH_N8N, n8n_workflow_export.json, docker-compose.yml + Dockerfiles, supabase_schema.sql, full React + Express src/ tree. **Not shipped**: `node_modules/`, `package-lock.json`, `uploads/`, `n8n-backup/`.
+- **Security audit performed, NOT patched**: the pack performed a security audit *after* bundling and documented every finding in [`SECURITY-CAVEATS.md`](SECURITY-CAVEATS.md) — no real authentication on `/api/auth/me` or any `/api/*` data route, SQL identifier injection in `updateSettings`, plaintext passwords, exposed n8n credential names + Qdrant collection names, missing CSRF / rate limit / audit log / helmet / CORS. **We chose to disclose, not silently patch**, because the vulnerabilities themselves are part of the Code2n8n teaching: AI-written code that runs is not the same as code that's enterprise-deployable, and modifying upstream behaviour without disclosure would misrepresent the case study. To deploy, fork and apply the 10-step hardening checklist at the end of `SECURITY-CAVEATS.md`.
 
 ## How to cite this case study
 

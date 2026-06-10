@@ -93,7 +93,7 @@ SaaS─┘
 **三大實證案例**（marquee skill 從這三份案例的真實踩坑經驗中淬煉而成）：
 - **[`examples/google-workspace-admin-workflow/`](examples/google-workspace-admin-workflow/)** — 1,373 行 Apps Script → n8n 完整移植，含逐行出處 `PROVENANCE.md`
 - **[`examples/line-ai-customer-service/`](examples/line-ai-customer-service/)** — Netlify + Supabase 雲端版 → n8n + approach C 自托管後台
-- **[`examples/line-ai-customer-service-onprem/`](examples/line-ai-customer-service-onprem/)** — **同一系統的地端 Docker 演化版**（MIT 練習案例）：Postgres + Redis + Qdrant + Ollama + RAG，37 節點 n8n 動態大腦，含 5 階段 V&V 與 5 個實戰雷點。對照另一個雲端版，可以看「同一程式可以走不同 Code2n8n 路徑」
+- **[`examples/line-ai-customer-service-onprem/`](examples/line-ai-customer-service-onprem/)** — **同一系統的地端 Docker 演化版**（MIT 練習案例，⚠️ **不可上線**，安全層有重大缺陷見其 [`SECURITY-CAVEATS.md`](examples/line-ai-customer-service-onprem/SECURITY-CAVEATS.md)）：Postgres + Redis + Qdrant + Ollama + RAG，37 節點 n8n 動態大腦，含 5 階段 V&V 與 5 個實戰雷點 + 安全缺陷揭露。對照另一個雲端版，可以看「同一程式可以走不同 Code2n8n 路徑」
 
 - **[`examples/tigerai-flagship/`](examples/tigerai-flagship/)** — 三大旗艦範例：原子化編排、Universal Worker、Skill-Driven 整合
 

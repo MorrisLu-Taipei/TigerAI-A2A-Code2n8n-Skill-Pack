@@ -34,10 +34,11 @@ Read at least one before using this skill — they are the empirical ground trut
 
 1. **Never strip the upstream license / attribution.** Code2n8n is a derivative-work pattern. Always copy LICENSE, write a CREDITS.md, and record the attribution chain (upstream → derivative changes → this pack). The MIT case study (line-ai-customer-service-onprem) is the template.
 2. **Scrub secrets before commit.** Real API keys, JWTs, OAuth tokens, hard-coded passwords in `.env*` / `docker-compose.yml` / `config.*.json` / source code must be replaced with env-var placeholders. Do a `grep -rn "sk-[a-zA-Z0-9]\{20,\}\|ghp_\|AIza\|password.*=.*[a-zA-Z0-9]\{8,\}"` pass before staging.
-3. **Don't claim n8n can replace a UI.** If the input has a React SPA / admin dashboard / interactive console, n8n cannot host that natively. Use the **frontend portability decision tree** (Step 4 below) and document the choice honestly in the SDD.
-4. **Preserve fidelity.** If the upstream has "10 default tasks" / "14 dropdown choices" / "5 reminder offsets", the port keeps those exactly — and `PROVENANCE.md` maps each preserved item to the upstream line number, pinned to a specific commit SHA.
-5. **Always validate before declaring done.** Run the 3-layer funnel (Step 6 below) — *especially* the local n8n REST import. Lint passing alone is not enough.
-6. **Tag local imports.** Any workflow imported into the user's local n8n must carry `[Claude YYYY-MM-DD]` name prefix + `claude-import-YYYY-MM-DD` tag + `active: false`. See the memory note `n8n-local-import-marking`.
+3. **Audit auth + injection before calling the port "enterprise-grade".** Most AI-coded POCs ship with `/me`-always-returns-true style auth stubs, plaintext passwords, missing middleware, and identifier-injection patterns (raw `req.body` keys concatenated into SQL). The real-world example [`line-ai-customer-service-onprem`](../../../examples/line-ai-customer-service-onprem/) has all of these — see its [`SECURITY-CAVEATS.md`](../../../examples/line-ai-customer-service-onprem/SECURITY-CAVEATS.md). **If you find these and don't fix them, you MUST publish a SECURITY-CAVEATS.md (or equivalent), downgrade any "enterprise-ready" / "production" wording, and tell the reader exactly what to harden before deploying.** Disclose, don't silently patch — silent patching misrepresents the case study and lets the next porter inherit the same blind spot.
+4. **Don't claim n8n can replace a UI.** If the input has a React SPA / admin dashboard / interactive console, n8n cannot host that natively. Use the **frontend portability decision tree** (Step 4 below) and document the choice honestly in the SDD.
+5. **Preserve fidelity.** If the upstream has "10 default tasks" / "14 dropdown choices" / "5 reminder offsets", the port keeps those exactly — and `PROVENANCE.md` maps each preserved item to the upstream line number, pinned to a specific commit SHA.
+6. **Always validate before declaring done.** Run the 3-layer funnel (Step 6 below) — *especially* the local n8n REST import. Lint passing alone is not enough.
+7. **Tag local imports.** Any workflow imported into the user's local n8n must carry `[Claude YYYY-MM-DD]` name prefix + `claude-import-YYYY-MM-DD` tag + `active: false`. See the memory note `n8n-local-import-marking`.
 
 ## The 7-step methodology
 
@@ -53,6 +54,27 @@ Read the upstream repo and list:
 | **Data stores** | DB schema tables + columns, Redis keys, S3 buckets, vector DBs |
 | **UI vs backend** | which files are HTML/JSX/SPA (UI), which are server-side (logic). UI does **not** port to n8n. |
 | **Sensitive config** | which env vars / secrets the app needs at runtime. Plan how to feed them to n8n. |
+
+### Step 1.5 — Security audit (mandatory before any "enterprise" claim)
+
+Most AI-coded POCs ship with severe auth / injection holes that you MUST detect before you tell the user the port is deployable. Minimum checklist:
+
+| Check | Where to look | How |
+| --- | --- | --- |
+| Real auth on `/me` / session check | `routes/auth.ts` (or equivalent) | `/me` must verify a cookie / JWT, **not** return a constant `authenticated: true` |
+| Middleware protecting `/api/*` data routes | server entry (`index.ts`, `app.js`) | Look for `app.use('/api', requireAuth, …)` — if absent, every data endpoint is open |
+| Password handling | login route + user table schema | bcrypt/argon2 hash required; **plaintext is automatic fail** |
+| Identifier injection | any `Object.keys(req.body)`+`f => `${f}=$${i}`` pattern | Field NAMES from request body concatenated into SQL → injection. Use a whitelist of allowed columns |
+| Value injection | every `query(`SELECT … WHERE x = '${...}'`)` | Even with parameterised values, look for string-interpolated identifiers (table / column names) |
+| CSRF on state-changing routes | POST / PATCH / DELETE handlers | Need CSRF token or SameSite=Strict cookies |
+| Rate limiting on login | `/api/auth/login` route | Should have `express-rate-limit` or similar |
+| Audit logging on settings / user-state writes | Look for an audit table or `INSERT INTO audit_log` | Absence is fine for POC; required for "enterprise" |
+| Secret exposure | `GET /api/settings`, n8n credential listing endpoints | Check whether the response body includes API keys / tokens. Should never return raw secrets |
+| File upload | `multer` / `formidable` configs | Auth required, MIME whitelist, size cap, scan, sanitise filename, isolated storage |
+
+**If any check fails and you do not fix it**, you MUST publish a [`SECURITY-CAVEATS.md`](../../../examples/line-ai-customer-service-onprem/SECURITY-CAVEATS.md)-style file in the example folder with: the file/line of each issue, repro instructions, the correct fix pattern, and a "DO NOT DEPLOY AS-IS" banner in the README. The on-prem LINE CS case in this pack is the template — read it before doing your own audit so you know what the artifact looks like.
+
+**If you do fix** something the upstream had wrong, the patches must show up in **your** `CREDITS.md` as your contribution, separate from the upstream's design.
 
 For a small repo (<2000 lines) this fits in one Python snippet:
 

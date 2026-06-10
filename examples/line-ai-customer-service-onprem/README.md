@@ -1,7 +1,18 @@
 # LINE AI 客服系統 — 地端 Docker 版（Code2n8n 案例）
 
 > 🌐 **繁體中文** | [English summary at bottom](#english-summary)
-> 📦 **這是一份 Code2n8n 練習案例**：我們拿一個 **MIT 授權** 的開源專案當原始素材，跑完整的 **Code2n8n** 流程（盤點 → 分區 → n8n workflow → 文件 → 驗證），把成果完整放在這裡讓你照著學或照著抄。
+>
+> ## ⚠️ 安全警告（必讀）
+>
+> **本範例不可公開部署。** 上游 POC 程式碼有**零真實認證**（`/api/auth/me` 永遠回登入成功 + 所有 `/api/*` 資料路由完全裸奔）和 **SQL identifier injection**（`updateSettings` 把 request body 的 key 直接拼進 SQL）。明文密碼、無 CSRF / rate limit / audit log、n8n credential 名單外露⋯⋯
+>
+> **完整清單與重現方式見 [`SECURITY-CAVEATS.md`](SECURITY-CAVEATS.md)。**
+>
+> 我們**主動稽核並公開揭露**，而不靜悄悄打補丁 — 因為這些缺陷本身就是 Code2n8n 的教學重點（AI 寫的程式能跑 ≠ 能上線）。要上線請 fork 後依 SECURITY-CAVEATS 末段的 10 步驟硬化。
+>
+> ---
+>
+> 📦 **這是一份 Code2n8n 練習案例**：我們拿一個 **MIT 授權** 的開源 POC 當原始素材，跑完整的 **Code2n8n** 流程（盤點 → 分區 → n8n workflow → 文件 → 驗證），把成果完整放在這裡讓你照著學或照著抄 — 但**不要直接上線**。
 
 ---
 
@@ -27,12 +38,12 @@
 | 資料庫 | Supabase（雲）| Postgres + Redis + Qdrant（全自家容器） |
 | AI 模型 | OpenAI、Gemini | OpenAI、Gemini、**Ollama 地端 LLM** |
 | 知識庫 | reference_file_url 純文字 / PDF | **Qdrant 向量 RAG**（適合大型 PDF） |
-| 後台認證 | `LINECS_ADMIN_TOKEN` 共享 token | 真實帳號（Postgres `users` 表） |
+| 後台認證 | `LINECS_ADMIN_TOKEN` 共享 token | **僅有 login form + 明文密碼比對**；`/me` 永遠回登入成功；無 session/JWT；資料路由全裸奔（見 [`SECURITY-CAVEATS.md`](SECURITY-CAVEATS.md)） |
 | 去重 | Supabase PK 衝突 | **Redis TTL + Postgres**（雙層、企業級） |
 | n8n workflow | 我們自己用 core+entry 拆法手刻 | 上游已有 `n8n_workflow_export.json`（37 節點，Switch on `active_ai` → 三條 RAG 線） |
 | 後台 UI | n8n 自托管薄管理 shim（approach C） | 完整 React Dashboard / AgentService / Login |
 | 驗證 | lint + n8n REST import | **5 階段 V&V**（Infra / API / UI / HMR / E2E）+ 真實 PASS 紀錄 |
-| 適合誰 | 學 Code2n8n **核心方法論**（最小可移植版） | 學 Code2n8n **企業上線版**（含實戰雷點與部署） |
+| 適合誰 | 學 Code2n8n **核心方法論**（最小可移植版） | 學 Code2n8n **方法論的踩坑紀錄 + 容器化部署模板**（**不是**「企業可上線版」 — 安全層有重大缺陷，見 SECURITY-CAVEATS） |
 
 兩個並排看，就能體會 Code2n8n 的核心思想：**同一個程式系統，依企業需求可以走不同的移植路徑**。
 
@@ -95,13 +106,20 @@ line-ai-customer-service-onprem/
 
 ---
 
-## ⚠️ 安全提醒
+## ⚠️ 安全提醒（必讀）
 
-匯入時請注意：
+**完整稽核結果在 [`SECURITY-CAVEATS.md`](SECURITY-CAVEATS.md)。** 速查版：
 
-- `docker-compose.yml` 的 `OPENWEBUI_API_KEY` 已改為環境變數 placeholder（原值已 scrub）—請自己設 env var
-- `supabase_schema.sql` 與 `src/server/schema.sql` 只含 schema 結構，無預植入金鑰
-- 上線前請改掉 onboarding.md 提到的預設管理員 `admin@tigerai.tw / admin123`
+- ❌ **`/api/auth/me` 永遠回登入成功** — 無 session、無 JWT
+- ❌ **所有 `/api/*` 資料路由完全裸奔** — settings 含金鑰可被任意讀寫、user_states 可被任意修改、上傳可被任意觸發
+- ❌ **`updateSettings` SQL identifier injection** — request body 的 key 直接拼進 SQL
+- ❌ **明文密碼** — `users.password` 沒 hash
+- ❌ **n8n credential 名單外露** — `GET /api/settings/n8n/credentials`
+- ❌ **無 CSRF / rate limit / helmet / audit log / CORS 鎖定**
+- ✅ `docker-compose.yml` 的 `OPENWEBUI_API_KEY` 已改為環境變數 placeholder（原值已 scrub）
+- ✅ `supabase_schema.sql` 與 `src/server/schema.sql` 只含 schema 結構，無預植入金鑰
+
+**結論**：本範例供方法論學習、容器化部署參考、Code2n8n 移植踩坑紀錄。**禁止直接上線。** 要上線請 fork 後執行 SECURITY-CAVEATS 末段的 10 步硬化清單。
 
 ---
 
@@ -116,9 +134,11 @@ line-ai-customer-service-onprem/
 
 ## English summary
 
-A **Code2n8n case study** — we took an **MIT-licensed** open-source project (`scorpioliu0953/ai_customer_service`) and transformed its **Netlify + Supabase cloud version** into a **fully on-prem Docker stack** (Postgres + Redis + Qdrant + Ollama) with a matching n8n "dynamic-brain" workflow (37 nodes, Switch on `active_ai` → three RAG paths). Both **the deployable system** (Docker stack + React + Express) and **the methodology** (SDD + DEV_LOG + LESSON_LEARNED + WALKTHROUGH_N8N) are in this folder.
+**⚠️ Not production-safe.** A real-world POC port: we took an **MIT-licensed** open-source project (`scorpioliu0953/ai_customer_service`) and walked it through the full Code2n8n pipeline into an **on-prem Docker stack** (Postgres + Redis + Qdrant + Ollama) with a matching n8n "dynamic-brain" workflow (37 nodes, Switch on `active_ai` → three RAG paths). Both **the deployable system** (Docker + React + Express) and **the methodology** (SDD + DEV_LOG + LESSON_LEARNED + WALKTHROUGH_N8N) are in this folder.
 
-This is the **enterprise-grade real-world variant** of the simpler [`line-ai-customer-service/`](../line-ai-customer-service/) example: same upstream system, two different Code2n8n paths — cloud minimum vs on-prem production — so readers can compare both routes side-by-side and pick what fits their enterprise.
+**The upstream POC has zero real authentication and an SQL identifier-injection vulnerability** in `updateSettings`; we **disclosed but did not patch** (see [`SECURITY-CAVEATS.md`](SECURITY-CAVEATS.md)) because the vulnerabilities themselves are part of the Code2n8n teaching: "AI-written software that runs ≠ enterprise-deployable software."
+
+Pair this with the simpler [`line-ai-customer-service/`](../line-ai-customer-service/) example to see **the same upstream system on two Code2n8n paths**: cloud-minimum vs on-prem-with-RAG. Neither is shippable without hardening; both are honest Code2n8n teaching artefacts.
 
 The companion skill [`skills/tigerai/code-to-workflow`](../../skills/tigerai/code-to-workflow/SKILL.md) codifies the methodology this case study walked through.
 
