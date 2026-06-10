@@ -4,6 +4,8 @@
 
 從 [scorpioliu0953/ai_customer_service](https://github.com/scorpioliu0953/ai_customer_service)（Netlify + React + Supabase + GPT/Gemini）的 **後端 webhook** 移植到 n8n。
 
+> 💡 **想看同一系統的進階企業版？** 走 [`../line-ai-customer-service-onprem/`](../line-ai-customer-service-onprem/) — 同一上游、地端 Docker 演化、Ollama + Qdrant RAG、真實 5 階段 V&V。兩個範例並排可看「同一程式可走不同 Code2n8n 路徑」。完整方法論見 marquee skill [`code-to-workflow`](../../skills/tigerai/code-to-workflow/SKILL.md)。
+
 原版是一套 LINE AI 客服：收訊息 → 去重 → 關鍵字轉真人 → 呼叫 GPT 或 Gemini → 回覆，附 React 管理儀表板。本目錄把**後端那條 runtime 路徑**完整移植成 n8n workflow；**前端**因為 n8n 不是網頁框架，改寫成計畫書（[FRONTEND-SDD.md](FRONTEND-SDD.md)，approach C：用 n8n 自己吐 UI），尚未實作。
 
 ---

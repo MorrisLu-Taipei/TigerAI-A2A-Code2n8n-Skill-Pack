@@ -1,5 +1,42 @@
 # Changelog
 
+## v0.22.0 — Marquee skill `code-to-workflow` + 地端 LINE CS 案例
+
+兌現 [CODE2N8N.md](CODE2N8N.md) 宣言裡承諾的 marquee skill — 終於有一個明確的「拿任何程式系統轉成 n8n」方法論技能，由 3 個真實案例的踩坑經驗淬煉。
+
+### 🎯 新 marquee skill：[`skills/tigerai/code-to-workflow/`](skills/tigerai/code-to-workflow/SKILL.md)
+
+把上游程式（Apps Script / Netlify Functions / Express / Docker stack）轉成 n8n workflow 的完整方法論：
+
+- **觸發詞**：「把這個 repo 移到 n8n」「Code2n8n 一下」「port this codebase to n8n」「我的 Python 腳本想丟給營運維護」
+- **7 步驟方法論**：盤點 → 分區決策（code / node / connection）→ core+entry 拆法 → 前端可移植性 3 條決策樹（保留原前端 / 改打 n8n API / n8n 自托管薄管理）→ workflow 設計（native 優先 + 3 個 HTTP fallback）→ 3 層驗證漏斗（lint + n8n REST import + Layer 3 實跑）→ 文件範本（SDD / FRONTEND-SDD / PROVENANCE / FIELD-MAPPING / CREDITS）
+- **真實雷點清單**：Port 衝突、Express v5 wildcard、ESM/tsx、共用 DB、共用 Redis、LINE 簽章 raw body、reply token TTL、Sheets dropdown 限制、Docs 段落樣式、GPT-5 Responses API、Gemini 沒原生節點、Ollama Docker 網路名、Vector RAG Switch on `active_ai`
+- **配套規則**：絕不抹除上游 LICENSE / attribution；commit 前 grep secrets；不假裝 n8n 能取代 UI；保真度可追溯（PROVENANCE.md 釘 commit SHA）；本機 n8n 匯入必標 `[Claude YYYY-MM-DD]`
+
+註冊為 `tigerai` 群、role: `marquee`。Skill 總數 13 → 14。
+
+### 🆕 新案例：[`examples/line-ai-customer-service-onprem/`](examples/line-ai-customer-service-onprem/)
+
+**MIT 授權的練習案例**：拿上游 [`scorpioliu0953/ai_customer_service`](https://github.com/scorpioliu0953/ai_customer_service) 跑完整 Code2n8n 流程，演化成地端 Docker 企業版：
+
+- 從 Netlify Functions + Supabase（雲）→ **Docker Compose + Postgres + Redis + Qdrant + Ollama**（全自家）
+- 加 **Qdrant 向量 RAG**（處理大型 PDF 知識庫）
+- 加 **真實帳號認證**（Postgres `users` 表，取代 Supabase Auth）
+- **37 節點 n8n 動態大腦**（Switch on `active_ai` → OpenAI / Gemini / Ollama 三條 RAG 線）
+- **5 階段 V&V 計畫**（Infra / API / UI / HMR / E2E）+ 真 PASS 紀錄
+- 5 個實戰 [`LESSON_LEARNED.md`](examples/line-ai-customer-service-onprem/docs/LESSON_LEARNED.md)：Port 衝突、Express v5、ESM/tsx、共用 DB 憑證、共用 Redis
+
+跟既有的 [`examples/line-ai-customer-service/`](examples/line-ai-customer-service/) 雲端版**對照展示**：**同一系統可走不同 Code2n8n 路徑**。
+
+完整出處鏈 + MIT 授權保留見 [`CREDITS.md`](examples/line-ai-customer-service-onprem/CREDITS.md)。Commit 前已 scrub 上游 `docker-compose.yml` 內一個硬編 API key，且 `n8n-backup/creds_backup.json` 未進 pack（隔離可能洩漏的憑證）。
+
+### 📝 周邊更新
+
+- [`CODE2N8N.md`](CODE2N8N.md) — 補上 marquee skill + 新案例 + 重新整理 skill / 案例的層級關係
+- [`examples/line-ai-customer-service/README.md`](examples/line-ai-customer-service/README.md) — 加 onprem 變體的指引橫條
+- `plugin.json`：skill 計數 14、description 加 marquee + 3 案例的具體名字
+- `VERSION` → 0.22.0
+
 ## v0.21.0 — 改名為 TigerAI Code2n8n Skill Pack（品牌定位升級）
 
 **Skill Pack 從「n8n 工具集」升級為「AI Coding → 企業可治理 n8n 工作流」的橋。**

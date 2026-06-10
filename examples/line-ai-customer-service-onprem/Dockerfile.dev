@@ -1,0 +1,10 @@
+FROM node:20-alpine
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+# 同時啟動 Vite dev server (前端 HMR) + tsx watch (後端)
+CMD sh -c "npx tsx --watch src/server/index.ts & npx vite --host 0.0.0.0 --port 5173"

@@ -82,11 +82,19 @@ SaaS─┘
 
 ## 在這個 Pack 裡，Code2n8n 怎麼落地？
 
-- **[`skills/tigerai/n8n-code-to-native/`](skills/tigerai/n8n-code-to-native/SKILL.md)** — 把 AI 生出的 Code 節點重構成原生宣告式節點，讓不會 JS 的 n8n 工程師也讀得懂
-- **[`skills/tigerai/sticky-note-to-workflow/`](skills/tigerai/sticky-note-to-workflow/SKILL.md)** — 黃便利貼（業務語言）→ 三層結構 workflow JSON
-- **[`skills/tigerai/tigerai-enterprise-patterns/`](skills/tigerai/tigerai-enterprise-patterns/SKILL.md)** — 4 大企業模式（治理、跨系統、人工介入、可觀測性）
-- **[`examples/google-workspace-admin-workflow/`](examples/google-workspace-admin-workflow/)** — 1,373 行 Apps Script → n8n 完整移植（含逐行出處 `PROVENANCE.md`）
-- **[`examples/line-ai-customer-service/`](examples/line-ai-customer-service/)** — Netlify + React + Supabase 客服系統 → n8n + approach C 自托管後台
+**Marquee skill**：
+- **[`skills/tigerai/code-to-workflow/`](skills/tigerai/code-to-workflow/SKILL.md)** — Code → n8n Workflow 的方法論主腦：7 步驟（盤點 → 分區 → core+entry → 前端決策樹 → workflow 設計 → 3 層驗證漏斗 → 文件範本）+ 真實雷點清單 + 三個實證案例導讀
+
+**配套 skill**：
+- **[`skills/tigerai/n8n-code-to-native/`](skills/tigerai/n8n-code-to-native/SKILL.md)** — Code 節點微觀去 JS 化（marquee skill 的下游）
+- **[`skills/tigerai/sticky-note-to-workflow/`](skills/tigerai/sticky-note-to-workflow/SKILL.md)** — 從零意圖（非既有程式碼）→ workflow
+- **[`skills/tigerai/tigerai-enterprise-patterns/`](skills/tigerai/tigerai-enterprise-patterns/SKILL.md)** — 4 大企業治理模式
+
+**三大實證案例**（marquee skill 從這三份案例的真實踩坑經驗中淬煉而成）：
+- **[`examples/google-workspace-admin-workflow/`](examples/google-workspace-admin-workflow/)** — 1,373 行 Apps Script → n8n 完整移植，含逐行出處 `PROVENANCE.md`
+- **[`examples/line-ai-customer-service/`](examples/line-ai-customer-service/)** — Netlify + Supabase 雲端版 → n8n + approach C 自托管後台
+- **[`examples/line-ai-customer-service-onprem/`](examples/line-ai-customer-service-onprem/)** — **同一系統的地端 Docker 演化版**（MIT 練習案例）：Postgres + Redis + Qdrant + Ollama + RAG，37 節點 n8n 動態大腦，含 5 階段 V&V 與 5 個實戰雷點。對照另一個雲端版，可以看「同一程式可以走不同 Code2n8n 路徑」
+
 - **[`examples/tigerai-flagship/`](examples/tigerai-flagship/)** — 三大旗艦範例：原子化編排、Universal Worker、Skill-Driven 整合
 
 ## 結論

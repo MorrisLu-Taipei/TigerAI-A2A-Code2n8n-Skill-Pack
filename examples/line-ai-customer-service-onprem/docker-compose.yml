@@ -1,0 +1,53 @@
+services:
+  app:
+    build: .
+    container_name: ai-customer-service
+    ports:
+      - "3010:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - OPENWEBUI_API_KEY=${OPENWEBUI_API_KEY:-CHANGE_ME_OR_LEAVE_BLANK}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=adm
+      - POSTGRES_PASSWORD=tigerai
+      - POSTGRES_DB=tigerai
+      - REDIS_URL=redis://redis:6379
+      - QDRANT_URL=http://qdrant-tigerai:6333
+      - OLLAMA_BASE_URL=http://ollama:11434
+    networks:
+      - tigerai-net
+
+  # === 開發模式 (Hot Reload) ===
+  # 使用方式: docker-compose up -d app-dev
+  # 前端 Vite HMR: localhost:5173  |  後端 API: localhost:3011
+  # 可與 production (app:3010) 同時運行，互不衝突
+  app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: ai-customer-service-dev
+    ports:
+      - "5173:5173"
+      - "3011:3000"
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=adm
+      - POSTGRES_PASSWORD=tigerai
+      - POSTGRES_DB=tigerai
+      - REDIS_URL=redis://redis:6379
+      - QDRANT_URL=http://qdrant-tigerai:6333
+      - OLLAMA_BASE_URL=http://ollama:11434
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - tigerai-net
+
+networks:
+  tigerai-net:
+    external: true

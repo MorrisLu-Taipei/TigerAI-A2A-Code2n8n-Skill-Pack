@@ -1,0 +1,263 @@
+{
+  "name": "AI 客服系統 - 視覺大腦 (最終相容版 - If v2.3 Logic Fix)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## ZONE 1: 入口區 (ENTRANCE)\n* **Webhook**: 接收 LINE 訊息封包\n* **Redis Check**: 5分鐘重複處理過濾 (Dedupe)\n* **Filter New**: 過濾完成，開啟新流程",
+        "height": 300,
+        "width": 650
+      },
+      "id": "note-zone-1", "name": "Note: Zone 1", "type": "n8n-nodes-base.stickyNote", "typeVersion": 1, "position": [-2600, 400]
+    },
+    {
+      "parameters": {
+        "content": "## ZONE 2: 設定區 (CONFIG)\n* **Get Settings**: 從 SQL 載入 AI 前置設定 (Prompt/Model)\n* **Get State**: 從 SQL 讀取用戶當前模式 (Human Mode)",
+        "height": 300, "width": 450, "color": 3
+      },
+      "id": "note-zone-2", "name": "Note: Zone 2", "type": "n8n-nodes-base.stickyNote", "typeVersion": 1, "position": [-1850, 400]
+    },
+    {
+      "parameters": {
+        "content": "## ZONE 3: 導航區 (NAVIGATION)\n* **IF AI Enabled**: 全局 AI 開關檢查 (v2.3)\n* **IF Human**: 真人接管狀態與 30min 超時判斷 (v2.3)\n* **IF Trigger**: 關鍵字偵測 (v2.3 Regex)\n* **Switch**: 依據後台設定導向分流 (GPT/Gemini/Ollama)",
+        "height": 600, "width": 850, "color": 4
+      },
+      "id": "note-zone-3", "name": "Note: Zone 3", "type": "n8n-nodes-base.stickyNote", "typeVersion": 1, "position": [-1350, 400]
+    },
+    {
+      "parameters": {
+        "content": "## ZONE 4: 智慧心臟 (BRAIN)\n* **AI Agents**: 各模型核心推理大腦 (Upgrade: v1.1/3.1)\n* **Models**: 參數配置 (TP/Temp)\n* **Qdrant**: RAG 知識庫存取工具 (Upgrade: v1.3 / Tool Mode)\n* **Embeddings**: 數據向量化運算\n* **Memory**: 交談歷史歷史記憶 (Buffer)",
+        "height": 1100, "width": 1100, "color": 6
+      },
+      "id": "note-zone-4", "name": "Note: Zone 4", "type": "n8n-nodes-base.stickyNote", "typeVersion": 1, "position": [-550, 0]
+    },
+    {
+      "parameters": {
+        "content": "## ZONE 5: 出口區 (EXIT)\n* **LINE Reply**: 最終消息傳送 (AI 回覆)\n* **Status Notify**: 真人切換成功狀態通知\n* **Mark Done**: Redis 任務結束狀態歸檔 (eventId)",
+        "height": 400, "width": 550, "color": 5
+      },
+      "id": "note-zone-5", "name": "Note: Zone 5", "type": "n8n-nodes-base.stickyNote", "typeVersion": 1, "position": [550, 400]
+    },
+    {
+      "parameters": { "method": "POST", "url": "=http://app:3000/api/logs/add", "sendBody": true, "bodyParameters": { "parameters": [{ "name": "line_user_id", "value": "={{ $('Webhook: LINE').first().json.body.events[0].source.userId }}" }, { "name": "role", "value": "user" }, { "name": "content", "value": "={{ $('Webhook: LINE').first().json.body.events[0].message.text }}" }] }, "options": {} },
+      "id": "log-user", "name": "Log: User", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.1, "position": [-1150, 250]
+    },
+    {
+      "parameters": { "method": "POST", "url": "=http://app:3000/api/logs/add", "sendBody": true, "bodyParameters": { "parameters": [{ "name": "line_user_id", "value": "={{ $('Webhook: LINE').first().json.body.events[0].source.userId }}" }, { "name": "role", "value": "ai" }, { "name": "content", "value": "={{ $json.output }}" }] }, "options": {} },
+      "id": "log-ai", "name": "Log: AI", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.1, "position": [150, 450]
+    },
+    {
+      "parameters": { "httpMethod": "POST", "path": "ai-customer-service/webhook", "options": {} },
+      "id": "8dc90afe-02e1-401a-bbbc-631482328573", "name": "Webhook: LINE", "type": "n8n-nodes-base.webhook", "typeVersion": 1, "position": [-2500, 550]
+    },
+    {
+      "parameters": { "operation": "get", "key": "={{ \"processed_event:\" + $json.body.events[0].eventId }}", "options": {} },
+      "id": "363d314f-e892-41c1-ba4f-14a495fa6f28", "name": "Redis: Check Dedupe", "type": "n8n-nodes-base.redis", "typeVersion": 1, "position": [-2250, 550], "credentials": { "redis": { "id": "vsGo6U44CEEiredE" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 },
+          "conditions": [
+            {
+              "id": "77da2720-5240-4203-8f35-75253a6a913f",
+              "leftValue": "={{ $json.value || \"\" }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "equals", "name": "filter.operator.equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "8dea0c0f-1361-439d-afat-e31dac6bc1c8", "name": "Filter: New Event", "type": "n8n-nodes-base.if", "typeVersion": 2.3, "position": [-2000, 550]
+    },
+    {
+      "parameters": { "operation": "executeQuery", "query": "SELECT * FROM public.app_settings ORDER BY id DESC LIMIT 1;", "options": {} },
+      "id": "7616a3f4-f2ab-4436-8454-9dda0eb51ebc", "name": "Postgres: Get Settings", "type": "n8n-nodes-base.postgres", "typeVersion": 2.3, "position": [-1750, 550], "credentials": { "postgres": { "id": "T015FrNUnfdeVqzM" } }
+    },
+    {
+      "parameters": { "operation": "executeQuery", "query": "SELECT COALESCE(is_human_mode, false) as is_human_mode, COALESCE(last_human_interaction, '1970-01-01') as last_human_interaction FROM (SELECT 1) t LEFT JOIN user_states ON line_user_id = '{{ $node[\"Webhook: LINE\"].json.body.events[0].source.userId }}' LIMIT 1;", "options": {} },
+      "id": "get-user-state", "name": "Postgres: Get User State", "type": "n8n-nodes-base.postgres", "typeVersion": 2.3, "position": [-1500, 550], "credentials": { "postgres": { "id": "T015FrNUnfdeVqzM" } }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "none", "version": 3 },
+          "conditions": [
+            {
+              "id": "ai-enabled-check",
+              "leftValue": "={{ $json.is_ai_enabled }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals", "name": "filter.operator.equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-ai-enabled", "name": "IF: AI Enabled?", "type": "n8n-nodes-base.if", "typeVersion": 2.3, "position": [-1250, 550]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "none", "version": 3 },
+          "conditions": [
+            {
+              "id": "human-mode-check",
+              "leftValue": "={{ (!!$json.is_human_mode && $node[\"Postgres: Get Settings\"].json.handover_enabled && (new Date() - new Date($json.last_human_interaction || 0)) / 1000 / 60 < ($node[\"Postgres: Get Settings\"].json.handover_timeout_minutes || 30)) }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals", "name": "filter.operator.equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-human-mode-active", "name": "IF: Human Mode?", "type": "n8n-nodes-base.if", "typeVersion": 2.3, "position": [-1000, 550]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 },
+          "conditions": [
+            {
+              "id": "handover-trigger-check",
+              "leftValue": "={{ $('Webhook: LINE').first().json.body.events[0].message.text }}",
+              "rightValue": "={{ \"(\" + ($node[\"Postgres: Get Settings\"].json.handover_keywords || \"真人,客服,人工\").split(',').map(k => k.trim()).join('|') + \")\" }}",
+              "operator": { "type": "string", "operation": "regex", "name": "filter.operator.regex" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-handover-trigger", "name": "IF: Handover Trigger?", "type": "n8n-nodes-base.if", "typeVersion": 2.3, "position": [-750, 550]
+    },
+    {
+      "parameters": { "dataType": "string", "value1": "={{ $node[\"Postgres: Get Settings\"].json.active_ai }}", "rules": { "rules": [{ "value2": "gpt" }, { "value2": "gemini" }, { "value2": "ollama" }] }, "options": {} },
+      "id": "provider-switch", "name": "Switch: Provider", "type": "n8n-nodes-base.switch", "typeVersion": 1, "position": [-500, 550]
+    },
+    {
+      "parameters": { "url": "={{ \"https://api.line.me/v2/bot/profile/\" + $node[\"Webhook: LINE\"].json.body.events[0].source.userId }}", "method": "GET", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Authorization", "value": "={{ \"Bearer \" + $node[\"Postgres: Get Settings\"].json.line_channel_access_token }}" }] }, "options": {} },
+      "id": "line-get-profile", "name": "LINE: Get Profile", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.1, "position": [-1000, 850]
+    },
+    {
+      "parameters": { "operation": "executeQuery", "query": "INSERT INTO public.user_states (line_user_id, nickname, is_human_mode, last_human_interaction) VALUES ('{{ $('Webhook: LINE').first().json.body.events[0].source.userId }}', '{{ $json.displayName }}', true, NOW()) ON CONFLICT (line_user_id) DO UPDATE SET nickname = '{{ $json.displayName }}', is_human_mode = true, last_human_interaction = NOW();", "options": {} },
+      "id": "set-human-mode-full", "name": "Postgres: Set Human", "type": "n8n-nodes-base.postgres", "typeVersion": 2.3, "position": [-750, 850], "credentials": { "postgres": { "id": "T015FrNUnfdeVqzM" } }
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://api.line.me/v2/bot/message/reply", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Authorization", "value": "={{ \"Bearer \" + $node[\"Postgres: Get Settings\"].json.line_channel_access_token }}" }] }, "sendBody": true, "bodyParameters": { "parameters": [{ "name": "replyToken", "value": "={{ $('Webhook: LINE').first().json.body.events[0].replyToken }}" }, { "name": "messages", "value": "=[{ \"type\": \"text\", \"text\": \"已為您轉接真人客服，請稍候。\" }]" }] }, "options": {} },
+      "id": "reply-handover", "name": "LINE: Reply User", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.1, "position": [-300, 1050]
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://api.line.me/v2/bot/message/push", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Authorization", "value": "={{ \"Bearer \" + $node[\"Postgres: Get Settings\"].json.line_channel_access_token }}" }] }, "sendBody": true, "bodyParameters": { "parameters": [{ "name": "to", "value": "={{ $node[\"Postgres: Get Settings\"].json.admin_line_ids.split(',')[0].trim() }}" }, { "name": "messages", "value": "=[{ \"type\": \"text\", \"text\": \"🚨 [真人轉接通知]\\n用戶：\" + $node[\"LINE: Get Profile\"].json.displayName + \"\\n原因：觸發關鍵字\" }]" }] }, "options": {} },
+      "id": "notify-admin", "name": "LINE: Notify Admin", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.1, "position": [-500, 1050]
+    },
+    {
+      "parameters": { "options": { "systemMessage": "={{ $json.system_prompt }}\n\n[靜態參考資料]\n{{ $json.reference_text || \"\" }}" } },
+      "id": "agent-gpt", "name": "AI Agent (GPT)", "type": "@n8n/n8n-nodes-langchain.agent", "typeVersion": 1.1, "position": [-150, 250]
+    },
+    {
+      "parameters": { "options": { "systemMessage": "={{ $json.system_prompt }}\n\n[靜態參考資料]\n{{ $json.reference_text || \"\" }}" } },
+      "id": "agent-gemini", "name": "AI Agent (Gemini)", "type": "@n8n/n8n-nodes-langchain.agent", "typeVersion": 1.1, "position": [-150, 550]
+    },
+    {
+      "parameters": { "options": { "systemMessage": "={{ $json.system_prompt }}\n\n[靜態參考資料]\n{{ $json.reference_text || \"\" }}" } },
+      "id": "agent-ollama", "name": "AI Agent (Ollama)", "type": "@n8n/n8n-nodes-langchain.agent", "typeVersion": 1.1, "position": [-150, 850]
+    },
+    {
+      "parameters": { "modelName": "={{ $node[\"Postgres: Get Settings\"].json.gpt_model }}", "options": { "temperature": 0.7 } },
+      "id": "model-openai", "name": "OpenAI Model", "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi", "typeVersion": 1.1, "position": [-400, 350], "credentials": { "openAiApi": { "id": "oYuq7g1MhyRu16HS" } }
+    },
+    {
+      "parameters": { "modelName": "={{ $node[\"Postgres: Get Settings\"].json.gemini_model }}", "options": { "temperature": 0.7 } },
+      "id": "model-gemini", "name": "Gemini Model", "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini", "typeVersion": 1, "position": [-400, 650]
+    },
+    {
+      "parameters": { "model": "={{ $node[\"Postgres: Get Settings\"].json.ollama_model }}", "options": {} },
+      "id": "model-ollama", "name": "Ollama Model", "type": "@n8n/n8n-nodes-langchain.lmChatOllama", "typeVersion": 1, "position": [-400, 950]
+    },
+    {
+      "parameters": { "mode": "retrieve-as-tool", "qdrantCollection": { "__rl": true, "mode": "id", "value": "knowledge_base" }, "options": {} },
+      "id": "qdrant-gpt", "name": "Qdrant (GPT)", "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant", "typeVersion": 1.3, "position": [100, 350], "credentials": { "qdrantApi": { "id": "1x8sy4w8E9nnHn6o" } }
+    },
+    {
+      "parameters": { "mode": "retrieve-as-tool", "qdrantCollection": { "__rl": true, "mode": "id", "value": "knowledge_base" }, "options": {} },
+      "id": "qdrant-gemini", "name": "Qdrant (Gemini)", "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant", "typeVersion": 1.3, "position": [100, 650], "credentials": { "qdrantApi": { "id": "1x8sy4w8E9nnHn6o" } }
+    },
+    {
+      "parameters": { "mode": "retrieve-as-tool", "qdrantCollection": { "__rl": true, "mode": "id", "value": "knowledge_base" }, "options": {} },
+      "id": "qdrant-ollama", "name": "Qdrant (Ollama)", "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant", "typeVersion": 1.3, "position": [100, 950], "credentials": { "qdrantApi": { "id": "1x8sy4w8E9nnHn6o" } }
+    },
+    {
+        "parameters": { "options": {} },
+        "id": "embed-openai", "name": "Embed: OpenAI", "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi", "typeVersion": 1, "position": [250, 450], "credentials": { "openAiApi": { "id": "oYuq7g1MhyRu16HS" } }
+    },
+    {
+        "parameters": { "modelName": "models/embedding-001", "options": {} },
+        "id": "embed-gemini", "name": "Embed: Gemini", "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini", "typeVersion": 1, "position": [250, 750]
+    },
+    {
+        "parameters": { "model": "mxbai-embed-large:latest", "options": {} },
+        "id": "embed-ollama", "name": "Embed: Ollama", "type": "@n8n/n8n-nodes-langchain.embeddingsOllama", "typeVersion": 1, "position": [250, 1050]
+    },
+    {
+      "parameters": { "url": "https://api.line.me/v2/bot/message/reply", "method": "POST", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Authorization", "value": "={{ \"Bearer \" + $node[\"Postgres: Get Settings\"].json.line_channel_access_token }}" }] }, "sendBody": true, "bodyParameters": { "parameters": [{ "name": "replyToken", "value": "={{ $node[\"Webhook: LINE\"].json.body.events[0].replyToken }}" }, { "name": "messages", "value": "={{ [ { \"type\": \"text\", \"text\": $json.output } ] }}" }] }, "options": {} },
+      "id": "reply-line", "name": "LINE: Reply", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.1, "position": [700, 550]
+    },
+    {
+      "parameters": { "operation": "set", "key": "={{ \"processed_event:\" + $node[\"Webhook: LINE\"].json.body.events[0].eventId }}", "value": "1", "options": {} },
+      "id": "mark-done", "name": "Redis: Mark Done", "type": "n8n-nodes-base.redis", "typeVersion": 1, "position": [950, 550], "credentials": { "redis": { "id": "vsGo6U44CEEiredE" } }
+    },
+    {
+        "parameters": {},
+        "id": "mem-gpt", "name": "Mem: GPT", "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow", "typeVersion": 1.3, "position": [-300, 150]
+    },
+    {
+        "parameters": {},
+        "id": "mem-gemini", "name": "Mem: Gemini", "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow", "typeVersion": 1.3, "position": [-300, 450]
+    },
+    {
+        "parameters": {},
+        "id": "mem-ollama", "name": "Mem: Ollama", "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow", "typeVersion": 1.3, "position": [-300, 750]
+    }
+  ],
+  "connections": {
+    "Webhook: LINE": { "main": [[{ "node": "Redis: Check Dedupe", "type": "main", "index": 0 }]] },
+    "Redis: Check Dedupe": { "main": [[{ "node": "Filter: New Event", "type": "main", "index": 0 }]] },
+    "Filter: New Event": { "main": [[{ "node": "Postgres: Get Settings", "type": "main", "index": 0 }]] },
+    "Postgres: Get Settings": { "main": [[{ "node": "IF: AI Enabled?", "type": "main", "index": 0 }]] },
+    "IF: AI Enabled?": { "main": [[{ "node": "Postgres: Get User State", "type": "main", "index": 0 }]] },
+    "Postgres: Get User State": { "main": [[{ "node": "IF: Human Mode?", "type": "main", "index": 0 }]] },
+    "IF: Human Mode?": { "main": [[], [{ "node": "IF: Handover Trigger?", "type": "main", "index": 0 }]] },
+    "IF: Handover Trigger?": {
+      "main": [
+        [{ "node": "LINE: Get Profile", "type": "main", "index": 0 }],
+        [{ "node": "Switch: Provider", "type": "main", "index": 0 }]
+      ]
+    },
+    "LINE: Get Profile": { "main": [[{ "node": "Postgres: Set Human", "type": "main", "index": 0 }]] },
+    "Postgres: Set Human": { "main": [[{ "node": "LINE: Reply User", "type": "main", "index": 0 }, { "node": "LINE: Notify Admin", "type": "main", "index": 0 }]] },
+    "LINE: Reply User": { "main": [[{ "node": "Redis: Mark Done", "type": "main", "index": 0 }]] },
+    "LINE: Notify Admin": { "main": [[]] },
+    "Switch: Provider": {
+      "main": [
+        [{ "node": "AI Agent (GPT)", "type": "main", "index": 0 }],
+        [{ "node": "AI Agent (Gemini)", "type": "main", "index": 0 }],
+        [{ "node": "AI Agent (Ollama)", "type": "main", "index": 0 }]
+      ]
+    },
+    "OpenAI Model": { "ai_languageModel": [[{ "node": "AI Agent (GPT)", "type": "ai_languageModel", "index": 0 }]] },
+    "Gemini Model": { "ai_languageModel": [[{ "node": "AI Agent (Gemini)", "type": "ai_languageModel", "index": 0 }]] },
+    "Ollama Model": { "ai_languageModel": [[{ "node": "AI Agent (Ollama)", "type": "ai_languageModel", "index": 0 }]] },
+    "Qdrant (GPT)": { "ai_tool": [[ { "node": "AI Agent (GPT)", "type": "ai_tool", "index": 0 } ]] },
+    "Qdrant (Gemini)": { "ai_tool": [[ { "node": "AI Agent (Gemini)", "type": "ai_tool", "index": 0 } ]] },
+    "Qdrant (Ollama)": { "ai_tool": [[ { "node": "AI Agent (Ollama)", "type": "ai_tool", "index": 0 } ]] },
+    "Embed: OpenAI": { "ai_embedding": [[{ "node": "Qdrant (GPT)", "type": "ai_embedding", "index": 0 }]] },
+    "Embed: Gemini": { "ai_embedding": [[{ "node": "Qdrant (Gemini)", "type": "ai_embedding", "index": 0 }]] },
+    "Embed: Ollama": { "ai_embedding": [[{ "node": "Qdrant (Ollama)", "type": "ai_embedding", "index": 0 }]] },
+    "Mem: GPT": { "ai_memory": [[{ "node": "AI Agent (GPT)", "type": "ai_memory", "index": 0 }]] },
+    "Mem: Gemini": { "ai_memory": [[{ "node": "AI Agent (Gemini)", "type": "ai_memory", "index": 0 }]] },
+    "Mem: Ollama": { "ai_memory": [[{ "node": "AI Agent (Ollama)", "type": "ai_memory", "index": 0 }]] },
+    "AI Agent (GPT)": { "main": [[{ "node": "LINE: Reply", "type": "main", "index": 0 }, { "node": "Log: AI", "type": "main", "index": 0 }]] },
+    "AI Agent (Gemini)": { "main": [[{ "node": "LINE: Reply", "type": "main", "index": 0 }, { "node": "Log: AI", "type": "main", "index": 0 }]] },
+    "AI Agent (Ollama)": { "main": [[{ "node": "LINE: Reply", "type": "main", "index": 0 }, { "node": "Log: AI", "type": "main", "index": 0 }]] },
+    "LINE: Reply": { "main": [[{ "node": "Redis: Mark Done", "type": "main", "index": 0 }]] }
+  }
+}
