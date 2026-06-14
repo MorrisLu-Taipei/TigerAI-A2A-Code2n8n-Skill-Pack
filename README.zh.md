@@ -5,7 +5,7 @@
 
 > **Code2n8n 的定位**：AI Coding（Claude Code / Codex / Antigravity）擅長把程式「寫出來」；n8n 擅長把程式變成「企業管得住」的流程資產。這個 pack 就是兩者之間的橋 — **描述一個需求，或 指向一個既有系統**（Apps Script / Express / Lambda / Docker stack），產出 IT、營運、主管都看得懂、稽核得了、交接得下去、跨系統治理得來的 n8n workflow。
 
-![TigerAI Code2n8n Skill Pack — Code2n8n hero（v11，中文版）](docs/images/code2n8n-hero-zh.png)
+![TigerAI Code2n8n Skill Pack — Code2n8n hero（v15，中文版）](docs/images/code2n8n-hero-zh.png)
 
 > 📊 **一張圖看懂**：自然語言需求或既有程式系統 → Code2n8n Skill Pack（Cookbook + 2,061 參考 workflow + DSL v1.2 + 14 個 manifest Skill + 4 大企業模式）→ 分析哪些邏輯留在程式、哪些上升為 n8n 節點 → 產出可檢查、可交接、可跨系統編排的 workflow。
 > *by n8n Taipei Ambassador Morris Lu*

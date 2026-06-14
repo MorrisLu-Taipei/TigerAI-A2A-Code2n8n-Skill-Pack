@@ -5,7 +5,7 @@
 
 > **The Code2n8n positioning**: AI Coding (Claude Code / Codex / Antigravity) is great at *writing* code. n8n is great at making code *manageable by an enterprise*. This pack is the bridge — **describe a requirement, *or* point at an existing system** (Apps Script / Express / Lambda / Docker stack), and get a runnable n8n workflow that IT, operations, and managers can all read, audit, hand off, and govern.
 
-![TigerAI Code2n8n Skill Pack — Code2n8n hero (v11)](docs/images/code2n8n-hero-en.png)
+![TigerAI Code2n8n Skill Pack — Code2n8n hero (v15)](docs/images/code2n8n-hero-en.png)
 
 > 📊 **The whole pack in one picture**: Natural-language intent *or* an existing program system → Code2n8n Skill Pack (Cookbook + 2,061 reference workflows + DSL v1.2 + **14 manifest skills** + 4 enterprise patterns) → decides what logic stays as code vs lifts into an n8n node → emits a reviewable, hand-off-able, cross-system n8n workflow.
 > *by n8n Taipei Ambassador Morris Lu*
