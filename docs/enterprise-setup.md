@@ -7,37 +7,46 @@
 
 ## 責任邊界：Pack vs n8n vs 你的 IT
 
-很多讀者看 hero 圖第三塊「n8n Enterprise Orchestration」會以為「裝了 Skill Pack 就有 SSO」。**不會**。下表把責任分清楚。
+很多讀者看 hero 圖第三塊「n8n Enterprise Orchestration」會以為「要裝 Skill Pack 才有 SSO / 稽核日誌 / HA」。**不是**。**n8n Enterprise（self-hosted）出貨就有**這些。下表把責任分清楚。
 
-| 圖示元素 | 誰負責提供 | Pack 是否附 setup 指引 |
+| 圖示元素 | 誰負責提供 | 落地方式 |
 | --- | --- | --- |
-| Workflow 結構 / 治理 SOP / 安全審查方法論 | ✅ **Pack**（這個 repo） | ✅ 是 — 看 `skills/tigerai/n8n-security-governance/` |
-| Workflow CI/CD gate / 版本控制紀律 | ✅ **Pack** | ✅ 同上 |
-| Audit log / Observability 標準 | ✅ **Pack** 訂規範 | ✅ 同上 |
-| Retry / Approval / Handover 模式 | ✅ **Pack** 訂模式 | ✅ 看 `skills/tigerai/tigerai-enterprise-patterns/` Pillar 4.2 |
-| ERP / CRM / DB / SaaS 連接器 | ✅ **n8n 內建節點** | ❌ Pack 不重做節點 |
-| SSO（SAML / OIDC / LDAP） | ✅ **n8n self-hosted enterprise** | ⚠️ 本檔僅指路 |
-| IAM / RBAC（使用者 / 角色 / 工作流權限） | ✅ **n8n self-hosted enterprise** | ⚠️ 本檔僅指路 |
-| HA / Resilience（多 instance + queue mode + Redis + Postgres） | ✅ **n8n 部署層** | ⚠️ 本檔僅指路 |
-| Backup / DR（資料庫備份、binlog、跨區災備） | ✅ **你的 IT** | ⚠️ 本檔列檢查清單 |
+| Workflow 結構 / 治理 SOP / 安全審查方法論 | ✅ **Pack**（這個 repo） | `skills/tigerai/n8n-security-governance/` |
+| Workflow CI/CD gate / 版本控制紀律 | ✅ **Pack** | 同上 |
+| Retry / Approval / Handover 模式 | ✅ **Pack** 訂模式 | `skills/tigerai/tigerai-enterprise-patterns/` Pillar 4.2 |
+| ERP / CRM / DB / SaaS 連接器 | ✅ **n8n 內建節點** | 開箱即有 |
+| **SSO**（SAML / OIDC / LDAP） | ✅ **n8n Enterprise** 開箱即有 | 升 Enterprise 授權；本檔指官方文件 |
+| **IAM / RBAC**（使用者 / 角色 / Project） | ✅ **n8n Enterprise** 開箱即有 | 同上 |
+| **稽核日誌 / Audit Log** | ✅ **n8n Enterprise** 開箱即有 | 同上；Pack 另訂「workflow 行為層」audit log 規範 |
+| **HA / Resilience**（queue mode + 多 worker + Redis + Postgres） | ✅ **n8n Enterprise** 部署模式 | 升 Enterprise + 跟你 IT 一起部署 |
+| Observability / 監控指標 | ✅ **n8n Enterprise** 出 metrics + ✅ Pack 訂 8 個 signal | n8n Insights / Prometheus / Grafana |
+| Backup / DR（DB 備份 / binlog / 跨區災備） | ✅ **你的 IT** | 本檔列必備檢查清單 |
 
-下面三章是「本檔僅指路」的部分。**Pack 不重做 n8n 已經做完的事**；它的工作是讓你產出的 workflow **跑在這套企業基礎建設上時不會破洞**。
+> ⚡ **一句話**：升 **n8n Enterprise** 直接拿到 SSO、IAM、稽核日誌、HA 與 metrics 端點。Pack **不重做** 這些；它的工作是讓你產出的 workflow **跑在 Enterprise 之上時不會破洞**（IAM-friendly、queue-safe、可 rollback）。
+
+下面三章針對「升 Enterprise 之後、寫 workflow 時要注意什麼」展開。
 
 ---
 
-## 1. SSO / IAM
+## 1. SSO / IAM / Audit Log
 
-### n8n self-hosted enterprise 提供什麼
+### n8n Enterprise 開箱即有
 
-n8n self-hosted **enterprise edition** 內建：
+**升級 n8n Enterprise 授權後**，下列直接到位、無需自製：
 
-- **SAML 2.0**（對接 Okta / Azure AD / Auth0 / Google Workspace SAML / OneLogin）
-- **OIDC / OAuth2**（對接 Keycloak / Auth0 / Azure AD / Google）
-- **LDAP**（對接內部 AD / OpenLDAP）
+- **SSO**：SAML 2.0（Okta / Azure AD / Auth0 / Google Workspace SAML / OneLogin）、OIDC / OAuth2（Keycloak / Auth0 / Azure AD / Google）、LDAP（內部 AD / OpenLDAP）
 - **RBAC**：Workflow / Credential / Variable / Project 四種資源的 owner / editor / viewer
 - **Project**：團隊命名空間，credential 與 workflow 限定範圍
+- **Audit Log**：登入、credential 改動、workflow 修改、execution 觸發都有官方稽核日誌
+- **External Secrets**：對接 Vault / AWS Secrets Manager / Infisical 等
+- **LDAP / SAML 自動建立使用者** + 角色映射
 
-設定路徑見官方文件：<https://docs.n8n.io/user-management/>
+官方文件入口：
+
+- 使用者管理：<https://docs.n8n.io/user-management/>
+- SSO / SAML：<https://docs.n8n.io/user-management/saml/>
+- Audit Log：<https://docs.n8n.io/user-management/audit-logs/>
+- External Secrets：<https://docs.n8n.io/external-secrets/>
 
 ### Pack 的 workflow 該怎麼配合
 
@@ -148,14 +157,19 @@ Code2n8n 產出的 workflow 在 `SECURITY-REVIEW.md` 內必含「Rollback / Reco
 
 ## English summary
 
-The hero diagram's third panel ("n8n Enterprise Orchestration") includes SSO, IAM, HA, CI/CD, Log Audit, etc. **The Pack does not implement SSO / HA / IAM — n8n self-hosted enterprise does.** What the Pack delivers is the discipline so that the workflows you produce *land cleanly* on top of those n8n features.
+The hero diagram's third panel ("n8n Enterprise Orchestration") includes SSO, IAM, HA, CI/CD, Audit Log, etc. **Upgrading to n8n Enterprise gives you SSO / IAM / audit log / HA out of the box — the Pack does not reimplement them.** What the Pack delivers is the discipline so that the workflows you produce *land cleanly* on top of those n8n Enterprise features.
 
-| Claim in the hero | Owner | Pack contribution |
+| Claim in the hero | Owner | How it shows up |
 | --- | --- | --- |
 | Workflow structure, security audit method, version control discipline, CI/CD gate, observability standard, retry/approval/handover patterns | **Pack** | Full SOPs in `n8n-security-governance` + `tigerai-enterprise-patterns` |
 | ERP/CRM/DB/SaaS connectors | n8n built-in nodes | not duplicated |
-| SSO (SAML/OIDC/LDAP), IAM/RBAC, projects | n8n self-hosted enterprise edition | this doc links to official setup; the Pack adds IAM-friendly workflow design rules |
-| HA / queue mode, multi-worker scaling | n8n deployment layer | this doc lists workflow rules so they survive multi-worker (no local-file passing, idempotency keys, Wait instead of sleep, proper timeouts) |
+| **SSO** (SAML / OIDC / LDAP) | **n8n Enterprise — built in** | enable in the Enterprise UI; this doc adds IAM-friendly workflow design rules |
+| **IAM / RBAC / Projects** | **n8n Enterprise — built in** | same |
+| **Audit Log** | **n8n Enterprise — built in** | covers login / credential / workflow / execution; Pack adds workflow-behaviour audit log rules |
+| **HA / queue mode / multi-worker** | **n8n Enterprise — deployment mode** | this doc lists workflow-side rules so they survive multi-worker (no local-file passing, idempotency keys, `Wait` instead of sleep, proper timeouts) |
+| **External Secrets** (Vault / AWS / Infisical) | **n8n Enterprise — built in** | enable + replace static credentials |
 | Backup / DR / encryption key custody | Your IT | this doc gives a checklist; the Pack's `SECURITY-REVIEW.md` template requires a Rollback section |
 
-**Order of adoption**: self-hosted enterprise n8n + SSO/RBAC/Projects first → then install the Pack → then run the Code2n8n migration → then Step 1.5 security review enforces IAM-friendly, queue-safe, traceable design → CI gate → production. Skipping the first two steps means your workflows run but fail enterprise sign-off.
+**One-line**: pay for n8n Enterprise → you get SSO + IAM + audit log + HA + external-secrets without writing code. Then add the Pack on top to keep the *workflows* you produce trustworthy on that foundation.
+
+**Order of adoption**: n8n Enterprise + SSO/RBAC/Projects/External Secrets first → install the Pack → run the Code2n8n migration → Step 1.5 security review enforces IAM-friendly, queue-safe, traceable design → CI gate → production. Skipping the first step means your workflows run but fail enterprise sign-off.
