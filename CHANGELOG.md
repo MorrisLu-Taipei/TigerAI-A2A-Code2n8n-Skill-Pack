@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.24.2 — 刷掉 v0.24.1 沒清乾淨的文件落差
+
+v0.24.1 把 installer + manifest + CI gate + evidence 收齊，但使用者再做一輪 audit 又挖到一批「文件還停留在舊版」的中度落差。這版只動文件、不動程式碼，把所有跟事實對不上的字眼一次刷掉。
+
+### 🩹 修：README 還留著已修好的舊警告
+
+- `README.md` 樹狀圖：「14 skill folders on disk; plugin manifest registers 15 entries」→「14 skills (plugin.json manifest matches on-disk)」
+- `README.md` 警告 footnote 換成中文版同款的事實說明：`/install-n8n-pack` 是 Antigravity workflow，不是 skill
+- `README.md` / `README.zh.md` 歷史驗收章節原本硬編 v0.22.2 → 改連到 [`VERSION`](VERSION) 與 [`tests/REPORT-v0.24.1-evidence.md`](tests/REPORT-v0.24.1-evidence.md)，下一版不會再漂移
+
+### 🩹 修：安裝文件自相矛盾
+
+`01-INSTALL.en.md` / `01-INSTALL.md` 整篇重寫：
+
+- 前提改成「No MCP server required」（與 plugin.json `"no MCP dependency"` 對齊），中文版原本還把 `n8n-mcp` 列為建議前提、宣稱會載入本 Pack 沒有的 `n8n-mcp-tools-expert` skill，全部移除
+- 「Enable n8n-mcp in Claude Code / Antigravity」→ 改為「Smoke-test the REST connection」，直接附 curl 範例
+- 移掉「Verify skill description triggers are loaded by Claude」這條腳本沒在做的虛假承諾，老實說明腳本只負責檔案複製，trigger verify 是使用者的事
+- 解除安裝段補齊缺失目標：`code-to-workflow`、`_tigerai-pack-shared`、Antigravity `~/.gemini/antigravity/global_skills/` 路徑都明確列出來；並標註尚無官方 `uninstall.sh`（v0.25 backlog）
+- 加上 installer 行為的誠實說明：寫入「所有偵測到的目標」、無 `--dry-run` 與 `--target` 旗標（v0.25 backlog）
+
+### 🩹 修：責任矩陣對 n8n edition 過度簡化
+
+`docs/responsibility-matrix.md` 把「Pack / n8n / n8n Enterprise / IT」四層拆成五層：
+
+- **n8n Community / self-hosted**：runtime + nodes + **queue mode** + `/metrics`（queue mode 跟 Prometheus endpoint 都不是 Enterprise-only）
+- **n8n Business**：加上 **Source Control / Environments**（這是 Business-tier，不是 Enterprise-only — 舊版錯標）
+- **n8n Enterprise**：SSO / RBAC/IAM / Audit Log / External Secrets / **multi-main active-active HA** / LDAP/SAML
+- **Enterprise IT / DevOps**：Postgres / Redis / LB / 備份 / DR / 真正的觀測 stack — 升上 Enterprise **不會自動拿到 HA**，IT 仍要部署底層
+
+Per-claim 表格相應改：SSO 列拆成 SSO / Source Control / multi-main HA / queue-mode HA / Metrics 五個獨立 row，把哪個能力屬於哪一 tier 講清楚。新增 installer ergonomics row 標 v0.25 backlog（`--dry-run` / `--target` / post-install verify / official `uninstall.sh`）。
+
+---
+
 ## v0.24.1 — 修正安裝器、補上 CI gate、刷新驗收證據
 
 v0.24.0 後使用者實際拿去裝，挖到一批會打臉「四件套俱全」的實作落差：Windows 安裝器無法解析、manifest 比磁碟多算一個 skill、`n8n-security-governance` 講的 CI/CD gate 在這個 repo 本身完全沒跑、驗收報告還停在 2026-05-05。這版把這四件一起補上。

@@ -289,7 +289,7 @@ TigerAI-Code2n8n-Skill-Pack/
 
 ## 📊 歷史驗收基準（v0.9.0 R3）
 
-以下是三層 workflow 生成能力在 v0.9.0 R3 時建立的真實環境基準；目前 Pack 版本為 v0.22.2，上方三個 Code2n8n 案例則是 v0.22.x 的新增驗證證據。
+以下是三層 workflow 生成能力在 v0.9.0 R3 時建立的真實環境基準；目前 Pack 版本見 [`VERSION`](VERSION)，上方三個 Code2n8n 案例與 [`tests/REPORT-v0.24.1-evidence.md`](tests/REPORT-v0.24.1-evidence.md) 是當前版本的驗證證據。
 
 | 層 | 通過率 |
 |---|---|

@@ -177,7 +177,7 @@ TigerAI-Code2n8n-Skill-Pack/
 ├── cookbook/                  ← 8 copy-paste recipes (each has plain-language + DSL fold)
 │   └── 00-INDEX.md/.en.md
 │
-├── skills/                    ← 14 skill folders on disk; plugin manifest registers 15 entries
+├── skills/                    ← 14 skills (plugin.json manifest matches on-disk)
 │   ├── _vendor/                  6 vendor n8n-skills (MIT)
 │   └── tigerai/                  8 TigerAI execution skills
 │       ├── code-to-workflow/        ← Marquee: existing code / system → n8n
@@ -203,7 +203,7 @@ TigerAI-Code2n8n-Skill-Pack/
 └── plugin.json                ← Skill manifest
 ```
 
-> ⚠️ `plugin.json` currently registers one extra maintenance skill, `install-tigerai-n8n-pack`, whose folder is not yet committed to the repository — that's why the manifest has 15 entries while the on-disk skills directory has 14. Either add the missing folder or remove the stale entry before the next release.
+> 📝 The `/install-n8n-pack` slash command lives in `.agent/workflows/install-pack.md` as an Antigravity-native workflow, not a Skill — so there is intentionally no `skills/tigerai/install-tigerai-n8n-pack/` folder. The manifest and disk both have 14 entries.
 
 ---
 
@@ -292,7 +292,7 @@ The third case deliberately preserves the upstream POC's security defects and do
 
 ## 📊 Historical baseline acceptance (v0.9.0 R3)
 
-The numbers below were the real-environment baseline for three-layer workflow generation as of **v0.9.0 R3**; the current pack version is **v0.22.2**, and the three Code2n8n case studies above are the v0.22.x evidence layer that supersedes pure-generation acceptance.
+The numbers below were the real-environment baseline for three-layer workflow generation as of **v0.9.0 R3**; the current pack version is in [`VERSION`](VERSION), and the three Code2n8n case studies above plus [`tests/REPORT-v0.24.1-evidence.md`](tests/REPORT-v0.24.1-evidence.md) are the current-version evidence layer that supersedes pure-generation acceptance.
 
 | Layer | Pass rate |
 |---|---|
