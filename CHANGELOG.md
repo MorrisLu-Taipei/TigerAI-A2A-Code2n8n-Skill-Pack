@@ -1,5 +1,55 @@
 # Changelog
 
+## v0.26.0 — 結清 responsibility-matrix 最後 4 個 🟡
+
+v0.25.0 把 installer / hero PNG / CI gate 收尾。v0.26.0 把責任矩陣裡剩下的 4 個 🟡（live-n8n round-trip、確定性 security scanner、完整 CI/CD、Retry/Approval/Handover drop-in 模板）一次清完。
+
+### 🆕 [`scripts/security-scan.mjs`](scripts/security-scan.mjs) — 確定性 workflow 安全掃描器
+
+regex / 結構性規則，不是 AI 判斷：
+- 密鑰文字（OpenAI / AWS / GitHub / Slack / Google API / PEM 私鑰 / JWT / basic-auth URL）
+- 敏感 key（password / secret / token / api_key / private_key…）底下的明文值
+- 非 localhost 的 cleartext HTTP URL
+- webhook 節點沒 authentication
+- empty / unparsable JSON 結構問題
+
+支援 `--glob "..."` / `--format markdown\|json\|text`。0 errors 就 exit 0；任何 error 就 exit 1。在本機跑 case-study + templates 共 16 個 workflow：0 errors、9 warnings（全部是 case study 故意保留的 webhook-no-auth，已在 SECURITY-CAVEATS 揭露）。
+
+### 🆕 [`scripts/live-roundtrip.mjs`](scripts/live-roundtrip.mjs) — n8n REST round-trip
+
+`POST /workflows` → `GET /workflows/{id}` 比對 node count → `DELETE /workflows/{id}`，每個 workflow 都不留垃圾。沒設 `N8N_API_URL` / `N8N_API_KEY` 時自動 exit 0 skip（CI optional job 用）。Import 名稱前綴 `[Claude YYYY-MM-DD] roundtrip —`，方便 crash 後找孤兒。
+
+### 🆕 [`examples/templates/`](examples/templates/) — 三個 drop-in importable workflow
+
+| 檔案 | 模式 | 節點 |
+| --- | --- | --- |
+| `retry-with-backoff.workflow.json` | 指數退避 retry + dead-letter | 10 nodes |
+| `human-approval-gate.workflow.json` | 人工核可關卡（Wait + resume webhook） | 8 nodes |
+| `handover-trace.workflow.json` | 跨系統交接 + correlation ID | 8 nodes |
+
+每個檔案含結構化 sticky note 說明：模式定義、實作節點對應、上線前要改什麼、滿足 `n8n-security-governance` 哪幾條規則。三檔皆通過 security scanner 0/0。
+
+### 🛡️ CI gate 擴充（多平台）
+
+`.github/workflows/security-gate.yml` 新增 4 個 job：
+- `workflow-security-scan` — 跑 security-scan.mjs 對 case studies + templates
+- `dependency-cve` — matrix npm audit（LINE CS cloud / on-prem 各跑一份；`continue-on-error`，先報不擋）
+- `container-scan` — Trivy filesystem scan on-prem case（HIGH / CRITICAL，`exit-code: 0` 先報不擋）
+- `live-roundtrip` — 跑 live-roundtrip.mjs；secret-gated（`N8N_API_URL` / `N8N_API_KEY`）
+
+[`.gitlab-ci.yml`](.gitlab-ci.yml) 鏡像同一份邏輯給 GitLab runner — 4 個 stage（parse / lint / scan / roundtrip），同樣的 script 被引用、不重抄。
+
+### 📋 周邊串接
+
+- `docs/responsibility-matrix.md`：4 個 🟡 全部翻 ✅，per-claim 表頂端的「狀態 as of」改 v0.26.0。
+- `skills/tigerai/tigerai-enterprise-patterns/SKILL.md` 頂部加引用 `examples/templates/` 的指引條，讓 AI 套 skill 時可直接拿模板當骨架。
+
+### Backlog 結餘
+
+責任矩陣現在 **0 個 🟡** — 剩 ⛔ 都是「不在 Pack scope 內」（SSO / IAM / Audit Log / multi-main HA / `/metrics` 觀測 stack / ERP/CRM/DB/LLM 實際整合）。如果未來要再加項目，是 ✅ + ⛔ 兩種狀態而已；🟡 不再代表「我們答應但還沒做」。
+
+---
+
 ## v0.25.0 — 把 responsibility-matrix 的 4 個 🟡 backlog 全部結清
 
 v0.24.2 把文件落差掃乾淨，但責任矩陣裡還留 4 個 🟡（hero PNG 沒燒字、installer 沒旗標、沒 dry-run、沒官方 uninstall）。這版一次結清。

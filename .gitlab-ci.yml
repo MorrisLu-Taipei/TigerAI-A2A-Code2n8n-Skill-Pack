@@ -1,0 +1,130 @@
+# Mirror of .github/workflows/security-gate.yml for GitLab CI users.
+# Run the same gate on a GitLab runner without rewriting any logic in the
+# scripts the gate calls.
+#
+# CI variables expected (Settings → CI/CD → Variables):
+#   N8N_API_URL, N8N_API_KEY  (masked, protected) — optional; live-roundtrip
+#                              skips itself when missing.
+
+stages:
+  - parse
+  - lint
+  - scan
+  - roundtrip
+
+default:
+  image: node:20-bookworm
+  before_script:
+    - node --version
+    - corepack enable || true
+
+variables:
+  GIT_DEPTH: '20'
+
+# ---------- parse stage ---------------------------------------------------
+
+manifest-consistency:
+  stage: parse
+  script:
+    - |
+      node -e "
+        const fs = require('fs');
+        const path = require('path');
+        const plugin = JSON.parse(fs.readFileSync('plugin.json','utf8'));
+        const missing = [];
+        for (const s of plugin.skills) {
+          if (!fs.existsSync(path.join(s.path, 'SKILL.md'))) missing.push(s.path);
+        }
+        if (missing.length) { console.error('Missing SKILL.md:\n  '+missing.join('\n  ')); process.exit(1); }
+        const registered = new Set(plugin.skills.map(s => s.path.replace(/\\\\/g,'/')));
+        const onDisk = [];
+        for (const root of ['skills/_vendor','skills/tigerai']) {
+          for (const d of fs.readdirSync(root)) {
+            const full = path.posix.join(root, d);
+            if (fs.existsSync(path.join(full,'SKILL.md'))) onDisk.push(full);
+          }
+        }
+        const orphans = onDisk.filter(p => !registered.has(p));
+        if (orphans.length) { console.error('On-disk orphans:\n  '+orphans.join('\n  ')); process.exit(1); }
+        console.log('OK — '+plugin.skills.length+' manifest entries match disk.');
+      "
+
+installer-parse:
+  stage: parse
+  image: mcr.microsoft.com/powershell:7.4-debian-12
+  script:
+    - bash -n install.sh
+    - bash -n uninstall.sh
+    - for f in install.ps1 uninstall.ps1; do
+        hex=$(head -c 3 "$f" | od -An -tx1 | tr -d ' \n');
+        [ "$hex" = "efbbbf" ] || { echo "$f missing BOM (got $hex)"; exit 1; };
+      done
+    - pwsh -NoProfile -Command 'foreach ($f in @("install.ps1","uninstall.ps1")) { $errors=$null; $tokens=$null; [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path "./$f"), [ref]$tokens, [ref]$errors) | Out-Null; if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Error $_.Message }; exit 1 }; Write-Host "OK — $f parses clean." }'
+    - bash install.sh --target claude --dry-run | tail -5
+    - bash uninstall.sh --target claude --dry-run | tail -5
+    - pwsh -NoProfile -Command "./install.ps1 -Target claude -DryRun | Select-Object -Last 5"
+    - pwsh -NoProfile -Command "./uninstall.ps1 -Target claude -DryRun | Select-Object -Last 5"
+
+# ---------- lint stage ----------------------------------------------------
+
+json-audit:
+  stage: lint
+  script:
+    - node examples/google-workspace-admin-workflow/_audit.mjs
+    - node examples/line-ai-customer-service/_audit.mjs
+    - |
+      node -e "
+        const j = JSON.parse(require('fs').readFileSync('examples/line-ai-customer-service-onprem/n8n_workflow_export.json','utf8'));
+        if (!Array.isArray(j.nodes) || j.nodes.length < 1) { process.exit(1); }
+        console.log('on-prem brain: '+j.nodes.length+' nodes.');
+      "
+
+# ---------- scan stage ----------------------------------------------------
+
+secret-scan:
+  stage: scan
+  script:
+    - |
+      patterns='sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----'
+      hits=$(git ls-files | grep -v -E '^(reference-workflows/|research/|tests/REPORT)' | xargs -I{} grep -lE "$patterns" "{}" 2>/dev/null || true)
+      if [ -n "$hits" ]; then echo "Possible secrets:"; echo "$hits"; exit 1; fi
+      echo "OK — clean."
+
+workflow-security-scan:
+  stage: scan
+  script:
+    - node scripts/security-scan.mjs --glob "examples/**/*.workflow.json" --format markdown
+    - node scripts/security-scan.mjs --glob "examples/templates/*.workflow.json"
+    - node scripts/security-scan.mjs examples/line-ai-customer-service-onprem/n8n_workflow_export.json --format markdown
+
+dependency-cve:
+  stage: scan
+  allow_failure: true
+  parallel:
+    matrix:
+      - CASE: examples/line-ai-customer-service
+      - CASE: examples/line-ai-customer-service-onprem
+  script:
+    - cd "$CASE"
+    - test -f package.json || { echo "No package.json — skip."; exit 0; }
+    - npm audit --omit=dev --audit-level=high || echo "npm audit reported findings (allow_failure)"
+
+container-scan:
+  stage: scan
+  allow_failure: true
+  image:
+    name: aquasec/trivy:latest
+    entrypoint: [""]
+  script:
+    - trivy fs --severity HIGH,CRITICAL --ignore-unfixed --exit-code 0 examples/line-ai-customer-service-onprem
+
+# ---------- roundtrip stage ----------------------------------------------
+
+live-roundtrip:
+  stage: roundtrip
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - node scripts/live-roundtrip.mjs --glob "examples/templates/*.workflow.json"
+    - node scripts/live-roundtrip.mjs --glob "examples/**/core/*.workflow.json"

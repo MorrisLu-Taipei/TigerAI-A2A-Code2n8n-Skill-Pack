@@ -1,0 +1,101 @@
+{
+  "name": "Template — Cross-system handover with correlation ID",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Pattern: Cross-system handover with correlation ID\n\n**When to use**: this workflow hands work off to another system (queue, downstream API, sub-workflow) and needs an audit-able correlation ID baked into every step's output so investigators can stitch the trace back together later.\n\n**Nodes that implement it**:\n- `Trigger`\n- `Mint correlation` — generates `correlationId` + `originSpanId`\n- `Persist origin event` — replace with your audit log writer (DB / Loki / S3)\n- `Hand off to system A` — replace with real call; carries the correlation ID in headers AND body\n- `Hand off to system B` — same, runs in parallel\n- `Merge handovers` — Merge node collects both downstream responses\n- `Persist handover result` — writes final state + downstream IDs to the audit store\n\n**Customise before activating**:\n1. Replace `Persist origin event` and `Persist handover result` with the real audit writer.\n2. Replace `Hand off to system A / B` with the real downstream APIs. Keep the `X-Correlation-ID` header.\n3. Decide your retention window for correlation IDs in your audit store.\n\n**Satisfies n8n-security-governance rules**: §5 every cross-system hop carries an audit-able correlation ID · §6 audit trail must record before-and-after state · §7 downstream IDs must be persisted so failure investigation can stitch the trace.",
+        "height": 460,
+        "width": 540
+      },
+      "id": "note-1",
+      "name": "Pattern note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-720, -340]
+    },
+    {
+      "parameters": {},
+      "id": "trigger-1",
+      "name": "Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-100, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "const id = `tpl-handover-${Date.now()}-${Math.floor(Math.random()*1e6)}`;\nconst spanId = `span-${Math.floor(Math.random()*1e9).toString(16)}`;\nreturn [{ json: { ...($input.first()?.json ?? {}), correlationId: id, originSpanId: spanId, startedAt: new Date().toISOString() } }];"
+      },
+      "id": "mint-1",
+      "name": "Mint correlation",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [120, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "// REPLACE with real audit log writer (DB / Loki / S3).\nreturn [{ json: { ...$json, auditEvent: 'origin', persisted: true } }];"
+      },
+      "id": "persist-origin-1",
+      "name": "Persist origin event",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [360, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "// REPLACE with real downstream-A call.\n// Keep the correlation ID in headers AND body so the receiver can log it.\nreturn [{ json: { downstream: 'A', acceptedId: `A-${Math.floor(Math.random()*1e9)}`, correlationId: $json.correlationId } }];"
+      },
+      "id": "handoff-a-1",
+      "name": "Hand off to system A",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [620, -160]
+    },
+    {
+      "parameters": {
+        "functionCode": "// REPLACE with real downstream-B call.\nreturn [{ json: { downstream: 'B', acceptedId: `B-${Math.floor(Math.random()*1e9)}`, correlationId: $json.correlationId } }];"
+      },
+      "id": "handoff-b-1",
+      "name": "Hand off to system B",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [620, 80]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition"
+      },
+      "id": "merge-1",
+      "name": "Merge handovers",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [880, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "// REPLACE with real audit writer. Persist correlation ID + both downstream IDs.\nconst items = $input.all().map(i => i.json);\nreturn [{ json: { auditEvent: 'handover-complete', correlationId: items[0]?.correlationId, downstreamIds: items.map(i => i.acceptedId), completedAt: new Date().toISOString() } }];"
+      },
+      "id": "persist-final-1",
+      "name": "Persist handover result",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1120, -40]
+    }
+  ],
+  "connections": {
+    "Trigger": { "main": [[{ "node": "Mint correlation", "type": "main", "index": 0 }]] },
+    "Mint correlation": { "main": [[{ "node": "Persist origin event", "type": "main", "index": 0 }]] },
+    "Persist origin event": { "main": [[
+      { "node": "Hand off to system A", "type": "main", "index": 0 },
+      { "node": "Hand off to system B", "type": "main", "index": 0 }
+    ]]},
+    "Hand off to system A": { "main": [[{ "node": "Merge handovers", "type": "main", "index": 0 }]] },
+    "Hand off to system B": { "main": [[{ "node": "Merge handovers", "type": "main", "index": 1 }]] },
+    "Merge handovers": { "main": [[{ "node": "Persist handover result", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

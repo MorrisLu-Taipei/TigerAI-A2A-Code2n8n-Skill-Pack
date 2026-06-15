@@ -127,3 +127,64 @@ jobs:
         run: |
           ./install.ps1 -Target claude -DryRun | Select-Object -Last 5
           ./uninstall.ps1 -Target claude -DryRun | Select-Object -Last 5
+
+  workflow-security-scan:
+    name: deterministic workflow security scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan case-study + template workflow JSON
+        run: |
+          node scripts/security-scan.mjs --glob "examples/**/*.workflow.json" --format markdown
+          node scripts/security-scan.mjs --glob "examples/templates/*.workflow.json"
+      - name: Scan on-prem brain JSON
+        run: node scripts/security-scan.mjs examples/line-ai-customer-service-onprem/n8n_workflow_export.json --format markdown
+
+  dependency-cve:
+    name: case-study npm audit
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      matrix:
+        case:
+          - examples/line-ai-customer-service
+          - examples/line-ai-customer-service-onprem
+    steps:
+      - uses: actions/checkout@v4
+      - name: npm audit (high+)
+        working-directory: ${{ matrix.case }}
+        run: |
+          if [ ! -f package.json ]; then
+            echo "No package.json — skip."
+            exit 0
+          fi
+          npm audit --omit=dev --audit-level=high || echo "npm audit reported findings (continue-on-error)"
+
+  container-scan:
+    name: on-prem container image scan (Trivy)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy filesystem scan on the on-prem case
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: examples/line-ai-customer-service-onprem
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '0'
+
+  live-roundtrip:
+    name: n8n REST round-trip (optional — needs secrets)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' }}
+    env:
+      N8N_API_URL: ${{ secrets.N8N_API_URL }}
+      N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Round-trip templates + case-study core workflows
+        run: |
+          node scripts/live-roundtrip.mjs --glob "examples/templates/*.workflow.json"
+          node scripts/live-roundtrip.mjs --glob "examples/**/core/*.workflow.json"

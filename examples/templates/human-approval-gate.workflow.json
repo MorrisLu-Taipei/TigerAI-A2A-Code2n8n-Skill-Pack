@@ -1,0 +1,111 @@
+{
+  "name": "Template — Human approval gate (Wait + resume webhook)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Pattern: Human approval gate\n\n**When to use**: workflow with a destructive or financially material step. Pauses on a `Wait → Resume on webhook` node; approver clicks the approve / reject link in the notification.\n\n**Nodes that implement it**:\n- `Trigger`\n- `Notify approver` — replace with Slack / email / Teams. Body MUST embed `{{$resumeUrl}}/approve` and `{{$resumeUrl}}/reject`.\n- `Wait for approval` — `resumeOn=webhook`, timeout configurable\n- `Approved?` IF — branches the workflow\n- `Apply destructive action` — your real action; only runs after approve\n- `Audit reject` — logs who rejected (Function placeholder — replace with audit log writer)\n\n**Customise before activating**:\n1. Wire `Notify approver` to your real channel.\n2. Set the timeout on `Wait for approval` to match SLA (default 24 h).\n3. Replace `Apply destructive action` with the real call.\n4. Replace `Audit reject` with a write to your audit log.\n\n**Satisfies n8n-security-governance rules**: §3 destructive actions require explicit human approval · §6 audit trail must record approver identity + decision · §9 timeouts must be bounded.",
+        "height": 460,
+        "width": 540
+      },
+      "id": "note-1",
+      "name": "Pattern note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-720, -340]
+    },
+    {
+      "parameters": {},
+      "id": "trigger-1",
+      "name": "Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-100, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{ json: { ...($input.first()?.json ?? {}), correlationId: `tpl-approval-${Date.now()}-${Math.floor(Math.random()*1e6)}`, requestedAt: new Date().toISOString() } }];"
+      },
+      "id": "init-1",
+      "name": "Stamp correlation",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [120, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "// REPLACE THIS with a real Slack / email / Teams send node.\n// The body MUST contain $resumeUrl/approve and $resumeUrl/reject so the\n// Wait node can pick up the decision.\nreturn [{ json: { ...$json, notified: true } }];"
+      },
+      "id": "notify-1",
+      "name": "Notify approver",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [360, -40]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "webhookSuffix": "approve",
+          "responseTimeout": "24h"
+        }
+      },
+      "id": "wait-1",
+      "name": "Wait for approval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [600, -40]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body?.decision ?? $json.query?.decision ?? 'reject' }}",
+              "operation": "equals",
+              "value2": "approve"
+            }
+          ]
+        }
+      },
+      "id": "if-1",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [840, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "// REPLACE WITH YOUR REAL DESTRUCTIVE ACTION (delete user, transfer funds, etc).\n// This node only runs after explicit approve.\nreturn [{ json: { ok: true, action: 'applied', correlationId: $json.correlationId } }];"
+      },
+      "id": "apply-1",
+      "name": "Apply destructive action",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1080, -160]
+    },
+    {
+      "parameters": {
+        "functionCode": "// REPLACE with a real audit log writer.\nreturn [{ json: { audit: 'rejected', approver: $json.body?.approver ?? 'unknown', correlationId: $json.correlationId } }];"
+      },
+      "id": "reject-1",
+      "name": "Audit reject",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1080, 80]
+    }
+  ],
+  "connections": {
+    "Trigger": { "main": [[{ "node": "Stamp correlation", "type": "main", "index": 0 }]] },
+    "Stamp correlation": { "main": [[{ "node": "Notify approver", "type": "main", "index": 0 }]] },
+    "Notify approver": { "main": [[{ "node": "Wait for approval", "type": "main", "index": 0 }]] },
+    "Wait for approval": { "main": [[{ "node": "Approved?", "type": "main", "index": 0 }]] },
+    "Approved?": { "main": [
+      [{ "node": "Apply destructive action", "type": "main", "index": 0 }],
+      [{ "node": "Audit reject", "type": "main", "index": 0 }]
+    ]}
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

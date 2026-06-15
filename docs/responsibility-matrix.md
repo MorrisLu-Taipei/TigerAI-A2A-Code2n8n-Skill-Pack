@@ -4,7 +4,7 @@
 
 > 🎯 **One-sentence positioning**: TigerAI Code2n8n Skill Pack is a **porting / review / governance methodology pack**; n8n (and your IT team) are the platforms that actually carry the enterprise capabilities. The hero diagram's third block (SSO / IAM / Audit Log / HA / Metrics / Source Control) is provided by **n8n editions + your IT deployment** — never reimplemented by the Pack.
 
-The hero diagram makes claims across multiple layers. This page tells you, per claim, who owns it and how complete it is **as of v0.24.1**. Honest evidence beats inflated evidence — if a row says "partial," that's the truth, not a hedge.
+The hero diagram makes claims across multiple layers. This page tells you, per claim, who owns it and how complete it is **as of v0.26.0**. Honest evidence beats inflated evidence — if a row says "partial," that's the truth, not a hedge.
 
 ---
 
@@ -32,17 +32,17 @@ The Pack does **not** reimplement any of the above and does **not** try to be yo
 
 ---
 
-## Per-claim status (v0.24.1)
+## Per-claim status (v0.26.0)
 
 | Hero claim | Current state | Status |
 | --- | --- | --- |
 | Inventory, Partition, Workflow Design | Codified in `code-to-workflow` skill; three case studies demonstrate it end to end | ✅ Methodology done |
 | Security Audit | Dedicated `n8n-security-governance` skill; `code-to-workflow` Step 1.5 enforces it; `SECURITY-REVIEW.md` (positive) + `SECURITY-CAVEATS.md` (negative) examples ship | ✅ Review methodology done |
-| Production Validation | `_audit.mjs` lint + `_n8n_import_test.mjs` REST scripts exist; full validation still needs a live n8n + credentials | 🟡 Partial — works, but not unattended |
-| Security scanning | Agent-driven SOP + checklists; **not** a deterministic scanner | 🟡 Not toolised |
+| Production Validation | `_audit.mjs` lint + `scripts/live-roundtrip.mjs` (import → fetch → delete cycle); v0.26.0 wires it into CI (gated on `N8N_API_URL` / `N8N_API_KEY` secrets) — skips cleanly when no credentials | ✅ Automated end-to-end when secrets present |
+| Security scanning | [`scripts/security-scan.mjs`](../scripts/security-scan.mjs) — deterministic regex / structural rules over workflow JSON: secret literals (OpenAI/AWS/GitHub/Slack/Google/PEM/JWT/basic-auth-URL), plaintext credentials under sensitive keys, cleartext HTTP URLs, webhook-without-auth. CI runs it on every push | ✅ Toolised |
 | Version Control | Commit pinning, version stamping, release/rollback rules documented | 🟡 Has SOP, no full automation |
-| CI/CD | Pack defines the gate; v0.24.1 ships `.github/workflows/security-gate.yml` (manifest consistency + JSON audit + secret scan + installer parse); broader pipelines (GitLab CI, full dep CVE, container scan) not yet | 🟡 First gate live, more to come |
-| Retry, Approval, Handover | Enterprise Pattern designs exist | 🟡 No drop-in importable template |
+| CI/CD | Pack ships `.github/workflows/security-gate.yml` AND `.gitlab-ci.yml` — both run manifest consistency, JSON audit, secret scan, installer/uninstaller parse + dry-run, deterministic workflow security scan, npm-audit (case studies with `package.json`), Trivy filesystem scan (on-prem case), and optional live REST round-trip | ✅ Multi-platform gate live |
+| Retry, Approval, Handover | [`examples/templates/`](../examples/templates/) ships 3 drop-in importable workflows: `retry-with-backoff.workflow.json`, `human-approval-gate.workflow.json`, `handover-trace.workflow.json`. Each carries structured sticky notes naming the SECGOV rules it satisfies; all pass the security scanner 0/0 | ✅ Templates shipped |
 | Logs, Alerts, Observability | Design requirements stated | ⛔ Execution belongs to n8n + monitoring stack + IT |
 | SSO, RBAC/IAM, Audit Log, External Secrets | — | ⛔ n8n Enterprise platform feature — Pack must not implement |
 | Source Control / Environments | — | ⛔ **n8n Business and up** (not Enterprise-only) — Pack must not implement |
@@ -60,8 +60,10 @@ Legend: ✅ done · 🟡 partial / in progress · ⛔ explicitly out of Pack sco
 
 ## What this means for readers
 
-- If you came here because the hero promises "Security Audit" and "CI/CD gate" — yes, both exist; read [`skills/tigerai/n8n-security-governance/SKILL.md`](../skills/tigerai/n8n-security-governance/SKILL.md) and [`.github/workflows/security-gate.yml`](../.github/workflows/security-gate.yml).
-- If you came expecting an out-of-the-box deterministic secret scanner or container CVE scanner — that's roadmap, not v0.24.1.
+- If you came here because the hero promises "Security Audit" and "CI/CD gate" — yes, both exist; read [`skills/tigerai/n8n-security-governance/SKILL.md`](../skills/tigerai/n8n-security-governance/SKILL.md), [`.github/workflows/security-gate.yml`](../.github/workflows/security-gate.yml), and [`.gitlab-ci.yml`](../.gitlab-ci.yml).
+- If you came expecting an out-of-the-box deterministic secret scanner — [`scripts/security-scan.mjs`](../scripts/security-scan.mjs) is it. For container CVE — `npm audit` matrix + Trivy fs scan ship in the gate (`continue-on-error: true` so they report without blocking — promote to blocking once your fork's baseline is clean).
+- If you want a live-n8n round-trip — [`scripts/live-roundtrip.mjs`](../scripts/live-roundtrip.mjs); set `N8N_API_URL` + `N8N_API_KEY` as CI secrets and the `live-roundtrip` job runs.
+- If you want drop-in templates for Retry / Approval / Handover — [`examples/templates/`](../examples/templates/).
 - If you came expecting SSO / Audit Log / External Secrets — that's **n8n Enterprise**.
 - If you came expecting Source Control / Environments — that's **n8n Business and up** (not Enterprise-only).
 - If you came expecting HA — partial answer: **queue mode + workers + Postgres/Redis** runs on any tier with IT effort; **multi-main active-active** is the Enterprise-specific bit. Either way IT still owns the deployment.

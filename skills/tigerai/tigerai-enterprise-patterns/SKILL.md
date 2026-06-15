@@ -6,6 +6,8 @@ description: Applies TigerAI enterprise-grade design patterns when generating n8
 # TigerAI Enterprise Patterns — 企業級模式 Skill
 
 > 🌐 [English](SKILL.en.md) | **繁體中文**
+>
+> 🧱 **Drop-in 模板（v0.26.0 起）**：Retry / Approval / Handover 三個經典模式有可直接 import 的最小工作流 JSON：[`examples/templates/`](../../../examples/templates/)。AI 套用本 Skill 時可優先參考這三個檔案的節點結構、sticky note 寫法、correlation ID 命名，並修改成使用者場景。
 
 ## 1. 觸發條件
 

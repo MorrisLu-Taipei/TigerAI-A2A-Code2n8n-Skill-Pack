@@ -1,0 +1,148 @@
+{
+  "name": "Template — Retry with exponential backoff + dead-letter",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Pattern: Retry with exponential backoff + dead-letter\n\n**When to use**: outbound HTTP / API call that can transiently fail (rate limits, 5xx, timeout). Retries 3× with 2 s / 4 s / 8 s backoff, then routes to a dead-letter sink for human follow-up.\n\n**Nodes that implement it**:\n- `Trigger` — replace with your real trigger\n- `Try HTTP` — the call you want to harden\n- `Catch Error` (error workflow on `Try HTTP`) — wired to the retry loop\n- `Wait Backoff` — 2 s → 4 s → 8 s\n- `Loop Counter` (Function) — tracks attempt count\n- `Dead-letter Sink` — replace with Slack / email / queue\n\n**Customise before activating**:\n1. Replace `Trigger` with your real trigger.\n2. Point `Try HTTP` at your real endpoint and credential.\n3. Replace `Dead-letter Sink` with your real notification / queue.\n\n**Satisfies n8n-security-governance rules**: §4.2 retries must be bounded · §4.3 unrecoverable failures must surface to a human · §8 every node must be `continueOnFail` aware.",
+        "height": 460,
+        "width": 540
+      },
+      "id": "note-1",
+      "name": "Pattern note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-720, -340]
+    },
+    {
+      "parameters": {},
+      "id": "trigger-1",
+      "name": "Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-100, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Initialise loop state. Replace the payload with whatever Trigger emits.\nreturn [{\n  json: {\n    payload: $input.first()?.json ?? {},\n    attempt: 0,\n    maxAttempts: 3,\n    backoffMs: [2000, 4000, 8000],\n    correlationId: `tpl-retry-${Date.now()}-${Math.floor(Math.random() * 1e6)}`\n  }\n}];"
+      },
+      "id": "init-1",
+      "name": "Init loop state",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [120, -40]
+    },
+    {
+      "parameters": {
+        "url": "https://example.invalid/REPLACE-ME",
+        "options": {
+          "timeout": 10000
+        },
+        "sendBody": true,
+        "jsonBody": "={{ JSON.stringify($json.payload) }}"
+      },
+      "id": "http-1",
+      "name": "Try HTTP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [400, -40],
+      "continueOnFail": true,
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [],
+          "number": [
+            {
+              "value1": "={{ $json.statusCode || 0 }}",
+              "operation": "between",
+              "value2": 200,
+              "value3": 299
+            }
+          ]
+        }
+      },
+      "id": "if-1",
+      "name": "HTTP ok?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [640, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Increment attempt counter. Out: { proceed: true|false, waitMs }\nconst s = $input.first().json;\nconst nextAttempt = (s.attempt ?? 0) + 1;\nif (nextAttempt > s.maxAttempts) {\n  return [{ json: { ...s, attempt: nextAttempt, exhausted: true } }];\n}\nreturn [{ json: { ...s, attempt: nextAttempt, waitMs: s.backoffMs[nextAttempt - 1] } }];"
+      },
+      "id": "incr-1",
+      "name": "Increment + decide",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [880, 120]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.exhausted === true }}"
+            }
+          ]
+        }
+      },
+      "id": "if-2",
+      "name": "Exhausted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1100, 120]
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.waitMs }}",
+        "unit": "ms"
+      },
+      "id": "wait-1",
+      "name": "Wait backoff",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1320, 220]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Replace this Function with your real dead-letter sink (Slack / email / queue).\nreturn [{\n  json: {\n    deadLetter: true,\n    reason: 'max retries exhausted',\n    correlationId: $json.correlationId,\n    finalAttempt: $json.attempt,\n    snapshot: $json.payload\n  }\n}];"
+      },
+      "id": "dlq-1",
+      "name": "Dead-letter sink",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1320, 20]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Success — pass through with correlation ID.\nreturn [{ json: { ok: true, correlationId: $node['Init loop state'].json.correlationId, response: $json } }];"
+      },
+      "id": "ok-1",
+      "name": "Mark success",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [880, -160]
+    }
+  ],
+  "connections": {
+    "Trigger": { "main": [[{ "node": "Init loop state", "type": "main", "index": 0 }]] },
+    "Init loop state": { "main": [[{ "node": "Try HTTP", "type": "main", "index": 0 }]] },
+    "Try HTTP": { "main": [[{ "node": "HTTP ok?", "type": "main", "index": 0 }]] },
+    "HTTP ok?": { "main": [
+      [{ "node": "Mark success", "type": "main", "index": 0 }],
+      [{ "node": "Increment + decide", "type": "main", "index": 0 }]
+    ]},
+    "Increment + decide": { "main": [[{ "node": "Exhausted?", "type": "main", "index": 0 }]] },
+    "Exhausted?": { "main": [
+      [{ "node": "Dead-letter sink", "type": "main", "index": 0 }],
+      [{ "node": "Wait backoff", "type": "main", "index": 0 }]
+    ]},
+    "Wait backoff": { "main": [[{ "node": "Try HTTP", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}
