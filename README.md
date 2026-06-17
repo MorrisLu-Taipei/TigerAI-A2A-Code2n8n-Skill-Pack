@@ -5,7 +5,7 @@
 
 > **The Code2n8n positioning**: AI Coding (Claude Code / Codex / Antigravity) is great at *writing* code. n8n is great at making code *manageable by an enterprise*. This pack is the bridge — **describe a requirement, *or* point at an existing system** (Apps Script / Express / Lambda / Docker stack), and get a runnable n8n workflow that IT, operations, and managers can all read, audit, hand off, and govern.
 
-![TigerAI Code2n8n Skill Pack — Code2n8n hero (v16 user-remaster)](docs/images/code2n8n-hero-en.png)
+![TigerAI Code2n8n Skill Pack — Code2n8n hero (v19, correct logos + platform-capability footnote)](docs/images/code2n8n-hero-en.png)
 
 > 🎯 **One-sentence positioning**: **This Pack is a porting / review / validation / governance method. n8n editions + your IT carry the enterprise platform capabilities.**
 
