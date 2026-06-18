@@ -1,0 +1,165 @@
+{
+  "name": "einvoice-allowance — refund webhook → svc/v1/allowance (retry + audit)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## einvoice-allowance (core)\n\n**Trigger**: webhook from your refund / billing system.\n\n**Body**\n```json\n{\n  \"provider\": \"amego\",\n  \"input\": {\n    \"invoiceNumber\": \"AB12345678\",\n    \"items\": [{ \"description\": \"訂閱方案\", \"quantity\": 1, \"unitPrice\": 1000, \"amount\": 1000 }],\n    \"amount\": { \"salesAmount\": 1000, \"taxAmount\": 50, \"totalAmount\": 1050 },\n    \"taxType\": \"TAXABLE\"\n  }\n}\n```\n\n**Flow**: same retry-with-backoff shape as `einvoice-issue-from-order`, calling `/v1/allowance` instead of `/v1/issue`. Same audit Sheet, op=`allowance`.\n\n**Why allowance does NOT need an approval gate** (unlike void): allowance is itself reversible via `voidAllowance`. If your finance policy demands approval anyway, copy `einvoice-void-with-approval` and swap the endpoint.\n\n**Before activating, replace**:\n- `__REPLACE_ME__EINVOICE_SVC_URL__`\n- `__REPLACE_ME__GOOGLE_SHEET_ID__`\n- `__REPLACE_ME__SLACK_CHANNEL__`",
+        "height": 460,
+        "width": 560
+      },
+      "id": "note-1",
+      "name": "Pattern note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-740, -340]
+    },
+    {
+      "parameters": {
+        "path": "einvoice/allowance",
+        "httpMethod": "POST",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh-1",
+      "name": "Webhook: allowance request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [-120, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "const body = $json.body || $json;\nif (!body.provider || !body.input) throw new Error('provider + input required');\nreturn [{ json: {\n  correlationId: `inv-allow-${Date.now()}-${Math.floor(Math.random()*1e6)}`,\n  startedAt: new Date().toISOString(),\n  provider: body.provider,\n  input: body.input,\n  attempt: 0,\n  maxAttempts: 3,\n  backoffMs: [2000, 4000, 8000]\n}}];"
+      },
+      "id": "stamp-1",
+      "name": "Stamp correlation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [120, -40]
+    },
+    {
+      "parameters": {
+        "url": "=__REPLACE_ME__EINVOICE_SVC_URL__/v1/allowance",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{ JSON.stringify({ provider: $json.provider, input: $json.input }) }}",
+        "options": { "timeout": 15000 },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "http-1",
+      "name": "Call svc /v1/allowance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [360, -40],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            { "value1": "={{ $json.statusCode || 200 }}", "operation": "between", "value2": 200, "value3": 299 }
+          ]
+        }
+      },
+      "id": "if-ok-1",
+      "name": "Allowance ok?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [600, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "const s = $input.first().json;\nconst nextAttempt = (s.attempt ?? 0) + 1;\nif (nextAttempt > s.maxAttempts) return [{ json: { ...s, attempt: nextAttempt, exhausted: true } }];\nreturn [{ json: { ...s, attempt: nextAttempt, waitMs: s.backoffMs[nextAttempt - 1] } }];"
+      },
+      "id": "incr-1",
+      "name": "Increment + decide",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [840, 120]
+    },
+    {
+      "parameters": {
+        "conditions": { "boolean": [{ "value1": "={{ $json.exhausted === true }}" }] }
+      },
+      "id": "if-ex-1",
+      "name": "Exhausted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1080, 120]
+    },
+    {
+      "parameters": { "amount": "={{ $json.waitMs }}", "unit": "ms" },
+      "id": "wait-1",
+      "name": "Wait backoff",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1320, 220]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": "__REPLACE_ME__GOOGLE_SHEET_ID__",
+        "sheetName": "Audit",
+        "columnsUi": {
+          "columnValues": [
+            { "column": "correlationId", "value": "={{ $json.correlationId }}" },
+            { "column": "op", "value": "allowance" },
+            { "column": "provider", "value": "={{ $json.provider }}" },
+            { "column": "invoiceNumber", "value": "={{ $json.input?.invoiceNumber }}" },
+            { "column": "status", "value": "={{ $json.exhausted ? 'failed-dlq' : 'allowed' }}" },
+            { "column": "result", "value": "={{ JSON.stringify($json.exhausted ? null : $json.body?.result) }}" },
+            { "column": "appliedAt", "value": "={{ new Date().toISOString() }}" }
+          ]
+        }
+      },
+      "id": "audit-1",
+      "name": "Audit row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1080, -120],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "channel": "__REPLACE_ME__SLACK_CHANNEL__",
+        "text": "=⚠️ einvoice allowance dead-letter — correlation: `{{ $json.correlationId }}` invoice=`{{ $json.input?.invoiceNumber }}` provider=`{{ $json.provider }}`"
+      },
+      "id": "slack-dlq-1",
+      "name": "Slack dead-letter",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1320, 20]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{ json: { ok: !$json.exhausted, correlationId: $json.correlationId, allowanceNumber: $json.body?.result?.allowanceNumber ?? null, status: $json.exhausted ? 'failed-dlq' : 'allowed' } }];"
+      },
+      "id": "respond-1",
+      "name": "Respond to caller",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, -120]
+    }
+  ],
+  "connections": {
+    "Webhook: allowance request": { "main": [[{ "node": "Stamp correlation", "type": "main", "index": 0 }]] },
+    "Stamp correlation": { "main": [[{ "node": "Call svc /v1/allowance", "type": "main", "index": 0 }]] },
+    "Call svc /v1/allowance": { "main": [[{ "node": "Allowance ok?", "type": "main", "index": 0 }]] },
+    "Allowance ok?": { "main": [
+      [{ "node": "Audit row", "type": "main", "index": 0 }],
+      [{ "node": "Increment + decide", "type": "main", "index": 0 }]
+    ]},
+    "Increment + decide": { "main": [[{ "node": "Exhausted?", "type": "main", "index": 0 }]] },
+    "Exhausted?": { "main": [
+      [{ "node": "Audit row", "type": "main", "index": 0 }],
+      [{ "node": "Wait backoff", "type": "main", "index": 0 }]
+    ]},
+    "Wait backoff": { "main": [[{ "node": "Call svc /v1/allowance", "type": "main", "index": 0 }]] },
+    "Audit row": { "main": [[{ "node": "Respond to caller", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

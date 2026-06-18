@@ -1,0 +1,113 @@
+{
+  "name": "einvoice-monthly-audit-export — month-end CSV → email accountant",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## einvoice-monthly-audit-export (scheduler)\n\n**Trigger**: Schedule 1st of every month, 03:00 (Asia/Taipei).\n\n**What it does**\n1. Read Audit Sheet rows where `appliedAt` falls in the prior calendar month.\n2. Group by op (issue / void / allowance / route:*).\n3. Render a CSV.\n4. Email accountant (PDF receipts they regenerate from provider portal; this CSV is just the operational ledger from n8n's side).\n5. Append a summary row to a `Monthly Summary` tab.\n\n**Why this exists**: 商業會計法 requires retention of invoicing records for at least 10 years. The Audit Sheet is the n8n side; the providers keep their own. This export is the bridge for the accountant.\n\n**Before activating, replace**:\n- `__REPLACE_ME__GOOGLE_SHEET_ID__`\n- `__REPLACE_ME__ACCOUNTANT_EMAIL__`\n- Attach SMTP / Gmail OAuth credential to the email node.",
+        "height": 460,
+        "width": 540
+      },
+      "id": "note-1",
+      "name": "Pattern note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-720, -340]
+    },
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "months", "triggerAtDayOfMonth": 1, "triggerAtHour": 3 }] }
+      },
+      "id": "sched-1",
+      "name": "Monthly 1st 03:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [-100, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "const now = new Date();\nconst firstOfThisMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));\nconst firstOfPrevMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));\nconst yyyymm = firstOfPrevMonth.toISOString().slice(0,7);\nreturn [{ json: {\n  correlationId: `monthly-${yyyymm}-${Math.floor(Math.random()*1e6)}`,\n  yyyymm,\n  rangeStart: firstOfPrevMonth.toISOString().slice(0,10),\n  rangeEndExclusive: firstOfThisMonth.toISOString().slice(0,10)\n}}];"
+      },
+      "id": "stamp-1",
+      "name": "Stamp range",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [120, -40]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": "__REPLACE_ME__GOOGLE_SHEET_ID__",
+        "sheetName": "Audit"
+      },
+      "id": "read-1",
+      "name": "Read Audit",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [360, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "const range = $node['Stamp range'].json;\nconst rows = $items().map(i => i.json).filter(r => {\n  const t = (r.appliedAt || '').slice(0,10);\n  return t >= range.rangeStart && t < range.rangeEndExclusive;\n});\nconst headers = ['correlationId','op','provider','orderId','invoiceNumber','status','appliedAt'];\nconst lines = [headers.join(',')];\nfor (const r of rows) {\n  lines.push(headers.map(h => JSON.stringify(r[h] ?? '')).join(','));\n}\nconst counts = rows.reduce((acc,r) => { acc[r.op] = (acc[r.op]||0) + 1; return acc; }, {});\nreturn [{ json: {\n  correlationId: range.correlationId,\n  yyyymm: range.yyyymm,\n  csv: lines.join('\\n'),\n  rowCount: rows.length,\n  counts\n}}];"
+      },
+      "id": "csv-1",
+      "name": "Render CSV",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, -40]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": "__REPLACE_ME__GOOGLE_SHEET_ID__",
+        "sheetName": "Monthly Summary",
+        "columnsUi": {
+          "columnValues": [
+            { "column": "correlationId", "value": "={{ $json.correlationId }}" },
+            { "column": "yyyymm", "value": "={{ $json.yyyymm }}" },
+            { "column": "rowCount", "value": "={{ $json.rowCount }}" },
+            { "column": "counts", "value": "={{ JSON.stringify($json.counts) }}" },
+            { "column": "exportedAt", "value": "={{ new Date().toISOString() }}" }
+          ]
+        }
+      },
+      "id": "summary-1",
+      "name": "Append summary",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [840, -40]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@your-company.tw",
+        "toEmail": "__REPLACE_ME__ACCOUNTANT_EMAIL__",
+        "subject": "=einvoice 月度稽核紀錄 — {{ $json.yyyymm }}",
+        "text": "=附件：{{ $json.yyyymm }} 月共 {{ $json.rowCount }} 筆 einvoice 操作。\\n\\n分類：{{ JSON.stringify($json.counts) }}\\n\\n本郵件由 n8n 自動產生，請以各供應商後台與財政部平台正式紀錄為準。",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "data"
+              }
+            ]
+          }
+        }
+      },
+      "id": "email-1",
+      "name": "Email accountant",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1080, -40]
+    }
+  ],
+  "connections": {
+    "Monthly 1st 03:00": { "main": [[{ "node": "Stamp range", "type": "main", "index": 0 }]] },
+    "Stamp range": { "main": [[{ "node": "Read Audit", "type": "main", "index": 0 }]] },
+    "Read Audit": { "main": [[{ "node": "Render CSV", "type": "main", "index": 0 }]] },
+    "Render CSV": { "main": [[{ "node": "Append summary", "type": "main", "index": 0 }]] },
+    "Append summary": { "main": [[{ "node": "Email accountant", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

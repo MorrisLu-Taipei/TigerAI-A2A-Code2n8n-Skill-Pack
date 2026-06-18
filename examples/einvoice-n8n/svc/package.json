@@ -1,0 +1,31 @@
+{
+  "name": "einvoice-svc",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Thin HTTP wrapper around @paid-tw/einvoice* so n8n can orchestrate invoicing without owning AES/MD5 signing.",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.0",
+    "@paid-tw/einvoice": "^0.1.0",
+    "@paid-tw/einvoice-amego": "^0.1.0",
+    "@paid-tw/einvoice-ecpay": "^0.1.0",
+    "@paid-tw/einvoice-ezpay": "^0.1.0",
+    "@paid-tw/einvoice-ezpay-crossborder": "^0.1.0",
+    "@paid-tw/einvoice-ezreceipt": "^0.1.0",
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

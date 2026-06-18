@@ -1,0 +1,159 @@
+{
+  "name": "einvoice-void-with-approval — Slack approval gate → svc/v1/void",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## einvoice-void-with-approval (entry)\n\n**Why this needs a human gate**: void is irreversible. Whoever clicks approve must own the audit trail. Built on `examples/templates/human-approval-gate.workflow.json`.\n\n**Trigger**: webhook from CS / admin UI (POST `/webhook/einvoice/void`).\n\n**Body it expects**\n```json\n{\n  \"provider\": \"amego\",\n  \"requestedBy\": \"jane@company.tw\",\n  \"reason\": \"客戶取消訂單\",\n  \"input\": { \"invoiceNumber\": \"AB12345678\", \"reason\": \"客戶取消\" }\n}\n```\n\n**Flow**\n1. Stamp correlation + post a Slack message naming invoice + reason + requester, with `$resumeUrl/approve` and `$resumeUrl/reject`.\n2. Wait up to 4h.\n3. On approve → POST svc/v1/void with Bearer auth → audit row.\n4. On reject / timeout → audit row only, no svc call.\n\n**🔒 Production hardening**\n- The Wait node accepts ANY POST to `$resumeUrl/approve` — in production put an inbound Webhook + HMAC SHA-256 verifier (`X-Slack-Signature`) in front. See `skills/tigerai/n8n-security-governance` §6.\n- The `requestedBy` field must NEVER be trusted from the caller alone — the approver field in the audit row should come from Slack's verified user, not from request body.\n\n**Before activating, replace**:\n- `__REPLACE_ME__EINVOICE_SVC_URL__`\n- `__REPLACE_ME__SLACK_CHANNEL__` (must be reviewable; #einvoice-ops not #general)\n- `__REPLACE_ME__GOOGLE_SHEET_ID__`",
+        "height": 580,
+        "width": 560
+      },
+      "id": "note-1",
+      "name": "Pattern note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-740, -360]
+    },
+    {
+      "parameters": {
+        "path": "einvoice/void",
+        "httpMethod": "POST",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh-1",
+      "name": "Webhook: void request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [-120, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "const body = $json.body || $json;\nfor (const k of ['provider','input','requestedBy','reason']) if (!body[k]) throw new Error(`${k} required`);\nreturn [{ json: {\n  correlationId: `inv-void-${Date.now()}-${Math.floor(Math.random()*1e6)}`,\n  requestedAt: new Date().toISOString(),\n  provider: body.provider,\n  requestedBy: body.requestedBy,\n  reason: body.reason,\n  input: body.input\n}}];"
+      },
+      "id": "stamp-1",
+      "name": "Stamp correlation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [120, -40]
+    },
+    {
+      "parameters": {
+        "channel": "__REPLACE_ME__SLACK_CHANNEL__",
+        "text": "=🛑 *VOID approval required*\\nInvoice: `{{ $json.input?.invoiceNumber }}` (provider: {{ $json.provider }})\\nRequested by: {{ $json.requestedBy }}\\nReason: {{ $json.reason }}\\nCorrelation: `{{ $json.correlationId }}`\\n\\nApprove: {{ $resumeUrl }}/approve\\nReject: {{ $resumeUrl }}/reject\\n\\n⚠ Void is irreversible."
+      },
+      "id": "slack-1",
+      "name": "Notify approver",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [360, -40]
+    },
+    {
+      "parameters": {
+        "resume": "webhook",
+        "options": { "webhookSuffix": "approve", "responseTimeout": "4h" }
+      },
+      "id": "wait-1",
+      "name": "Wait for approval",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [600, -40]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            { "value1": "={{ $json.body?.decision ?? $json.query?.decision ?? 'reject' }}", "operation": "equals", "value2": "approve" }
+          ]
+        }
+      },
+      "id": "if-1",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [840, -40]
+    },
+    {
+      "parameters": {
+        "url": "=__REPLACE_ME__EINVOICE_SVC_URL__/v1/void",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{ JSON.stringify({ provider: $json.provider, input: $json.input }) }}",
+        "options": { "timeout": 15000 },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "http-void-1",
+      "name": "Call svc /v1/void",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1080, -160],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": "__REPLACE_ME__GOOGLE_SHEET_ID__",
+        "sheetName": "Audit",
+        "columnsUi": {
+          "columnValues": [
+            { "column": "correlationId", "value": "={{ $json.correlationId }}" },
+            { "column": "op", "value": "void" },
+            { "column": "provider", "value": "={{ $json.provider }}" },
+            { "column": "invoiceNumber", "value": "={{ $json.input?.invoiceNumber }}" },
+            { "column": "requestedBy", "value": "={{ $json.requestedBy }}" },
+            { "column": "approver", "value": "={{ $json.body?.approver ?? 'unknown' }}" },
+            { "column": "reason", "value": "={{ $json.reason }}" },
+            { "column": "status", "value": "={{ ($json.statusCode>=200 && $json.statusCode<300) ? 'voided' : 'failed' }}" },
+            { "column": "appliedAt", "value": "={{ new Date().toISOString() }}" }
+          ]
+        }
+      },
+      "id": "audit-ok-1",
+      "name": "Audit (approved)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1320, -160]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": "__REPLACE_ME__GOOGLE_SHEET_ID__",
+        "sheetName": "Audit",
+        "columnsUi": {
+          "columnValues": [
+            { "column": "correlationId", "value": "={{ $json.correlationId }}" },
+            { "column": "op", "value": "void" },
+            { "column": "provider", "value": "={{ $json.provider }}" },
+            { "column": "invoiceNumber", "value": "={{ $json.input?.invoiceNumber }}" },
+            { "column": "requestedBy", "value": "={{ $json.requestedBy }}" },
+            { "column": "approver", "value": "={{ $json.body?.approver ?? 'unknown' }}" },
+            { "column": "reason", "value": "={{ $json.reason }}" },
+            { "column": "status", "value": "rejected" },
+            { "column": "appliedAt", "value": "={{ new Date().toISOString() }}" }
+          ]
+        }
+      },
+      "id": "audit-rej-1",
+      "name": "Audit (rejected)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1080, 80]
+    }
+  ],
+  "connections": {
+    "Webhook: void request": { "main": [[{ "node": "Stamp correlation", "type": "main", "index": 0 }]] },
+    "Stamp correlation": { "main": [[{ "node": "Notify approver", "type": "main", "index": 0 }]] },
+    "Notify approver": { "main": [[{ "node": "Wait for approval", "type": "main", "index": 0 }]] },
+    "Wait for approval": { "main": [[{ "node": "Approved?", "type": "main", "index": 0 }]] },
+    "Approved?": { "main": [
+      [{ "node": "Call svc /v1/void", "type": "main", "index": 0 }],
+      [{ "node": "Audit (rejected)", "type": "main", "index": 0 }]
+    ]},
+    "Call svc /v1/void": { "main": [[{ "node": "Audit (approved)", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

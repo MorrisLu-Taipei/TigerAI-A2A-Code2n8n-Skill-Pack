@@ -1,0 +1,158 @@
+{
+  "name": "einvoice-daily-reconcile — Schedule → query yesterday → diff → finance report",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## einvoice-daily-reconcile (core / scheduler)\n\n**Trigger**: Schedule 02:00 daily.\n\n**What it does**\n1. Read yesterday's expected order list from `Audit` tab where `op=issue` and `appliedAt` falls yesterday.\n2. For each row, call svc `/v1/query` with the invoice number to confirm provider state.\n3. Diff: `audit.status='issued'` AND `query.status='ISSUED'` → green. Otherwise → mismatch.\n4. Append mismatches to `Mismatches` tab.\n5. Email finance the daily summary (count green / count mismatch).\n\n**Why this matters**: voided invoices, provider-side cancels, and silent failures only show up by reconciliation. The audit Sheet is the source of truth for what n8n thinks happened; provider query is the source of truth for what actually happened. They should match.\n\n**Before activating, replace**:\n- `__REPLACE_ME__EINVOICE_SVC_URL__`\n- `__REPLACE_ME__GOOGLE_SHEET_ID__`\n- `__REPLACE_ME__FINANCE_EMAIL__`\n- `__REPLACE_ME__SLACK_CHANNEL__` (mismatch notification)",
+        "height": 480,
+        "width": 560
+      },
+      "id": "note-1",
+      "name": "Pattern note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-740, -340]
+    },
+    {
+      "parameters": {
+        "rule": { "interval": [{ "field": "hours", "triggerAtHour": 2 }] }
+      },
+      "id": "sched-1",
+      "name": "Daily 02:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [-120, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "const correlationId = `recon-${new Date().toISOString().slice(0,10)}-${Math.floor(Math.random()*1e6)}`;\nconst d = new Date(Date.now() - 86400000);\nconst yesterday = d.toISOString().slice(0,10);\nreturn [{ json: { correlationId, yesterday } }];"
+      },
+      "id": "stamp-1",
+      "name": "Stamp date",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [120, -40]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": "__REPLACE_ME__GOOGLE_SHEET_ID__",
+        "sheetName": "Audit"
+      },
+      "id": "read-1",
+      "name": "Read Audit",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [360, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "const yesterday = $node['Stamp date'].json.yesterday;\nconst rows = $items().map(i => i.json);\nconst candidates = rows.filter(r => r.op === 'issue' && (r.appliedAt || '').startsWith(yesterday) && r.status === 'issued');\nreturn candidates.map(json => ({ json: { ...json, correlationId: $node['Stamp date'].json.correlationId } }));"
+      },
+      "id": "filter-1",
+      "name": "Filter to yesterday",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, -40]
+    },
+    {
+      "parameters": {
+        "url": "=__REPLACE_ME__EINVOICE_SVC_URL__/v1/query",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{ JSON.stringify({ provider: $json.provider, input: { invoiceNumber: JSON.parse($json.result || '{}').invoiceNumber, orderId: $json.orderId } }) }}",
+        "options": { "timeout": 15000 },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "query-1",
+      "name": "Query provider",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [840, -40],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "const r = $json;\nconst expected = 'ISSUED';\nconst actual = r.body?.result?.status ?? 'UNKNOWN';\nconst match = actual === expected;\nreturn [{ json: {\n  correlationId: r.correlationId,\n  orderId: r.orderId,\n  provider: r.provider,\n  invoiceNumber: r.body?.result?.invoiceNumber ?? null,\n  expected,\n  actual,\n  match\n}}];"
+      },
+      "id": "diff-1",
+      "name": "Diff",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, -40]
+    },
+    {
+      "parameters": {
+        "conditions": { "boolean": [{ "value1": "={{ $json.match === true }}" }] }
+      },
+      "id": "if-match-1",
+      "name": "Match?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1320, -40]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": "__REPLACE_ME__GOOGLE_SHEET_ID__",
+        "sheetName": "Mismatches",
+        "columnsUi": {
+          "columnValues": [
+            { "column": "correlationId", "value": "={{ $json.correlationId }}" },
+            { "column": "orderId", "value": "={{ $json.orderId }}" },
+            { "column": "provider", "value": "={{ $json.provider }}" },
+            { "column": "invoiceNumber", "value": "={{ $json.invoiceNumber }}" },
+            { "column": "expected", "value": "={{ $json.expected }}" },
+            { "column": "actual", "value": "={{ $json.actual }}" },
+            { "column": "detectedAt", "value": "={{ new Date().toISOString() }}" }
+          ]
+        }
+      },
+      "id": "write-mis-1",
+      "name": "Append mismatch",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1560, 80]
+    },
+    {
+      "parameters": {
+        "channel": "__REPLACE_ME__SLACK_CHANNEL__",
+        "text": "=📉 einvoice reconcile mismatch · correlation `{{ $json.correlationId }}`\\norderId=`{{ $json.orderId }}` invoice=`{{ $json.invoiceNumber }}` expected `{{ $json.expected }}` got `{{ $json.actual }}`"
+      },
+      "id": "slack-mis-1",
+      "name": "Slack mismatch",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1800, 80]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{ json: { ok: true, correlationId: $json.correlationId } }];"
+      },
+      "id": "noop-1",
+      "name": "Match — noop",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, -160]
+    }
+  ],
+  "connections": {
+    "Daily 02:00": { "main": [[{ "node": "Stamp date", "type": "main", "index": 0 }]] },
+    "Stamp date": { "main": [[{ "node": "Read Audit", "type": "main", "index": 0 }]] },
+    "Read Audit": { "main": [[{ "node": "Filter to yesterday", "type": "main", "index": 0 }]] },
+    "Filter to yesterday": { "main": [[{ "node": "Query provider", "type": "main", "index": 0 }]] },
+    "Query provider": { "main": [[{ "node": "Diff", "type": "main", "index": 0 }]] },
+    "Diff": { "main": [[{ "node": "Match?", "type": "main", "index": 0 }]] },
+    "Match?": { "main": [
+      [{ "node": "Match — noop", "type": "main", "index": 0 }],
+      [{ "node": "Append mismatch", "type": "main", "index": 0 }]
+    ]},
+    "Append mismatch": { "main": [[{ "node": "Slack mismatch", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

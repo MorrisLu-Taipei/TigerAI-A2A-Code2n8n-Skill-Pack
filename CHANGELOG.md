@@ -1,5 +1,58 @@
 # Changelog
 
+## v0.27.0 — 新案例：台灣電子發票 SDK → n8n 治理鏈（Code2n8n Path B 教科書級）
+
+把 [`MorrisLu-Taipei/einvoice`](https://github.com/MorrisLu-Taipei/einvoice)（台灣電子發票統一 TypeScript SDK，5 家供應商：Amego / ECPay / ezPay / ezPay 跨境 / ezReceipt）做成可被 n8n 編排的治理鏈。**SDK 本身不搬進 n8n** — SDK 已經解了「5 家 → 1 介面」這層 partition，搬進 n8n 是反模式。Pack 給的答案是寫一個 80 行的 HTTP wrapper service 持有 credentials，n8n 只編排業務流程。
+
+### 🆕 [`examples/einvoice-n8n/`](examples/einvoice-n8n/)
+
+**Wrapper service**（`svc/`）— Hono + TypeScript 單檔 80 行，7 endpoints：
+- `GET /healthz` / `GET /v1/capabilities/:provider`（meta）
+- `POST /v1/issue` / `void` / `allowance` / `void-allowance` / `query`（5 個 SDK 方法）
+- `POST /v1/route` — capability-aware failover，走 SDK 的 `supports(p, cap)` 找第一個能做的 provider
+- Bearer token (`EINVOICE_SVC_TOKEN`)；附 Dockerfile + docker-compose
+
+**6 個 importable workflow**（`workflows/`）：
+
+| Workflow | 角色 | 套哪個 Pack 模板 |
+| --- | --- | --- |
+| `einvoice-issue-from-order` | 訂單 webhook → svc/issue → 重試 → 稽核 | `retry-with-backoff` + `handover-trace` |
+| `einvoice-void-with-approval` | 作廢請求 → Slack 核可 → svc/void | `human-approval-gate` |
+| `einvoice-allowance` | 退款 webhook → svc/allowance → 重試 | `retry-with-backoff` |
+| `einvoice-daily-reconcile` | Schedule 02:00 → query 昨日 → diff → 告警 | — |
+| `einvoice-provider-failover` | sub-workflow，capability-aware 走 `/v1/route` | — |
+| `einvoice-monthly-audit-export` | Schedule 月初 03:00 → 上月稽核 CSV → 寄會計 | — |
+
+### ✅ 驗證紀錄
+
+- **Scanner**：`scripts/security-scan.mjs` → **6 files · 0 error · 3 warning**（3 個 warning 全是 issue/void/allowance 入口 webhook 沒驗簽 — **故意的**，生產環境前面要擋 reverse-proxy + HMAC SHA-256，README security 段有寫）
+- **Live REST round-trip**（使用者 localhost:5678 受管 n8n）：
+  ```
+  OK   einvoice-allowance              (id=wJS2xiecMIns9VfB, nodes=11)
+  OK   einvoice-daily-reconcile        (id=9l5vhxEdvX4Mco6s, nodes=11)
+  OK   einvoice-issue-from-order       (id=AI5SS29TOiKTRsE6, nodes=11)
+  OK   einvoice-monthly-audit-export   (id=vi5QAhu4TQIji498, nodes=7)
+  OK   einvoice-provider-failover      (id=zZaLD8nG9yv7xbUp, nodes=7)
+  OK   einvoice-void-with-approval     (id=ssP7iu9pKpH5igAT, nodes=9)
+  Summary: 6/6 ok · tag=claude-import-2026-06-18
+  ```
+  Post-test 已 DELETE，instance 乾淨。
+
+### 為什麼這版重要
+
+v0.26.0 把 3 個模板丟出去當 drop-in。v0.27.0 證明它們**真的可以在一個外部開源 SDK 上組合出來**：
+- `retry-with-backoff` 被 issue / allowance / failover 三條路徑套用
+- `human-approval-gate` 被 void 套用（作廢不可逆 → 強制人工核可）
+- `handover-trace` 在每個 workflow 都用 `correlationId` 把整條鏈串起
+
+並把 Code2n8n 的核心 partition 主張 **「方法包 + 平台」** 演到 SDK 層級：**SDK 不該被 n8n 重做。n8n 編排業務，SDK 處理協定**。
+
+### Proof bar 新增一列
+
+`README.md` / `README.zh.md` 在三個原始案例後加一列：「Taiwan e-invoice unified SDK → 80-line Hono wrapper svc + 6 governance workflows」。
+
+---
+
 ## v0.26.3 — Rollback v0.26.2（FB 案例不屬於 Pack）
 
 撤回 v0.26.2 — 那四份 FB 每日廣告 workflow 是使用者個人練習，**不是 Pack 的公開案例**。在 v0.26.2 出貨之前未確認歸屬就上 GitHub 是判斷失誤，這版把它清乾淨：

@@ -53,6 +53,7 @@ Code2n8n **does not transliterate every line of Python or JavaScript into nodes*
 | [Google Workspace admin](examples/google-workspace-admin-workflow/) | 1,373-line Apps Script → 7 workflows (core + entry + setup) | Static lint 0 err / 0 warn · n8n REST import 7/7 · **live execution requires your Google Workspace credentials** |
 | [LINE customer service (cloud)](examples/line-ai-customer-service/) | Netlify + Supabase → core + entry + approach-C admin | Static lint 0 err / 0 warn · n8n REST import 6/6 · **live execution requires your LINE + Supabase credentials** |
 | [LINE customer service (on-prem)](examples/line-ai-customer-service-onprem/) | Docker + Postgres + Redis + Qdrant + Ollama → 37-node brain | 5-phase V&V; security review concluded **BLOCKED — DO NOT DEPLOY AS-IS** (kept as a teaching artefact, see [`SECURITY-REVIEW.md`](examples/line-ai-customer-service-onprem/SECURITY-REVIEW.md)) |
+| [Taiwan e-invoice unified SDK](examples/einvoice-n8n/) | TypeScript SDK ([`MorrisLu-Taipei/einvoice`](https://github.com/MorrisLu-Taipei/einvoice), 5 providers) → 80-line Hono wrapper svc + 6 governance workflows | Static lint 0 err / 3 expected webhook warnings · n8n REST import 6/6 against localhost:5678 · composes all three v0.26.0 templates (`retry-with-backoff` + `human-approval-gate` + `handover-trace`) |
 
 Full evidence table further down. The bar above is what *immediately* backs the two-path claim — if any of these three case studies disappear, the claim weakens.
 

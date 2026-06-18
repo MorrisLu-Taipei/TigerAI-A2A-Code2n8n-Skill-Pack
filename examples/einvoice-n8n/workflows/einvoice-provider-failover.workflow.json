@@ -1,0 +1,114 @@
+{
+  "name": "einvoice-provider-failover — capability-aware routing via svc/v1/route",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## einvoice-provider-failover (sub-workflow)\n\n**Why this exists**: the SDK's `Capability` set is not uniform across providers (e.g. only Amego + ezPay-CB support FOREIGN_CURRENCY; only ECPay / ezPay / ezPay-CB support SCHEDULED_ISSUE). If your business path needs a capability that the default provider lacks, this WF picks the first candidate that has it.\n\n**Called by**: other workflows (sub-workflow trigger), passing a body like:\n```json\n{\n  \"capability\": \"FOREIGN_CURRENCY\",\n  \"candidates\": [\"amego\", \"ezpay-crossborder\"],\n  \"op\": \"issue\",\n  \"input\": { ... unified InvoiceInput ... }\n}\n```\n\n**Flow**\n1. Validate request body (must include capability, candidates[], op, input).\n2. POST `svc/v1/route` (the svc walks the candidate list, checks `supports()`, calls the first matching provider, returns its result OR all attempt errors).\n3. Append result to audit Sheet with op=`route:<original-op>`.\n4. Return the result (or the consolidated error) to the caller.\n\n**Before activating, replace**:\n- `__REPLACE_ME__EINVOICE_SVC_URL__`\n- `__REPLACE_ME__GOOGLE_SHEET_ID__`\n\n**Satisfies n8n-security-governance rules**: §3 fallback chain auditable · §5 correlationId carried · §7 attempts persisted for forensics.",
+        "height": 540,
+        "width": 560
+      },
+      "id": "note-1",
+      "name": "Pattern note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-740, -360]
+    },
+    {
+      "parameters": {},
+      "id": "trigger-1",
+      "name": "When called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [-120, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "const body = $json;\nfor (const k of ['capability','candidates','op','input']) if (body[k] == null) throw new Error(`${k} required`);\nif (!Array.isArray(body.candidates) || body.candidates.length === 0) throw new Error('candidates must be non-empty array');\nreturn [{ json: {\n  correlationId: body.correlationId || `inv-route-${Date.now()}-${Math.floor(Math.random()*1e6)}`,\n  capability: body.capability,\n  candidates: body.candidates,\n  op: body.op,\n  input: body.input\n}}];"
+      },
+      "id": "stamp-1",
+      "name": "Validate + stamp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [120, -40]
+    },
+    {
+      "parameters": {
+        "url": "=__REPLACE_ME__EINVOICE_SVC_URL__/v1/route",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{ JSON.stringify({ capability: $json.capability, candidates: $json.candidates, op: $json.op, input: $json.input }) }}",
+        "options": { "timeout": 20000 },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "route-1",
+      "name": "Call svc /v1/route",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [360, -40],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            { "value1": "={{ $json.statusCode || 200 }}", "operation": "between", "value2": 200, "value3": 299 }
+          ]
+        }
+      },
+      "id": "if-ok-1",
+      "name": "Routed ok?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [600, -40]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": "__REPLACE_ME__GOOGLE_SHEET_ID__",
+        "sheetName": "Audit",
+        "columnsUi": {
+          "columnValues": [
+            { "column": "correlationId", "value": "={{ $json.correlationId }}" },
+            { "column": "op", "value": "=route:{{ $json.op }}" },
+            { "column": "provider", "value": "={{ $json.body?.provider ?? 'no-candidate' }}" },
+            { "column": "status", "value": "={{ ($json.statusCode>=200 && $json.statusCode<300) ? 'routed' : 'all-failed' }}" },
+            { "column": "result", "value": "={{ JSON.stringify($json.body) }}" },
+            { "column": "appliedAt", "value": "={{ new Date().toISOString() }}" }
+          ]
+        }
+      },
+      "id": "audit-1",
+      "name": "Audit row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [840, -40],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{ json: { ok: ($json.statusCode || 200) < 300, correlationId: $json.correlationId, provider: $json.body?.provider ?? null, capability: $json.capability, result: $json.body?.result ?? null, error: $json.body?.error ?? null, attempts: $json.body?.attempts ?? null } }];"
+      },
+      "id": "respond-1",
+      "name": "Respond to caller",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, -40]
+    }
+  ],
+  "connections": {
+    "When called": { "main": [[{ "node": "Validate + stamp", "type": "main", "index": 0 }]] },
+    "Validate + stamp": { "main": [[{ "node": "Call svc /v1/route", "type": "main", "index": 0 }]] },
+    "Call svc /v1/route": { "main": [[{ "node": "Routed ok?", "type": "main", "index": 0 }]] },
+    "Routed ok?": { "main": [
+      [{ "node": "Audit row", "type": "main", "index": 0 }],
+      [{ "node": "Audit row", "type": "main", "index": 0 }]
+    ]},
+    "Audit row": { "main": [[{ "node": "Respond to caller", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

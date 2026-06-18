@@ -1,0 +1,168 @@
+{
+  "name": "einvoice-issue-from-order — webhook → svc/v1/issue (retry + audit)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## einvoice-issue-from-order (core)\n\n**Trigger**: webhook from your order system (POST `/webhook/einvoice/issue`).\n\n**Body it expects**\n```json\n{\n  \"provider\": \"amego\",\n  \"input\": {\n    \"orderId\": \"order-1001\",\n    \"buyer\": { \"email\": \"buyer@example.com\" },\n    \"items\": [{ \"description\": \"訂閱方案\", \"quantity\": 1, \"unitPrice\": 1000, \"amount\": 1000 }],\n    \"amount\": { \"salesAmount\": 1000, \"taxAmount\": 50, \"totalAmount\": 1050 },\n    \"taxType\": \"TAXABLE\",\n    \"priceMode\": \"TAX_EXCLUSIVE\"\n  }\n}\n```\n\n**Flow**\n1. Stamp correlationId.\n2. POST `EINVOICE_SVC_URL/v1/issue` with Bearer auth (n8n Credential).\n3. retry-with-backoff template (2s/4s/8s, dead-letter after 3 attempts).\n4. On 2xx: append audit row to Google Sheet → respond to caller.\n5. On dead-letter: Slack finance + audit row with status `failed-dlq`.\n\n**Before activating, replace placeholders**:\n- `__REPLACE_ME__EINVOICE_SVC_URL__` → `http://einvoice-svc:8787` (compose) or your host:port\n- `__REPLACE_ME__GOOGLE_SHEET_ID__` → audit Sheet documentId\n- `__REPLACE_ME__SLACK_CHANNEL__` → finance Slack channel\n- Attach n8n `httpHeaderAuth` Credential with `Authorization: Bearer <EINVOICE_SVC_TOKEN>` to the HTTP node.\n\n**Satisfies n8n-security-governance rules**: §4.2 retries bounded · §4.3 dead-letter surfaces to human · §5 correlationId carried · §6 audit before/after.",
+        "height": 560,
+        "width": 560
+      },
+      "id": "note-1",
+      "name": "Pattern note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-740, -360]
+    },
+    {
+      "parameters": {
+        "path": "einvoice/issue",
+        "httpMethod": "POST",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh-1",
+      "name": "Webhook: issue request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [-120, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "const body = $json.body || $json;\nif (!body.provider || !body.input) throw new Error('provider + input required');\nreturn [{ json: {\n  correlationId: `inv-issue-${Date.now()}-${Math.floor(Math.random()*1e6)}`,\n  startedAt: new Date().toISOString(),\n  provider: body.provider,\n  input: body.input,\n  attempt: 0,\n  maxAttempts: 3,\n  backoffMs: [2000, 4000, 8000]\n}}];"
+      },
+      "id": "stamp-1",
+      "name": "Stamp correlation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [120, -40]
+    },
+    {
+      "parameters": {
+        "url": "=__REPLACE_ME__EINVOICE_SVC_URL__/v1/issue",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={{ JSON.stringify({ provider: $json.provider, input: $json.input }) }}",
+        "options": { "timeout": 15000 },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "http-1",
+      "name": "Call svc /v1/issue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [360, -40],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            { "value1": "={{ $json.statusCode || 200 }}", "operation": "between", "value2": 200, "value3": 299 }
+          ]
+        }
+      },
+      "id": "if-ok-1",
+      "name": "Issue ok?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [600, -40]
+    },
+    {
+      "parameters": {
+        "functionCode": "const s = $input.first().json;\nconst nextAttempt = (s.attempt ?? 0) + 1;\nif (nextAttempt > s.maxAttempts) return [{ json: { ...s, attempt: nextAttempt, exhausted: true } }];\nreturn [{ json: { ...s, attempt: nextAttempt, waitMs: s.backoffMs[nextAttempt - 1] } }];"
+      },
+      "id": "incr-1",
+      "name": "Increment + decide",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [840, 120]
+    },
+    {
+      "parameters": {
+        "conditions": { "boolean": [{ "value1": "={{ $json.exhausted === true }}" }] }
+      },
+      "id": "if-ex-1",
+      "name": "Exhausted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1080, 120]
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.waitMs }}",
+        "unit": "ms"
+      },
+      "id": "wait-1",
+      "name": "Wait backoff",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1320, 220]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": "__REPLACE_ME__GOOGLE_SHEET_ID__",
+        "sheetName": "Audit",
+        "columnsUi": {
+          "columnValues": [
+            { "column": "correlationId", "value": "={{ $json.correlationId }}" },
+            { "column": "op", "value": "issue" },
+            { "column": "provider", "value": "={{ $json.provider }}" },
+            { "column": "orderId", "value": "={{ $json.input?.orderId }}" },
+            { "column": "status", "value": "={{ $json.exhausted ? 'failed-dlq' : 'issued' }}" },
+            { "column": "result", "value": "={{ JSON.stringify($json.exhausted ? null : $json.body?.result) }}" },
+            { "column": "appliedAt", "value": "={{ new Date().toISOString() }}" }
+          ]
+        }
+      },
+      "id": "audit-1",
+      "name": "Audit row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1080, -120],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "channel": "__REPLACE_ME__SLACK_CHANNEL__",
+        "text": "=⚠️ einvoice issue dead-letter — correlation: `{{ $json.correlationId }}` order=`{{ $json.input?.orderId }}` provider=`{{ $json.provider }}` after {{ $json.attempt }} attempts. Investigate the Audit tab."
+      },
+      "id": "slack-dlq-1",
+      "name": "Slack dead-letter",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1320, 20]
+    },
+    {
+      "parameters": {
+        "functionCode": "return [{ json: { ok: !$json.exhausted, correlationId: $json.correlationId, invoiceNumber: $json.body?.result?.invoiceNumber ?? null, status: $json.exhausted ? 'failed-dlq' : 'issued' } }];"
+      },
+      "id": "respond-1",
+      "name": "Respond to caller",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, -120]
+    }
+  ],
+  "connections": {
+    "Webhook: issue request": { "main": [[{ "node": "Stamp correlation", "type": "main", "index": 0 }]] },
+    "Stamp correlation": { "main": [[{ "node": "Call svc /v1/issue", "type": "main", "index": 0 }]] },
+    "Call svc /v1/issue": { "main": [[{ "node": "Issue ok?", "type": "main", "index": 0 }]] },
+    "Issue ok?": { "main": [
+      [{ "node": "Audit row", "type": "main", "index": 0 }],
+      [{ "node": "Increment + decide", "type": "main", "index": 0 }]
+    ]},
+    "Increment + decide": { "main": [[{ "node": "Exhausted?", "type": "main", "index": 0 }]] },
+    "Exhausted?": { "main": [
+      [{ "node": "Audit row", "type": "main", "index": 0 }],
+      [{ "node": "Wait backoff", "type": "main", "index": 0 }]
+    ]},
+    "Wait backoff": { "main": [[{ "node": "Call svc /v1/issue", "type": "main", "index": 0 }]] },
+    "Audit row": { "main": [[{ "node": "Respond to caller", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}
