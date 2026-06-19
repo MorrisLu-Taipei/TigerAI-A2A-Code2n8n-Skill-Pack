@@ -1,5 +1,82 @@
 # Changelog
 
+## v0.40.0 — Amego 10/10 capability 對真實 Amego sandbox 跑通 + 揭露 1 個 SDK gap (SEC-021)
+
+回應 user：「Amego 這個完整測試就好」。v0.35.0 ship 了 11/11 capability workflow 但 runtime 只測過 5/55 cell；v0.40.0 把 Amego 那一欄補完到 10/10。
+
+### ✅ Amego 真實 Amego sandbox runtime 結果
+
+| Cell | Capability | 結果 | 真實發票 trace |
+| --- | --- | --- | --- |
+| A1 | ISSUE | 🟢 PASS | `AA26515011` |
+| A2 | VOID | 🟢 PASS | `AA26515012` voided |
+| A3 | ALLOWANCE | 🟢 PASS | `A1781885120033` |
+| A4 | VOID_ALLOWANCE | 🟢 PASS | A3 allowance voided |
+| A5 | QUERY by invoiceNumber | 🟢 PASS | status=ISSUED match |
+| A6 | B2B (buyer.ubn=04595257) | 🟢 PASS | `AA26515015` |
+| A7 | MIXED_TAX (TAXABLE+ZERO_RATED+MIG fields) | 🟢 PASS | `AA26515016` |
+| A8 | QUERY_BY_ORDER_ID | 🟢 PASS | orderId roundtrip |
+| A9 | CARRIER mobile barcode | 🟢 PASS（wire-path via Amego registry reject） |
+| A10 | DONATION 愛心碼 | 🟡 PARTIAL（Amego 接受但 raw 不 echo donation） |
+| A11 | FOREIGN_CURRENCY USD@32.5 | 🟢 PASS | `AA26515019` |
+| **A12** | **SCHEDULED_ISSUE negative test** | 🔴 **SDK gap → SEC-021** | Amego 接受並開立 `AA26515020`（不該）|
+
+**10/12 PASS、1 PARTIAL、1 SDK gap 發現** — Amego 真實 SDK runtime 覆蓋 10/10 capability。
+
+### 🆕 [`examples/einvoice-n8n/tests/v0.40-amego-full-coverage-report.md`](examples/einvoice-n8n/tests/v0.40-amego-full-coverage-report.md)
+
+中文單語報告（依 §1.5）。8 個 §：
+- §1 對照表 + 11 張真實發票號 trace
+- §2 v0.27→v0.40 Amego runtime 覆蓋演進
+- §3 **修正過程中的真實發現**：跑這次連續發現 4 個前一輪測試的「**偽 PASS**」（用錯 SDK 欄位名 → 沉默 fallback 成 B2C），元教訓寫進報告 — 沒有 SDK type 對照閱讀，僅憑「issue 200 + invoiceNumber」判定 PASS 嚴重高估覆蓋。也是 §1.6 lexical schema-before-claim 規則想擋的事
+- §4 **SCHEDULED_ISSUE SDK gap 完整描述**：SDK `capabilities[]` 列宣告 + assertSupports() 主動 check API + provider.issue() runtime 沒被動強制 = caller 不主動呼叫 assertSupports 即可繞過
+- §5 A10 DONATION PARTIAL 處置（verification-method limitation）
+- §6 V&V evidence 雙層 schema
+- §7 處置決定（matrix doc 更新、SEC-021、其他 4 provider 明標未驗）
+- §8 下一步（upstream issue、Pack 自衛 workflow、CI gate）
+
+### 🆕 `examples/einvoice-n8n/sandbox/scripts/amego-full-coverage.mjs`
+
+本地測試 runner（依 §1.7 sandbox 規則 local-only）。直接打 svc，12 個 scenario，每個 cell 含 capability id + 結果記錄 + 真實發票 trace。
+
+### 🆕 SECURITY-REVIEW SEC-021
+
+**SDK `capabilities[]` 宣告與 `issue()` runtime 行為不一致**：
+
+- v0.40.0 🔴 OPEN — 真實 SDK 發現，需 upstream issue
+- 完整 root cause / impact / mitigation（呼叫 SDK 前過 [`einvoice-capability-aware-gate`](examples/einvoice-n8n/workflows/einvoice-capability-aware-gate.workflow.json)）/ upstream action 都寫清楚
+- owner：upstream paid-tw/einvoice + Pack workflow 層防線
+
+### 📈 [`docs/capability-coverage-matrix.md`](examples/einvoice-n8n/docs/capability-coverage-matrix.md) 更新
+
+加「Amego runtime（v0.40.0）」欄，逐 capability 標 🟢 PASS / 🟡 PARTIAL / 🔴 SDK gap + 真實發票 trace。其他 4 provider 真實 sandbox runtime 明標**未驗 — 沒有公開測試環境帳號**。
+
+### 修正過程中的元教訓（給未來 AI Coder）
+
+跑這次 4 輪 iterative 過程中：
+
+| 我先寫的（錯）| SDK 真實要的 | 影響 |
+| --- | --- | --- |
+| `buyer.taxId` | `buyer.ubn` | A6 第一輪偽 PASS |
+| `buyer.carrier` | top-level `carrier:{type,code}` | A9 第一輪偽 PASS |
+| `buyer.loveCode` | top-level `donation:{npoban}` | A10 第一輪偽 PASS |
+| `taxType:"ZERO"` | `taxType:"ZERO_RATED"` | A7 enum reject |
+| `allowanceId` 缺 / 太長 | 必填且 ≤16 chars | A3 reject |
+| `providerOptions.customsClearanceMark` (camelCase) | `providerOptions.CustomsClearanceMark` (PascalCase MIG 原名 + 數字 1\|2) | A7 reject |
+
+**這就是為何 §1.6 lexical schema-before-claim 重要** — 沒 evidence 不可說「驗過」。第一輪我幾乎以為「8 PASS」要 ship，仔細對照 SDK types.ts 才發現 3 個是偽 PASS。
+
+### V&V Layer 1
+
+- `node scripts/security-scan.mjs --glob "examples/**/*.workflow.json"` → 30 files, 0 error / 20 warning（regression 無）
+
+### V&V Layer 2
+
+- 10/10 Amego SDK capability 對**真實 Amego sandbox** end-to-end PASS（11 張真實發票 trace 可驗）
+- A10 DONATION PARTIAL：邏輯路徑驗了（SDK 接受 + Amego 接受 + 開立成功），結果生效驗未做（response 不 echo）
+- A12 SCHEDULED_ISSUE：揭露 SDK gap，已 SEC-021 條目化
+- 其他 4 provider runtime：**未驗 — 沒有公開測試環境帳號**，誠實標於 matrix doc
+
 ## v0.39.0 — Skill 規則自動 enforcement + A2A directive（紙面 SOP → 真實 gate）
 
 回應 user：「有寫入 skill 會自動達成嗎? 要 這樣才有價值 寫成 A2A 要看的規範」。v0.38.0 自查發現 Skill 寫得多漂亮都只是文件 — AI Coder 沒讀就等於沒寫。v0.39.0 把 4 條 Skill 規則**轉譯為真實的 CI / pre-commit / CODEOWNERS / PR template 自動 gate**，加上 A2A directive 讓未來任何 AI consumer（Claude / Codex / Gemini / ...）有 machine-readable 規格可循。

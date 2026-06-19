@@ -8,21 +8,24 @@
 
 ## 1. capability 對照（11 個 capability × 5 個 provider × 對應 workflow）
 
-| 能力 | Amego | ECPay | ezPay | ezPay 跨境 | ezReceipt | n8n workflow（本 Pack） | svc endpoint |
-| --- | :---: | :---: | :---: | :---: | :---: | --- | --- |
-| **ISSUE** — 開立 | ✅ | ✅ | ✅ | ✅ | ✅ | [`einvoice-issue-from-order`](../workflows/einvoice-issue-from-order.workflow.json) | `POST /v1/issue` |
-| **VOID** — 作廢 | ✅ | ✅ | ✅ | ✅ | ✅ | [`einvoice-void-with-approval` v1/v2/v3](../workflows/einvoice-void-with-approval.workflow.json) | `POST /v1/void` |
-| **ALLOWANCE** — 折讓 | ✅ | ✅ | ✅ | ✅ | ✅ | [`einvoice-allowance`](../workflows/einvoice-allowance.workflow.json) | `POST /v1/allowance` |
-| **VOID_ALLOWANCE** — 折讓作廢 | ✅ | ✅ | ✅ | ✅ | ✅ | [`einvoice-void-allowance`](../workflows/einvoice-void-allowance.workflow.json) ★ v0.35.0 | `POST /v1/void-allowance` |
-| **QUERY** — 查詢 | ✅ | ✅ | ✅ | ✅ | ✅ | 嵌在 [`einvoice-daily-reconcile`](../workflows/einvoice-daily-reconcile.workflow.json) 內 | `POST /v1/query` |
-| **B2B** — 統一編號買受人 | ✅ | ✅ | ✅ | — | ✅ | [`einvoice-issue-b2b-with-modifiers`](../workflows/einvoice-issue-b2b-with-modifiers.workflow.json) ★ v0.35.0 | （透過 `/v1/issue` body 帶 `buyer.taxId`） |
-| **MIXED_TAX** — 混合稅率發票 | ✅ | ✅ | ✅ | — | ✅ | 同上 `einvoice-issue-b2b-with-modifiers` ★ v0.35.0 | （透過 `/v1/issue` body 每 item 帶獨立 `taxType`） |
-| **QUERY_BY_ORDER_ID** — 以訂單編號查詢 | ✅ | ✅ | ✅ | ✅ | — | [`einvoice-query-by-order-id`](../workflows/einvoice-query-by-order-id.workflow.json) ★ v0.35.0 | （透過 `/v1/query` body 帶 `orderId` 替代 `invoiceNumber`） |
-| **SCHEDULED_ISSUE** — 預約未來開立 | — | ✅ | ✅ | ✅ | — | [`einvoice-scheduled-issue`](../workflows/einvoice-scheduled-issue.workflow.json) ★ v0.35.0 | （透過 `/v1/issue` body 帶 `scheduledAt`） |
-| **CARRIER_VALIDATION** — 手機條碼 / 愛心碼 | ✅ | ✅ | ✅ | — | ✅ | 同 `einvoice-issue-b2b-with-modifiers` 內 B2C 分支 ★ v0.35.0 | （透過 `/v1/issue` body 帶 `buyer.carrier` 或 `buyer.loveCode`） |
-| **FOREIGN_CURRENCY** — `currency` + `exchangeRate` 外幣註記 | ✅ | — | — | ✅ | — | [`einvoice-foreign-currency`](../workflows/einvoice-foreign-currency.workflow.json) ★ v0.35.0 | （透過 `/v1/issue` body 帶 `currency` + `exchangeRate`） |
+| 能力 | Amego | ECPay | ezPay | ezPay 跨境 | ezReceipt | Amego runtime（v0.40.0）| n8n workflow（本 Pack） | svc endpoint |
+| --- | :---: | :---: | :---: | :---: | :---: | --- | --- | --- |
+| **ISSUE** — 開立 | ✅ | ✅ | ✅ | ✅ | ✅ | 🟢 PASS `AA26515011` | [`einvoice-issue-from-order`](../workflows/einvoice-issue-from-order.workflow.json) | `POST /v1/issue` |
+| **VOID** — 作廢 | ✅ | ✅ | ✅ | ✅ | ✅ | 🟢 PASS `AA26515012` voided | [`einvoice-void-with-approval` v1/v2/v3](../workflows/einvoice-void-with-approval.workflow.json) | `POST /v1/void` |
+| **ALLOWANCE** — 折讓 | ✅ | ✅ | ✅ | ✅ | ✅ | 🟢 PASS `A1781885120033` | [`einvoice-allowance`](../workflows/einvoice-allowance.workflow.json) | `POST /v1/allowance` |
+| **VOID_ALLOWANCE** — 折讓作廢 | ✅ | ✅ | ✅ | ✅ | ✅ | 🟢 PASS（A3 allowance 後 void） | [`einvoice-void-allowance`](../workflows/einvoice-void-allowance.workflow.json) ★ v0.35.0 | `POST /v1/void-allowance` |
+| **QUERY** — 查詢 | ✅ | ✅ | ✅ | ✅ | ✅ | 🟢 PASS by invoiceNumber match | 嵌在 [`einvoice-daily-reconcile`](../workflows/einvoice-daily-reconcile.workflow.json) 內 | `POST /v1/query` |
+| **B2B** — 統一編號買受人 | ✅ | ✅ | ✅ | — | ✅ | 🟢 PASS `AA26515015` UBN confirmed | [`einvoice-issue-b2b-with-modifiers`](../workflows/einvoice-issue-b2b-with-modifiers.workflow.json) ★ v0.35.0 | （透過 `/v1/issue` body 帶 `buyer.ubn`） |
+| **MIXED_TAX** — 混合稅率發票 | ✅ | ✅ | ✅ | — | ✅ | 🟢 PASS `AA26515016` + MIG ZeroTax fields | 同上 `einvoice-issue-b2b-with-modifiers` ★ v0.35.0 | （透過 `/v1/issue` body 每 item 帶獨立 `taxType` + `providerOptions.CustomsClearanceMark/ZeroTaxRateReason`） |
+| **QUERY_BY_ORDER_ID** — 以訂單編號查詢 | ✅ | ✅ | ✅ | ✅ | — | 🟢 PASS orderId roundtrip match | [`einvoice-query-by-order-id`](../workflows/einvoice-query-by-order-id.workflow.json) ★ v0.35.0 | （透過 `/v1/query` body 帶 `orderId` 替代 `invoiceNumber`） |
+| **SCHEDULED_ISSUE** — 預約未來開立 | — | ✅ | ✅ | ✅ | — | 🔴 SDK gap：Amego 接受並開立（應拒）— 詳見 [`tests/v0.40-amego-full-coverage-report.md`](../tests/v0.40-amego-full-coverage-report.md) §4 + SECURITY-REVIEW SEC-021 | [`einvoice-scheduled-issue`](../workflows/einvoice-scheduled-issue.workflow.json) ★ v0.35.0 | （透過 `/v1/issue` body 帶 `scheduledAt`） |
+| **CARRIER_VALIDATION** — 手機條碼 / 愛心碼 | ✅ | ✅ | ✅ | — | ✅ | 🟢 PASS wire-path（手機條碼 via Amego registry reject）/ 🟡 PARTIAL（捐贈愛心碼 Amego 不 echo） | 同 `einvoice-issue-b2b-with-modifiers` 內 B2C 分支 ★ v0.35.0 | （透過 `/v1/issue` body 帶 top-level `carrier: { type, code }` 或 `donation: { npoban }`） |
+| **FOREIGN_CURRENCY** — `currency` + `exchangeRate` 外幣註記 | ✅ | — | — | ✅ | — | 🟢 PASS `AA26515019` USD@32.5 | [`einvoice-foreign-currency`](../workflows/einvoice-foreign-currency.workflow.json) ★ v0.35.0 | （透過 `/v1/issue` body 帶 `currency` + `exchangeRate`） |
 
-**覆蓋率**：11/11（100%）。★ 標示為 v0.35.0 新增。
+**覆蓋率**：
+- workflow 檔案覆蓋：11/11（100%）★ 為 v0.35.0 新增
+- **Amego runtime 實測**（v0.40.0）：10 capability 真實 Amego sandbox PASS、1 capability PARTIAL（DONATION 不可從 response 驗證）、1 capability 揭露 SDK gap（SCHEDULED_ISSUE）
+- 其他 4 provider 真實 sandbox runtime：**未驗** — 沒有公開測試環境帳號；本地 sandbox stub 可作結構層驗，非 ground truth
 
 ---
 

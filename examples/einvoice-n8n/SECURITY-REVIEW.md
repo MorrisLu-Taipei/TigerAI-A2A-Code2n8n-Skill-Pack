@@ -346,6 +346,20 @@ The v0.28.0 review caught 13 SEC-### through code review + Layer 1 scanner + RES
 | Owner | Pack |
 | Target | v0.37.0 |
 
+### SEC-021 — SDK `capabilities[]` 宣告與 `issue()` runtime 行為不一致（SCHEDULED_ISSUE on Amego）— v0.40.0 真實 sandbox 測試發現
+
+| Field | Value |
+| --- | --- |
+| Severity | **Medium** |
+| Status (v0.40.0) | 🔴 **OPEN — 真實 SDK 發現，需 upstream issue** |
+| Evidence | 跑 `examples/einvoice-n8n/sandbox/scripts/amego-full-coverage.mjs` 對真實 Amego sandbox 12 個 scenarios。A12 scenario：送 `provider:"amego"` + `input.scheduledAt:"2026-06-27T00:00:00+08:00"`。期望 SDK 拒絕（因為 `GET /v1/capabilities/amego` 不含 SCHEDULED_ISSUE，SDK README 也明示 Amego 不支援），但實際 svc 回 HTTP 200 + 真實 invoiceNumber `AA26515020`。詳見 [`tests/v0.40-amego-full-coverage-report.md`](../tests/v0.40-amego-full-coverage-report.md) §4。 |
+| Impact | (a) 上游 caller 以為「Amego 預約成功」實際 Amego 立即開立 → 訂閱模式 / B2B 月結場景**業務邏輯錯誤**；(b) Pack 內 [`einvoice-scheduled-issue.workflow.json`](../workflows/einvoice-scheduled-issue.workflow.json) 對 Amego 不會被 SDK 層擋下 → 操作者誤導；(c) 違背 SDK README 的明文承諾「不具該 capability 的供應商會拋 UNSUPPORTED」 |
+| Root cause（推論） | SDK 對 `capabilities[]` 是宣告層、`assertSupports(provider, cap)` 是主動 check API、`provider.issue(input)` runtime 沒有對 input 內 capability-marker fields（`scheduledAt` / `currency != 'TWD'` / `donation` 等）做被動強制檢查。caller 不主動跑 `assertSupports` 即可繞過。 |
+| Mitigation in Pack（v0.40.0 起建議）| 呼叫 SDK 前先過 [`einvoice-capability-aware-gate`](../workflows/einvoice-capability-aware-gate.workflow.json) 子 workflow — 該 gate 先 GET `/v1/capabilities/:provider` 對齊上游請求的 capability，不符即回 UNSUPPORTED_CAPABILITY 給 caller。本案例：`scheduledAt` 出現於 input + provider=`amego` → gate 偵測 `SCHEDULED_ISSUE` 不在 amego.capabilities → reject。 |
+| Upstream action | 建議在 [paid-tw/einvoice](https://github.com/paid-tw/einvoice) 開 issue：「`capabilities[]` 宣告為合約應 runtime enforce — 提議在每個 adapter 的 `issue()` entry 自動跑 `assertSupports(this, cap)` 對應 input field（如 `scheduledAt → SCHEDULED_ISSUE`、`currency != "TWD" → FOREIGN_CURRENCY` 等）」+ 附 v0.40.0 reproducer。本 Pack 不修 SDK，只記錄 + workflow 層防線。 |
+| Owner | upstream paid-tw/einvoice（SDK fix）+ Pack（workflow 防線 + 文件揭露） |
+| Target | upstream PR → Pack v0.41+ 跟隨；workflow 防線即時可用 |
+
 ### SEC-020 — Skill 規則無自動 enforcement；AI Coder 可繞過、人類 reviewer 看不到（v0.38.0 自查）
 
 | Field | Value |
