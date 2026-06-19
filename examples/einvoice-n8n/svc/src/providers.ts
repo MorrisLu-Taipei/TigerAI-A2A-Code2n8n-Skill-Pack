@@ -30,6 +30,14 @@ const mode = (env.EINVOICE_MODE === "PRODUCTION" ? "PRODUCTION" : "TEST") as
   | "PRODUCTION"
   | "TEST";
 
+// 🆕 v0.30.2 — read optional *_BASE_URL env vars so operators can point each
+// provider at a local sandbox simulator or a private proxy without modifying
+// the SDK or this file. Empty / unset env var falls back to the SDK default.
+function optionalBaseUrl(varName: string): string | undefined {
+  const v = env[varName];
+  return v && v.trim().length > 0 ? v : undefined;
+}
+
 const cache = new Map<string, InvoiceProvider>();
 
 export function getProvider(name: string): InvoiceProvider {
@@ -44,6 +52,7 @@ export function getProvider(name: string): InvoiceProvider {
         sellerUbn: need("AMEGO_SELLER_UBN"),
         appKey: need("AMEGO_APP_KEY"),
         mode,
+        baseUrl: optionalBaseUrl("AMEGO_BASE_URL"),
       });
       break;
     case "ecpay":
@@ -52,6 +61,7 @@ export function getProvider(name: string): InvoiceProvider {
         hashKey: need("ECPAY_HASH_KEY"),
         hashIV: need("ECPAY_HASH_IV"),
         mode,
+        baseUrl: optionalBaseUrl("ECPAY_BASE_URL"),
       });
       break;
     case "ezpay":
@@ -60,6 +70,7 @@ export function getProvider(name: string): InvoiceProvider {
         hashKey: need("EZPAY_HASH_KEY"),
         hashIV: need("EZPAY_HASH_IV"),
         mode,
+        baseUrl: optionalBaseUrl("EZPAY_BASE_URL"),
       });
       break;
     case "ezpay-crossborder":
@@ -69,6 +80,7 @@ export function getProvider(name: string): InvoiceProvider {
         hashKey: need("EZPAY_CB_HASH_KEY"),
         hashIV: need("EZPAY_CB_HASH_IV"),
         mode,
+        baseUrl: optionalBaseUrl("EZPAY_CB_BASE_URL"),
       });
       break;
     case "ezreceipt":
@@ -78,6 +90,7 @@ export function getProvider(name: string): InvoiceProvider {
         accName: need("EZRECEIPT_ACC_NAME"),
         password: need("EZRECEIPT_PASSWORD"),
         mode,
+        baseUrl: optionalBaseUrl("EZRECEIPT_BASE_URL"),
       });
       break;
     default:

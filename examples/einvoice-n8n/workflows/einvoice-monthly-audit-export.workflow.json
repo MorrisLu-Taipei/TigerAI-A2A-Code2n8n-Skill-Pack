@@ -11,27 +11,46 @@
       "name": "Pattern note",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-740, -360]
+      "position": [
+        -740,
+        -360
+      ]
     },
     {
       "parameters": {
-        "rule": { "interval": [{ "field": "months", "triggerAtDayOfMonth": 1, "triggerAtHour": 3 }] }
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "triggerAtDayOfMonth": 1,
+              "triggerAtHour": 3
+            }
+          ]
+        }
       },
       "id": "sched-1",
       "name": "Monthly 1st 03:00 Taipei",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
-      "position": [-120, -40]
+      "position": [
+        -120,
+        -40
+      ]
     },
     {
       "parameters": {
-        "functionCode": "// Compute previous calendar month in Asia/Taipei.\nconst now = new Date();\nconst fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' });\nconst todayParts = fmt.formatToParts(now).reduce((acc,p) => { if (p.type !== 'literal') acc[p.type] = p.value; return acc; }, {});\nconst yr = Number(todayParts.year), mo = Number(todayParts.month);\nconst prevYr = mo === 1 ? yr - 1 : yr;\nconst prevMo = mo === 1 ? 12 : mo - 1;\nconst yyyymm = `${prevYr}-${String(prevMo).padStart(2,'0')}`;\nconst rangeStart = `${yyyymm}-01`;\nconst rangeEndExclusive = `${yr}-${String(mo).padStart(2,'0')}-01`;\nreturn [{ json: { correlationId: `monthly-${yyyymm}-${Math.floor(Math.random()*1e6)}`, yyyymm, rangeStart, rangeEndExclusive } }];"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Compute previous calendar month in Asia/Taipei.\nconst now = new Date();\nconst fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' });\nconst todayParts = fmt.formatToParts(now).reduce((acc,p) => { if (p.type !== 'literal') acc[p.type] = p.value; return acc; }, {});\nconst yr = Number(todayParts.year), mo = Number(todayParts.month);\nconst prevYr = mo === 1 ? yr - 1 : yr;\nconst prevMo = mo === 1 ? 12 : mo - 1;\nconst yyyymm = `${prevYr}-${String(prevMo).padStart(2,'0')}`;\nconst rangeStart = `${yyyymm}-01`;\nconst rangeEndExclusive = `${yr}-${String(mo).padStart(2,'0')}-01`;\nreturn [{ json: { correlationId: `monthly-${yyyymm}-${Math.floor(Math.random()*1e6)}`, yyyymm, rangeStart, rangeEndExclusive } }];"
       },
       "id": "stamp-1",
       "name": "Stamp previous month (Taipei)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [120, -40]
+      "position": [
+        120,
+        -40
+      ]
     },
     {
       "parameters": {
@@ -43,17 +62,25 @@
       "name": "Read Audit",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
-      "position": [360, -40]
+      "position": [
+        360,
+        -40
+      ]
     },
     {
       "parameters": {
-        "functionCode": "const range = $node['Stamp previous month (Taipei)'].json;\nconst rows = $items().map(i => i.json).filter(r => {\n  const t = (r.appliedAt || '').slice(0,10);\n  return t >= range.rangeStart && t < range.rangeEndExclusive;\n});\nconst headers = ['correlationId','op','provider','orderId','invoiceNumber','status','appliedAt'];\nconst escape = (v) => {\n  const s = v == null ? '' : String(v);\n  if (/[,\"\\n]/.test(s)) return '\"' + s.replace(/\"/g, '\"\"') + '\"';\n  return s;\n};\nconst lines = [headers.join(',')];\nfor (const r of rows) lines.push(headers.map(h => escape(r[h])).join(','));\nconst counts = rows.reduce((acc,r) => { acc[r.op] = (acc[r.op]||0) + 1; return acc; }, {});\nreturn [{ json: { correlationId: range.correlationId, yyyymm: range.yyyymm, csv: lines.join('\\n'), rowCount: rows.length, counts } }];"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const range = $node['Stamp previous month (Taipei)'].json;\nconst rows = $items().map(i => i.json).filter(r => {\n  const t = (r.appliedAt || '').slice(0,10);\n  return t >= range.rangeStart && t < range.rangeEndExclusive;\n});\nconst headers = ['correlationId','op','provider','orderId','invoiceNumber','status','appliedAt'];\nconst escape = (v) => {\n  const s = v == null ? '' : String(v);\n  if (/[,\"\\n]/.test(s)) return '\"' + s.replace(/\"/g, '\"\"') + '\"';\n  return s;\n};\nconst lines = [headers.join(',')];\nfor (const r of rows) lines.push(headers.map(h => escape(r[h])).join(','));\nconst counts = rows.reduce((acc,r) => { acc[r.op] = (acc[r.op]||0) + 1; return acc; }, {});\nreturn [{ json: { correlationId: range.correlationId, yyyymm: range.yyyymm, csv: lines.join('\\n'), rowCount: rows.length, counts } }];"
       },
       "id": "csv-1",
       "name": "Render CSV",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [600, -40]
+      "position": [
+        600,
+        -40
+      ]
     },
     {
       "parameters": {
@@ -70,7 +97,10 @@
       "name": "Convert CSV to file",
       "type": "n8n-nodes-base.convertToFile",
       "typeVersion": 1.1,
-      "position": [840, -40]
+      "position": [
+        840,
+        -40
+      ]
     },
     {
       "parameters": {
@@ -79,11 +109,26 @@
         "sheetName": "Monthly Summary",
         "columnsUi": {
           "columnValues": [
-            { "column": "correlationId", "value": "={{ $json.correlationId }}" },
-            { "column": "yyyymm", "value": "={{ $json.yyyymm }}" },
-            { "column": "rowCount", "value": "={{ $json.rowCount }}" },
-            { "column": "counts", "value": "={{ JSON.stringify($json.counts) }}" },
-            { "column": "exportedAt", "value": "={{ new Date().toISOString() }}" }
+            {
+              "column": "correlationId",
+              "value": "={{ $json.correlationId }}"
+            },
+            {
+              "column": "yyyymm",
+              "value": "={{ $json.yyyymm }}"
+            },
+            {
+              "column": "rowCount",
+              "value": "={{ $json.rowCount }}"
+            },
+            {
+              "column": "counts",
+              "value": "={{ JSON.stringify($json.counts) }}"
+            },
+            {
+              "column": "exportedAt",
+              "value": "={{ new Date().toISOString() }}"
+            }
           ]
         }
       },
@@ -91,7 +136,10 @@
       "name": "Append summary",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
-      "position": [1080, -40]
+      "position": [
+        1080,
+        -40
+      ]
     },
     {
       "parameters": {
@@ -106,18 +154,84 @@
       "name": "Email accountant",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [1320, -40]
+      "position": [
+        1320,
+        -40
+      ]
     }
   ],
   "connections": {
-    "Monthly 1st 03:00 Taipei": { "main": [[{ "node": "Stamp previous month (Taipei)", "type": "main", "index": 0 }]] },
-    "Stamp previous month (Taipei)": { "main": [[{ "node": "Read Audit", "type": "main", "index": 0 }]] },
-    "Read Audit": { "main": [[{ "node": "Render CSV", "type": "main", "index": 0 }]] },
-    "Render CSV": { "main": [[{ "node": "Convert CSV to file", "type": "main", "index": 0 }]] },
-    "Convert CSV to file": { "main": [[{ "node": "Append summary", "type": "main", "index": 0 }]] },
-    "Append summary": { "main": [[{ "node": "Email accountant", "type": "main", "index": 0 }]] }
+    "Monthly 1st 03:00 Taipei": {
+      "main": [
+        [
+          {
+            "node": "Stamp previous month (Taipei)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stamp previous month (Taipei)": {
+      "main": [
+        [
+          {
+            "node": "Read Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Audit": {
+      "main": [
+        [
+          {
+            "node": "Render CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render CSV": {
+      "main": [
+        [
+          {
+            "node": "Convert CSV to file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert CSV to file": {
+      "main": [
+        [
+          {
+            "node": "Append summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append summary": {
+      "main": [
+        [
+          {
+            "node": "Email accountant",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1", "timezone": "Asia/Taipei" },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Taipei"
+  },
   "active": false,
   "pinData": {},
   "tags": []

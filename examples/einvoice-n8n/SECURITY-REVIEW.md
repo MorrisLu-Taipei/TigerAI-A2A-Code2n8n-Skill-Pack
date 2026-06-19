@@ -277,6 +277,60 @@ This is the failure mode of "structure-only validation passes, runtime is broken
 
 ---
 
+## 6.4 v0.30.2 addendum — three additional SEC findings caught by real end-to-end smoke
+
+The v0.28.0 review caught 13 SEC-### through code review + Layer 1 scanner + REST round-trip. v0.30.2 introduced an actual end-to-end smoke against the user's localhost:5678 n8n with svc → SDK → Amego public sandbox. That smoke surfaced three more findings the earlier review missed because they only manifest at runtime:
+
+### SEC-014 — n8n Code node v2 contract drift (`functionCode` silently dropped)
+
+| Field | Value |
+| --- | --- |
+| Severity | **High** |
+| Status (v0.30.2) | ✅ **FIXED** |
+| Evidence | All 6 workflow JSONs used the Function-node-style `parameters.functionCode` field for Code nodes whose `typeVersion >= 2`. Code v2 expects `mode + language + jsCode` — the old field is silently dropped by n8n on import, producing `parameters: {}`. Workflow execution failed at the first Code node with opaque `Error: Unknown error` (n8n's `throwExecutionError` from `JsTaskRunnerSandbox.runCodeAllItems`). |
+| Impact | Every workflow's first Code node failed → workflow never reached svc / SDK / vendor. Scanner + REST round-trip both PASSED because they don't execute the workflow. This is the exact failure mode the V&V two-layer gate was created for. |
+| Fix shipped | Migrated 19 Code v2 nodes across all 6 workflows: `functionCode` → `{ mode: "runOnceForAllItems", language: "javaScript", jsCode: <code> }`. |
+| Owner | Pack |
+| Target | v0.30.2 |
+
+### SEC-015 — n8n HTTP v4 `jsonBody` contract drift (expression evaluation)
+
+| Field | Value |
+| --- | --- |
+| Severity | **High** |
+| Status (v0.30.2) | ✅ **FIXED** |
+| Evidence | All 5 HTTP nodes that POST JSON to svc used `sendBody: true, contentType: "json", jsonBody: "={{ JSON.stringify({ provider: $json.provider, input: $json.input }) }}"` without `specifyBody`. n8n v1.x HTTP v4 requires `specifyBody: "json"` for the `jsonBody` field to actually be sent as the body, AND the expression must produce an inline object literal (`={{ { ... } }}`), not a `JSON.stringify(...)` wrapper. With the wrong shape, svc received an empty body and returned `400 body.provider (string) required`. |
+| Impact | Every workflow's first svc call failed with a misleading 400 → retry exhaustion path triggered with no actual upstream error → audit row showed `failed-dlq` for transient-looking reasons. Operators investigating could not distinguish workflow JSON bug from real svc error. |
+| Fix shipped | All 5 HTTP nodes patched: `specifyBody: "json"` added; `jsonBody` rewritten as inline expression (`={{ { provider: $json.provider, input: $json.input } }}`). |
+| Owner | Pack |
+| Target | v0.30.2 |
+
+### SEC-016 — svc `providers.ts` did not honor `*_BASE_URL` env vars
+
+| Field | Value |
+| --- | --- |
+| Severity | **Medium** |
+| Status (v0.30.2) | ✅ **FIXED** |
+| Evidence | `svc/src/providers.ts` passed `{ sellerUbn, appKey, mode }` (and equivalents per provider) but never the optional `baseUrl` field from `BaseProviderConfig`. Setting `AMEGO_BASE_URL=http://einvoice-sandbox:9090/amego` (per `examples/einvoice-n8n/docker-compose.sandbox.yml`) had no effect — the SDK fell back to the real vendor URL. Local sandbox simulator was effectively unreachable. |
+| Impact | The local sandbox built in v0.30.1 could not actually be used by svc → workflows always hit the real vendor sandbox. Operators wanting deterministic injection (`X-Sandbox-Inject`) could not exercise it through svc. |
+| Fix shipped | `providers.ts` now reads optional `AMEGO_BASE_URL` / `ECPAY_BASE_URL` / `EZPAY_BASE_URL` / `EZPAY_CB_BASE_URL` / `EZRECEIPT_BASE_URL` and passes them as `baseUrl` to each provider config when set. Empty / unset falls back to SDK default. |
+| Owner | Pack |
+| Target | v0.30.2 |
+
+### Documentation finding — n8n webhook registration via public REST API
+
+| Field | Value |
+| --- | --- |
+| Severity | **Low (n8n behavior, not Pack bug)** |
+| Status | 📋 **DOCUMENTED** in `skills/tigerai/code2n8n-pipeline/SKILL.md` Stage 10 |
+| Evidence | Workflows created via `POST /api/v1/workflows` + `POST /api/v1/workflows/{id}/activate` are marked `active: true` by the n8n DB but their webhook nodes are NOT registered with the webhook listener until the workflow is saved through the n8n UI once (or n8n is restarted). Public `/webhook/{path}` returns 404 with `"The requested webhook ... is not registered"` despite the workflow being active. |
+| Impact | Automated import + activation via REST API alone cannot trigger via webhook. Operators must either: (a) open n8n UI and click Save once; (b) restart n8n; (c) use the test webhook URL `/webhook-test/{path}` with the canvas-side "Execute workflow" click. |
+| Mitigation in pipeline SKILL | Stage 10 (Activate to n8n) now warns: "if the case study uses webhook entry nodes, expect the first import → activate to leave webhooks unregistered; the pipeline directive includes opening the n8n UI to click Save (or restarting n8n) as part of Stage 10." |
+| Owner | n8n upstream; Pack documents the workaround |
+| Target | v0.30.2 (documented) |
+
+---
+
 ## 6.5 v0.30.1 addendum — local-only vendor sandbox simulator
 
 A new local-only sandbox (`examples/einvoice-n8n/sandbox/`, ~600 lines TypeScript Hono, **excluded from git via `.git/info/exclude`**) mimics the five vendors' HTTP APIs so operators can run the workflows end-to-end without a real Amego / ECPay / ezPay / ezPay-CB / ezReceipt account. It uses each vendor's published sandbox credentials (ECPAY_SANDBOX from the SDK README, plus equivalents). Failure injection via `X-Sandbox-Inject` header or `?_inject=` query (`network-timeout / slow-5s / 5xx / auth-fail / quota-exhausted / validation / not-found / conflict`) lets the operator exercise retry / DLQ / approval paths deterministically.

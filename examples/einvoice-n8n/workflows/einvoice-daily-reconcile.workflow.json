@@ -11,27 +11,45 @@
       "name": "Pattern note",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-740, -380]
+      "position": [
+        -740,
+        -380
+      ]
     },
     {
       "parameters": {
-        "rule": { "interval": [{ "field": "hours", "triggerAtHour": 2 }] }
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "triggerAtHour": 2
+            }
+          ]
+        }
       },
       "id": "sched-1",
       "name": "Daily 02:00 Taipei",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.1,
-      "position": [-120, -40]
+      "position": [
+        -120,
+        -40
+      ]
     },
     {
       "parameters": {
-        "functionCode": "// Compute yesterday in Asia/Taipei robustly (Intl handles tz, no UTC slice trap).\nconst now = new Date();\nconst taipei = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' });\nconst todayParts = taipei.formatToParts(now).reduce((acc,p) => { if (p.type !== 'literal') acc[p.type] = p.value; return acc; }, {});\nconst todayTaipei = `${todayParts.year}-${todayParts.month}-${todayParts.day}`;\n// One day back in Taipei = subtract 24h from the Taipei-formatted today.\nconst y = new Date(todayTaipei + 'T00:00:00+08:00');\ny.setUTCDate(y.getUTCDate() - 1);\nconst yParts = taipei.formatToParts(y).reduce((acc,p) => { if (p.type !== 'literal') acc[p.type] = p.value; return acc; }, {});\nconst yesterday = `${yParts.year}-${yParts.month}-${yParts.day}`;\nreturn [{ json: { correlationId: `recon-${yesterday}-${Math.floor(Math.random()*1e6)}`, yesterday, todayTaipei } }];"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Compute yesterday in Asia/Taipei robustly (Intl handles tz, no UTC slice trap).\nconst now = new Date();\nconst taipei = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' });\nconst todayParts = taipei.formatToParts(now).reduce((acc,p) => { if (p.type !== 'literal') acc[p.type] = p.value; return acc; }, {});\nconst todayTaipei = `${todayParts.year}-${todayParts.month}-${todayParts.day}`;\n// One day back in Taipei = subtract 24h from the Taipei-formatted today.\nconst y = new Date(todayTaipei + 'T00:00:00+08:00');\ny.setUTCDate(y.getUTCDate() - 1);\nconst yParts = taipei.formatToParts(y).reduce((acc,p) => { if (p.type !== 'literal') acc[p.type] = p.value; return acc; }, {});\nconst yesterday = `${yParts.year}-${yParts.month}-${yParts.day}`;\nreturn [{ json: { correlationId: `recon-${yesterday}-${Math.floor(Math.random()*1e6)}`, yesterday, todayTaipei } }];"
       },
       "id": "stamp-1",
       "name": "Stamp yesterday (Taipei)",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [120, -40]
+      "position": [
+        120,
+        -40
+      ]
     },
     {
       "parameters": {
@@ -43,17 +61,25 @@
       "name": "Read Audit",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
-      "position": [360, -40]
+      "position": [
+        360,
+        -40
+      ]
     },
     {
       "parameters": {
-        "functionCode": "const yesterday = $node['Stamp yesterday (Taipei)'].json.yesterday;\nconst correlationId = $node['Stamp yesterday (Taipei)'].json.correlationId;\nconst rows = $items().map(i => i.json);\nconst candidates = rows.filter(r => r.op === 'issue' && (r.appliedAt || '').startsWith(yesterday) && r.status === 'issued');\nif (candidates.length === 0) return [{ json: { correlationId, yesterday, empty: true, total: 0, green: 0, mismatchRows: [] } }];\nreturn candidates.map(json => ({ json: { ...json, correlationId, yesterday } }));"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const yesterday = $node['Stamp yesterday (Taipei)'].json.yesterday;\nconst correlationId = $node['Stamp yesterday (Taipei)'].json.correlationId;\nconst rows = $items().map(i => i.json);\nconst candidates = rows.filter(r => r.op === 'issue' && (r.appliedAt || '').startsWith(yesterday) && r.status === 'issued');\nif (candidates.length === 0) return [{ json: { correlationId, yesterday, empty: true, total: 0, green: 0, mismatchRows: [] } }];\nreturn candidates.map(json => ({ json: { ...json, correlationId, yesterday } }));"
       },
       "id": "filter-1",
       "name": "Filter to yesterday",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [600, -40]
+      "position": [
+        600,
+        -40
+      ]
     },
     {
       "parameters": {
@@ -61,49 +87,79 @@
         "method": "POST",
         "sendBody": true,
         "contentType": "json",
-        "jsonBody": "={{ JSON.stringify({ provider: $json.provider, input: { invoiceNumber: (JSON.parse($json.result || '{}').invoiceNumber) || null, orderId: $json.orderId } }) }}",
+        "jsonBody": "={{ { provider: $json.provider, input: { invoiceNumber: (JSON.parse($json.result || '{}').invoiceNumber) || null, orderId: $json.orderId } } }}",
         "options": {
           "timeout": 15000,
-          "response": { "response": { "fullResponse": true, "neverError": true } }
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
         },
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth"
+        "genericAuthType": "httpHeaderAuth",
+        "specifyBody": "json"
       },
       "id": "query-1",
       "name": "Query provider",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [840, -40]
+      "position": [
+        840,
+        -40
+      ]
     },
     {
       "parameters": {
-        "functionCode": "// Collapse all queries into one summary item.\nconst items = $items().map(i => i.json);\nconst correlationId = $node['Stamp yesterday (Taipei)'].json.correlationId;\nconst yesterday = $node['Stamp yesterday (Taipei)'].json.yesterday;\nconst mismatchRows = [];\nlet green = 0;\nfor (const it of items) {\n  const statusCode = Number(it.statusCode ?? 0);\n  const body = it.body ?? it;\n  const expected = 'ISSUED';\n  const actual = body?.result?.status ?? (statusCode >= 200 && statusCode < 300 ? 'UNKNOWN' : 'NETWORK_OR_ERROR');\n  if (statusCode >= 200 && statusCode < 300 && actual === expected) green++;\n  else mismatchRows.push({ orderId: it.orderId, provider: it.provider, invoiceNumber: body?.result?.invoiceNumber ?? null, expected, actual });\n}\nreturn [{ json: { correlationId, yesterday, total: items.length, green, mismatch: mismatchRows.length, mismatchRows } }];"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Collapse all queries into one summary item.\nconst items = $items().map(i => i.json);\nconst correlationId = $node['Stamp yesterday (Taipei)'].json.correlationId;\nconst yesterday = $node['Stamp yesterday (Taipei)'].json.yesterday;\nconst mismatchRows = [];\nlet green = 0;\nfor (const it of items) {\n  const statusCode = Number(it.statusCode ?? 0);\n  const body = it.body ?? it;\n  const expected = 'ISSUED';\n  const actual = body?.result?.status ?? (statusCode >= 200 && statusCode < 300 ? 'UNKNOWN' : 'NETWORK_OR_ERROR');\n  if (statusCode >= 200 && statusCode < 300 && actual === expected) green++;\n  else mismatchRows.push({ orderId: it.orderId, provider: it.provider, invoiceNumber: body?.result?.invoiceNumber ?? null, expected, actual });\n}\nreturn [{ json: { correlationId, yesterday, total: items.length, green, mismatch: mismatchRows.length, mismatchRows } }];"
       },
       "id": "diff-1",
       "name": "Summarize diffs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1080, -40]
+      "position": [
+        1080,
+        -40
+      ]
     },
     {
       "parameters": {
-        "conditions": { "number": [{ "value1": "={{ $json.mismatch }}", "operation": "larger", "value2": 0 }] }
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.mismatch }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
       },
       "id": "if-1",
       "name": "Any mismatch?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [1320, -40]
+      "position": [
+        1320,
+        -40
+      ]
     },
     {
       "parameters": {
-        "functionCode": "// Fan out mismatches into one item each for Sheet append.\nconst d = $json;\nreturn (d.mismatchRows || []).map(m => ({ json: { correlationId: d.correlationId, yesterday: d.yesterday, ...m, detectedAt: new Date().toISOString() } }));"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Fan out mismatches into one item each for Sheet append.\nconst d = $json;\nreturn (d.mismatchRows || []).map(m => ({ json: { correlationId: d.correlationId, yesterday: d.yesterday, ...m, detectedAt: new Date().toISOString() } }));"
       },
       "id": "fanout-1",
       "name": "Fan out mismatches",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1560, -120]
+      "position": [
+        1560,
+        -120
+      ]
     },
     {
       "parameters": {
@@ -112,13 +168,34 @@
         "sheetName": "Mismatches",
         "columnsUi": {
           "columnValues": [
-            { "column": "correlationId", "value": "={{ $json.correlationId }}" },
-            { "column": "orderId", "value": "={{ $json.orderId }}" },
-            { "column": "provider", "value": "={{ $json.provider }}" },
-            { "column": "invoiceNumber", "value": "={{ $json.invoiceNumber }}" },
-            { "column": "expected", "value": "={{ $json.expected }}" },
-            { "column": "actual", "value": "={{ $json.actual }}" },
-            { "column": "detectedAt", "value": "={{ $json.detectedAt }}" }
+            {
+              "column": "correlationId",
+              "value": "={{ $json.correlationId }}"
+            },
+            {
+              "column": "orderId",
+              "value": "={{ $json.orderId }}"
+            },
+            {
+              "column": "provider",
+              "value": "={{ $json.provider }}"
+            },
+            {
+              "column": "invoiceNumber",
+              "value": "={{ $json.invoiceNumber }}"
+            },
+            {
+              "column": "expected",
+              "value": "={{ $json.expected }}"
+            },
+            {
+              "column": "actual",
+              "value": "={{ $json.actual }}"
+            },
+            {
+              "column": "detectedAt",
+              "value": "={{ $json.detectedAt }}"
+            }
           ]
         }
       },
@@ -126,7 +203,10 @@
       "name": "Append mismatches",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
-      "position": [1800, -120]
+      "position": [
+        1800,
+        -120
+      ]
     },
     {
       "parameters": {
@@ -137,7 +217,10 @@
       "name": "Slack mismatch alert",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.2,
-      "position": [2040, -120]
+      "position": [
+        2040,
+        -120
+      ]
     },
     {
       "parameters": {
@@ -151,36 +234,161 @@
       "name": "Email finance",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [2280, -40]
+      "position": [
+        2280,
+        -40
+      ]
     },
     {
       "parameters": {
-        "functionCode": "return [{ json: { ok: true, summary: $node['Summarize diffs'].json } }];"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{ json: { ok: true, summary: $node['Summarize diffs'].json } }];"
       },
       "id": "noop-1",
       "name": "All green — proceed",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1560, 80]
+      "position": [
+        1560,
+        80
+      ]
     }
   ],
   "connections": {
-    "Daily 02:00 Taipei": { "main": [[{ "node": "Stamp yesterday (Taipei)", "type": "main", "index": 0 }]] },
-    "Stamp yesterday (Taipei)": { "main": [[{ "node": "Read Audit", "type": "main", "index": 0 }]] },
-    "Read Audit": { "main": [[{ "node": "Filter to yesterday", "type": "main", "index": 0 }]] },
-    "Filter to yesterday": { "main": [[{ "node": "Query provider", "type": "main", "index": 0 }]] },
-    "Query provider": { "main": [[{ "node": "Summarize diffs", "type": "main", "index": 0 }]] },
-    "Summarize diffs": { "main": [[{ "node": "Any mismatch?", "type": "main", "index": 0 }]] },
-    "Any mismatch?": { "main": [
-      [{ "node": "Fan out mismatches", "type": "main", "index": 0 }],
-      [{ "node": "All green — proceed", "type": "main", "index": 0 }]
-    ]},
-    "Fan out mismatches": { "main": [[{ "node": "Append mismatches", "type": "main", "index": 0 }]] },
-    "Append mismatches": { "main": [[{ "node": "Slack mismatch alert", "type": "main", "index": 0 }]] },
-    "Slack mismatch alert": { "main": [[{ "node": "Email finance", "type": "main", "index": 0 }]] },
-    "All green — proceed": { "main": [[{ "node": "Email finance", "type": "main", "index": 0 }]] }
+    "Daily 02:00 Taipei": {
+      "main": [
+        [
+          {
+            "node": "Stamp yesterday (Taipei)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stamp yesterday (Taipei)": {
+      "main": [
+        [
+          {
+            "node": "Read Audit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Audit": {
+      "main": [
+        [
+          {
+            "node": "Filter to yesterday",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter to yesterday": {
+      "main": [
+        [
+          {
+            "node": "Query provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query provider": {
+      "main": [
+        [
+          {
+            "node": "Summarize diffs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize diffs": {
+      "main": [
+        [
+          {
+            "node": "Any mismatch?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any mismatch?": {
+      "main": [
+        [
+          {
+            "node": "Fan out mismatches",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "All green — proceed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fan out mismatches": {
+      "main": [
+        [
+          {
+            "node": "Append mismatches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append mismatches": {
+      "main": [
+        [
+          {
+            "node": "Slack mismatch alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack mismatch alert": {
+      "main": [
+        [
+          {
+            "node": "Email finance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "All green — proceed": {
+      "main": [
+        [
+          {
+            "node": "Email finance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1", "timezone": "Asia/Taipei" },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Taipei"
+  },
   "active": false,
   "pinData": {},
   "tags": []

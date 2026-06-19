@@ -1,5 +1,58 @@
 # Changelog
 
+## v0.30.2 — 真實 n8n end-to-end smoke 抓到 3 個 V&V 漏網之魚（SEC-014/015/016）
+
+實際把 einvoice-issue-from-order workflow 上架到使用者 localhost:5678 n8n、打了真的 webhook、看 svc → SDK → **Amego 公開 sandbox** 回了真實測試發票 `AA26514637`。**這是 v0.28.0 起 SECURITY-REVIEW 一直標 PENDING 的 end-to-end runtime smoke 第一次真的跑通**。
+
+而且，這次 smoke 一路爬出 4 個前面 V&V 沒抓到的 contract drift bug — 全部修了。
+
+### 🆕 3 個新 SEC-### finding（推上 SECURITY-REVIEW.md §6.4）
+
+| ID | Severity | 內容 | v0.30.2 |
+| --- | --- | --- | --- |
+| **SEC-014** | High | 6 份 workflow 全部用 `parameters.functionCode`（舊 Function node 欄位），但 Code v2 要 `mode + language + jsCode` — n8n 默默丟掉、執行時拋 `Error: Unknown error` | ✅ 19 個 Code v2 nodes 批次 migrate |
+| **SEC-015** | High | 5 個 HTTP v4 nodes 用 `={{ JSON.stringify({...}) }}` wrapper，但 n8n v4 需要 `specifyBody: "json"` + 內聯物件表達式 `={{ { ... } }}` — 結果 svc 收到空 body 回 400 | ✅ 全部改成 inline expression + 加 specifyBody |
+| **SEC-016** | Medium | `svc/src/providers.ts` 沒讀 `*_BASE_URL` env，導致 v0.30.1 的本地 sandbox 完全被 bypass | ✅ 5 家 provider config 都加 `baseUrl: optionalBaseUrl(...)` |
+
+加碼一條 **n8n 行為文件化**（不是 Pack bug 但需告知使用者）：透過 REST API 創的 workflow，webhook listener 不自動 register，必須 UI Save 或 n8n 重啟。寫進 SKILL Stage 10 警告。
+
+### 🩹 SKILL Stage 9 + 10 加強
+
+`code2n8n-pipeline` SKILL 加入 **4 項 n8n node version contract checks**（Stage 9）：
+1. Code v2 必須 `mode + language + jsCode`
+2. HTTP v4 + sendBody 必須 `specifyBody: "json"`
+3. `jsonBody` 必須內聯物件表達式
+4. 若 svc 有 sandbox/proxy 支援，必須讀 `*_BASE_URL` env 並傳進 SDK
+
+Stage 10 加 webhook registration caveat：若案例含 webhook entry，**不可宣稱「自動上架完成」**，必須告知使用者「需要 UI Save 或 restart」。
+
+### ✅ 驗證紀錄（誠實版）
+
+**Layer 1**：scanner 6/0 err/3 warn · live-roundtrip 6/6 ok (tag claude-import-2026-06-19)
+**Layer 2.A**：svc tsc 0 err · npm audit 0 CVE
+**Layer 2.B**：svc /healthz 200 · /v1/* 401 · op=__proto__ → 400 · 2MB body → 413 · missing creds → "configuration error"
+**Layer 2.E（end-to-end）**：
+- 第 1 次 smoke（patched v0.30.1）：4 個 bug 連環暴露 → workflow 跑不完
+- 第 7 次 smoke（patched 4 個 bug 後）：**全 10 節點綠 · 真實 invoice `AA26514637` 回來 · svc.log 200 / 182ms**
+- 第 8 次 smoke（v0.30.2 純 repo patch 後 re-import）：webhook 404 因為等使用者點 UI Save（n8n 行為，已寫進 SKILL Stage 10）
+
+**未驗證**（誠實揭露）：
+- 其他 5 個 workflow（void / allowance / reconcile / failover / monthly-export）的 end-to-end 沒真打
+- Google Sheet audit row / Slack DLQ 實際寫入沒測（節點 disable 跳過）
+- Retry / DLQ 路徑沒驗（happy path only）
+- ECPay / ezPay / ezPay-CB / ezReceipt via n8n 沒驗
+- 本地 sandbox（v0.30.1）+ svc baseUrl env（v0.30.2）整合 — 程式碼到位但沒實打 smoke
+
+### 為什麼這版重要
+
+v0.28.0 是「方法論修了第一次」。v0.30.2 是 **方法論修了第二次** — 因為 v0.28.0 的 review 用 scanner + roundtrip 抓到 13 個 SEC、但 Code v2 / HTTP v4 contract drift 因為「沒實際 run」漏抓。v0.30.2 把 n8n version contract checks 寫進 SKILL Stage 9，避免下個案例再踩。
+
+**第一次寫進 SKILL 的兩條 hard-learned 規則**：
+- 「workflow JSON 結構合法 ≠ workflow 能執行」— v0.28.0 學到一次
+- 「**workflow 能 import ≠ webhook 真的 register**」— v0.30.2 學到第二次
+
+---
+
 ## v0.30.1 — Sandbox build directive 寫進 SKILL Stage 8（pattern 推上，實作本地留）
 
 實作層：本地建好 5 家 vendor HTTP simulator（`examples/einvoice-n8n/sandbox/`）— Hono + AES + 8 種錯誤注入 + 5 sub-router，跑通 Amego 全鏈 smoke。**但 sandbox 本身不推 GitHub**（操作者特定 scaffolding，`.git/info/exclude` 鎖死）；推上的只有「pattern 怎麼用」。

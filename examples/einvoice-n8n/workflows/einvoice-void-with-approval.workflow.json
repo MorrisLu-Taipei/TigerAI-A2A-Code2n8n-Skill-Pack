@@ -11,7 +11,10 @@
       "name": "Pattern note",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-740, -400]
+      "position": [
+        -740,
+        -400
+      ]
     },
     {
       "parameters": {
@@ -24,17 +27,25 @@
       "name": "Webhook: void request",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
-      "position": [-120, -40]
+      "position": [
+        -120,
+        -40
+      ]
     },
     {
       "parameters": {
-        "functionCode": "const body = $json.body || $json;\nfor (const k of ['provider','input','requestedBy','reason']) if (!body[k]) throw new Error(`${k} required`);\nreturn [{ json: {\n  correlationId: `inv-void-${Date.now()}-${Math.floor(Math.random()*1e6)}`,\n  requestedAt: new Date().toISOString(),\n  provider: body.provider,\n  requestedBy: body.requestedBy,\n  reason: body.reason,\n  input: body.input\n}}];"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const body = $json.body || $json;\nfor (const k of ['provider','input','requestedBy','reason']) if (!body[k]) throw new Error(`${k} required`);\nreturn [{ json: {\n  correlationId: `inv-void-${Date.now()}-${Math.floor(Math.random()*1e6)}`,\n  requestedAt: new Date().toISOString(),\n  provider: body.provider,\n  requestedBy: body.requestedBy,\n  reason: body.reason,\n  input: body.input\n}}];"
       },
       "id": "stamp-1",
       "name": "Stamp correlation",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [120, -40]
+      "position": [
+        120,
+        -40
+      ]
     },
     {
       "parameters": {
@@ -45,34 +56,51 @@
       "name": "Notify approver",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.2,
-      "position": [360, -40]
+      "position": [
+        360,
+        -40
+      ]
     },
     {
       "parameters": {
         "resume": "webhook",
-        "options": { "responseTimeout": "4h" }
+        "options": {
+          "responseTimeout": "4h"
+        }
       },
       "id": "wait-1",
       "name": "Wait for approval",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
-      "position": [600, -40]
+      "position": [
+        600,
+        -40
+      ]
     },
     {
       "parameters": {
-        "functionCode": "// After Wait, $json is the resume callback payload. Rehydrate the upstream state.\nconst state = $node['Stamp correlation'].json;\nconst decision = $json.query?.decision || $json.body?.decision || 'reject';\nconst approver = $json.query?.approver || $json.body?.approver || 'unknown';\nreturn [{ json: { ...state, decision, approver, decidedAt: new Date().toISOString() } }];"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// After Wait, $json is the resume callback payload. Rehydrate the upstream state.\nconst state = $node['Stamp correlation'].json;\nconst decision = $json.query?.decision || $json.body?.decision || 'reject';\nconst approver = $json.query?.approver || $json.body?.approver || 'unknown';\nreturn [{ json: { ...state, decision, approver, decidedAt: new Date().toISOString() } }];"
       },
       "id": "rehydrate-1",
       "name": "Rehydrate after Wait",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [840, -40]
+      "position": [
+        840,
+        -40
+      ]
     },
     {
       "parameters": {
         "conditions": {
           "string": [
-            { "value1": "={{ $json.decision }}", "operation": "equals", "value2": "approve" }
+            {
+              "value1": "={{ $json.decision }}",
+              "operation": "equals",
+              "value2": "approve"
+            }
           ]
         }
       },
@@ -80,7 +108,10 @@
       "name": "Approved?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [1080, -40]
+      "position": [
+        1080,
+        -40
+      ]
     },
     {
       "parameters": {
@@ -88,29 +119,43 @@
         "method": "POST",
         "sendBody": true,
         "contentType": "json",
-        "jsonBody": "={{ JSON.stringify({ provider: $json.provider, input: $json.input }) }}",
+        "jsonBody": "={{ { provider: $json.provider, input: $json.input } }}",
         "options": {
           "timeout": 15000,
-          "response": { "response": { "fullResponse": true, "neverError": true } }
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
         },
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth"
+        "genericAuthType": "httpHeaderAuth",
+        "specifyBody": "json"
       },
       "id": "http-void-1",
       "name": "Call svc /v1/void",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1320, -160]
+      "position": [
+        1320,
+        -160
+      ]
     },
     {
       "parameters": {
-        "functionCode": "const state = $node['Rehydrate after Wait'].json;\nconst statusCode = Number($json.statusCode ?? 0);\nconst ok = statusCode >= 200 && statusCode < 300;\nreturn [{ json: { ...state, statusCode, ok, response: $json.body ?? $json } }];"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const state = $node['Rehydrate after Wait'].json;\nconst statusCode = Number($json.statusCode ?? 0);\nconst ok = statusCode >= 200 && statusCode < 300;\nreturn [{ json: { ...state, statusCode, ok, response: $json.body ?? $json } }];"
       },
       "id": "merge-1",
       "name": "Rehydrate after void",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1560, -160]
+      "position": [
+        1560,
+        -160
+      ]
     },
     {
       "parameters": {
@@ -119,15 +164,42 @@
         "sheetName": "Audit",
         "columnsUi": {
           "columnValues": [
-            { "column": "correlationId", "value": "={{ $json.correlationId }}" },
-            { "column": "op", "value": "void" },
-            { "column": "provider", "value": "={{ $json.provider }}" },
-            { "column": "invoiceNumber", "value": "={{ $json.input?.invoiceNumber }}" },
-            { "column": "requestedBy", "value": "={{ $json.requestedBy }}" },
-            { "column": "approver", "value": "={{ $json.approver }}" },
-            { "column": "reason", "value": "={{ $json.reason }}" },
-            { "column": "status", "value": "={{ $json.ok ? 'voided' : 'failed' }}" },
-            { "column": "appliedAt", "value": "={{ $json.decidedAt }}" }
+            {
+              "column": "correlationId",
+              "value": "={{ $json.correlationId }}"
+            },
+            {
+              "column": "op",
+              "value": "void"
+            },
+            {
+              "column": "provider",
+              "value": "={{ $json.provider }}"
+            },
+            {
+              "column": "invoiceNumber",
+              "value": "={{ $json.input?.invoiceNumber }}"
+            },
+            {
+              "column": "requestedBy",
+              "value": "={{ $json.requestedBy }}"
+            },
+            {
+              "column": "approver",
+              "value": "={{ $json.approver }}"
+            },
+            {
+              "column": "reason",
+              "value": "={{ $json.reason }}"
+            },
+            {
+              "column": "status",
+              "value": "={{ $json.ok ? 'voided' : 'failed' }}"
+            },
+            {
+              "column": "appliedAt",
+              "value": "={{ $json.decidedAt }}"
+            }
           ]
         }
       },
@@ -135,7 +207,10 @@
       "name": "Audit (approved)",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
-      "position": [1800, -160]
+      "position": [
+        1800,
+        -160
+      ]
     },
     {
       "parameters": {
@@ -144,15 +219,42 @@
         "sheetName": "Audit",
         "columnsUi": {
           "columnValues": [
-            { "column": "correlationId", "value": "={{ $json.correlationId }}" },
-            { "column": "op", "value": "void" },
-            { "column": "provider", "value": "={{ $json.provider }}" },
-            { "column": "invoiceNumber", "value": "={{ $json.input?.invoiceNumber }}" },
-            { "column": "requestedBy", "value": "={{ $json.requestedBy }}" },
-            { "column": "approver", "value": "={{ $json.approver }}" },
-            { "column": "reason", "value": "={{ $json.reason }}" },
-            { "column": "status", "value": "rejected" },
-            { "column": "appliedAt", "value": "={{ $json.decidedAt }}" }
+            {
+              "column": "correlationId",
+              "value": "={{ $json.correlationId }}"
+            },
+            {
+              "column": "op",
+              "value": "void"
+            },
+            {
+              "column": "provider",
+              "value": "={{ $json.provider }}"
+            },
+            {
+              "column": "invoiceNumber",
+              "value": "={{ $json.input?.invoiceNumber }}"
+            },
+            {
+              "column": "requestedBy",
+              "value": "={{ $json.requestedBy }}"
+            },
+            {
+              "column": "approver",
+              "value": "={{ $json.approver }}"
+            },
+            {
+              "column": "reason",
+              "value": "={{ $json.reason }}"
+            },
+            {
+              "column": "status",
+              "value": "rejected"
+            },
+            {
+              "column": "appliedAt",
+              "value": "={{ $json.decidedAt }}"
+            }
           ]
         }
       },
@@ -160,7 +262,10 @@
       "name": "Audit (rejected)",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
-      "position": [1320, 80]
+      "position": [
+        1320,
+        80
+      ]
     },
     {
       "parameters": {
@@ -172,25 +277,135 @@
       "name": "Respond to caller",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [2040, -80]
+      "position": [
+        2040,
+        -80
+      ]
     }
   ],
   "connections": {
-    "Webhook: void request": { "main": [[{ "node": "Stamp correlation", "type": "main", "index": 0 }]] },
-    "Stamp correlation": { "main": [[{ "node": "Notify approver", "type": "main", "index": 0 }]] },
-    "Notify approver": { "main": [[{ "node": "Wait for approval", "type": "main", "index": 0 }]] },
-    "Wait for approval": { "main": [[{ "node": "Rehydrate after Wait", "type": "main", "index": 0 }]] },
-    "Rehydrate after Wait": { "main": [[{ "node": "Approved?", "type": "main", "index": 0 }]] },
-    "Approved?": { "main": [
-      [{ "node": "Call svc /v1/void", "type": "main", "index": 0 }],
-      [{ "node": "Audit (rejected)", "type": "main", "index": 0 }]
-    ]},
-    "Call svc /v1/void": { "main": [[{ "node": "Rehydrate after void", "type": "main", "index": 0 }]] },
-    "Rehydrate after void": { "main": [[{ "node": "Audit (approved)", "type": "main", "index": 0 }]] },
-    "Audit (approved)": { "main": [[{ "node": "Respond to caller", "type": "main", "index": 0 }]] },
-    "Audit (rejected)": { "main": [[{ "node": "Respond to caller", "type": "main", "index": 0 }]] }
+    "Webhook: void request": {
+      "main": [
+        [
+          {
+            "node": "Stamp correlation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stamp correlation": {
+      "main": [
+        [
+          {
+            "node": "Notify approver",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify approver": {
+      "main": [
+        [
+          {
+            "node": "Wait for approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for approval": {
+      "main": [
+        [
+          {
+            "node": "Rehydrate after Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rehydrate after Wait": {
+      "main": [
+        [
+          {
+            "node": "Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved?": {
+      "main": [
+        [
+          {
+            "node": "Call svc /v1/void",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Audit (rejected)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call svc /v1/void": {
+      "main": [
+        [
+          {
+            "node": "Rehydrate after void",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rehydrate after void": {
+      "main": [
+        [
+          {
+            "node": "Audit (approved)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit (approved)": {
+      "main": [
+        [
+          {
+            "node": "Respond to caller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit (rejected)": {
+      "main": [
+        [
+          {
+            "node": "Respond to caller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1", "timezone": "Asia/Taipei" },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Taipei"
+  },
   "active": false,
   "pinData": {},
   "tags": []

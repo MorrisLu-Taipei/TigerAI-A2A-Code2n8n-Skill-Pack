@@ -11,7 +11,10 @@
       "name": "Pattern note",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-740, -360]
+      "position": [
+        -740,
+        -360
+      ]
     },
     {
       "parameters": {},
@@ -19,17 +22,25 @@
       "name": "When called",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1,
-      "position": [-120, -40]
+      "position": [
+        -120,
+        -40
+      ]
     },
     {
       "parameters": {
-        "functionCode": "const body = $json;\nconst ALLOWED_OPS = ['issue','void','allowance','voidAllowance','query'];\nfor (const k of ['capability','candidates','op','input']) if (body[k] == null) throw new Error(`${k} required`);\nif (!Array.isArray(body.candidates) || body.candidates.length === 0) throw new Error('candidates must be non-empty array');\nif (!ALLOWED_OPS.includes(body.op)) throw new Error(`op must be one of: ${ALLOWED_OPS.join(', ')}`);\nreturn [{ json: {\n  correlationId: body.correlationId || `inv-route-${Date.now()}-${Math.floor(Math.random()*1e6)}`,\n  capability: body.capability,\n  candidates: body.candidates,\n  op: body.op,\n  input: body.input\n}}];"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const body = $json;\nconst ALLOWED_OPS = ['issue','void','allowance','voidAllowance','query'];\nfor (const k of ['capability','candidates','op','input']) if (body[k] == null) throw new Error(`${k} required`);\nif (!Array.isArray(body.candidates) || body.candidates.length === 0) throw new Error('candidates must be non-empty array');\nif (!ALLOWED_OPS.includes(body.op)) throw new Error(`op must be one of: ${ALLOWED_OPS.join(', ')}`);\nreturn [{ json: {\n  correlationId: body.correlationId || `inv-route-${Date.now()}-${Math.floor(Math.random()*1e6)}`,\n  capability: body.capability,\n  candidates: body.candidates,\n  op: body.op,\n  input: body.input\n}}];"
       },
       "id": "stamp-1",
       "name": "Validate + stamp",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [120, -40]
+      "position": [
+        120,
+        -40
+      ]
     },
     {
       "parameters": {
@@ -37,29 +48,43 @@
         "method": "POST",
         "sendBody": true,
         "contentType": "json",
-        "jsonBody": "={{ JSON.stringify({ capability: $json.capability, candidates: $json.candidates, op: $json.op, input: $json.input }) }}",
+        "jsonBody": "={{ { capability: $json.capability, candidates: $json.candidates, op: $json.op, input: $json.input } }}",
         "options": {
           "timeout": 20000,
-          "response": { "response": { "fullResponse": true, "neverError": true } }
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
         },
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth"
+        "genericAuthType": "httpHeaderAuth",
+        "specifyBody": "json"
       },
       "id": "route-1",
       "name": "Call svc /v1/route",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [360, -40]
+      "position": [
+        360,
+        -40
+      ]
     },
     {
       "parameters": {
-        "functionCode": "const state = $node['Validate + stamp'].json;\nconst statusCode = Number($json.statusCode ?? 0);\nconst body = $json.body ?? $json;\nconst ok = statusCode >= 200 && statusCode < 300;\nreturn [{ json: { ...state, statusCode, ok, response: body } }];"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const state = $node['Validate + stamp'].json;\nconst statusCode = Number($json.statusCode ?? 0);\nconst body = $json.body ?? $json;\nconst ok = statusCode >= 200 && statusCode < 300;\nreturn [{ json: { ...state, statusCode, ok, response: body } }];"
       },
       "id": "merge-1",
       "name": "Rehydrate state",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [600, -40]
+      "position": [
+        600,
+        -40
+      ]
     },
     {
       "parameters": {
@@ -68,12 +93,30 @@
         "sheetName": "Audit",
         "columnsUi": {
           "columnValues": [
-            { "column": "correlationId", "value": "={{ $json.correlationId }}" },
-            { "column": "op", "value": "=route:{{ $json.op }}" },
-            { "column": "provider", "value": "={{ $json.response?.provider ?? 'no-candidate' }}" },
-            { "column": "status", "value": "={{ $json.ok ? 'routed' : 'all-failed' }}" },
-            { "column": "result", "value": "={{ JSON.stringify($json.response) }}" },
-            { "column": "appliedAt", "value": "={{ new Date().toISOString() }}" }
+            {
+              "column": "correlationId",
+              "value": "={{ $json.correlationId }}"
+            },
+            {
+              "column": "op",
+              "value": "=route:{{ $json.op }}"
+            },
+            {
+              "column": "provider",
+              "value": "={{ $json.response?.provider ?? 'no-candidate' }}"
+            },
+            {
+              "column": "status",
+              "value": "={{ $json.ok ? 'routed' : 'all-failed' }}"
+            },
+            {
+              "column": "result",
+              "value": "={{ JSON.stringify($json.response) }}"
+            },
+            {
+              "column": "appliedAt",
+              "value": "={{ new Date().toISOString() }}"
+            }
           ]
         }
       },
@@ -81,28 +124,89 @@
       "name": "Audit row",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
-      "position": [840, -40],
+      "position": [
+        840,
+        -40
+      ],
       "continueOnFail": true
     },
     {
       "parameters": {
-        "functionCode": "return [{ json: { ok: $json.ok, correlationId: $json.correlationId, provider: $json.response?.provider ?? null, capability: $json.capability, result: $json.response?.result ?? null, error: $json.response?.error ?? null, attempts: $json.response?.attempts ?? null } }];"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return [{ json: { ok: $json.ok, correlationId: $json.correlationId, provider: $json.response?.provider ?? null, capability: $json.capability, result: $json.response?.result ?? null, error: $json.response?.error ?? null, attempts: $json.response?.attempts ?? null } }];"
       },
       "id": "respond-1",
       "name": "Respond to caller",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1080, -40]
+      "position": [
+        1080,
+        -40
+      ]
     }
   ],
   "connections": {
-    "When called": { "main": [[{ "node": "Validate + stamp", "type": "main", "index": 0 }]] },
-    "Validate + stamp": { "main": [[{ "node": "Call svc /v1/route", "type": "main", "index": 0 }]] },
-    "Call svc /v1/route": { "main": [[{ "node": "Rehydrate state", "type": "main", "index": 0 }]] },
-    "Rehydrate state": { "main": [[{ "node": "Audit row", "type": "main", "index": 0 }]] },
-    "Audit row": { "main": [[{ "node": "Respond to caller", "type": "main", "index": 0 }]] }
+    "When called": {
+      "main": [
+        [
+          {
+            "node": "Validate + stamp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate + stamp": {
+      "main": [
+        [
+          {
+            "node": "Call svc /v1/route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call svc /v1/route": {
+      "main": [
+        [
+          {
+            "node": "Rehydrate state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rehydrate state": {
+      "main": [
+        [
+          {
+            "node": "Audit row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit row": {
+      "main": [
+        [
+          {
+            "node": "Respond to caller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1", "timezone": "Asia/Taipei" },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Taipei"
+  },
   "active": false,
   "pinData": {},
   "tags": []

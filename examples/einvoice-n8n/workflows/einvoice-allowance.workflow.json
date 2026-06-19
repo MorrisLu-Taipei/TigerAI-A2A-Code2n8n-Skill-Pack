@@ -11,7 +11,10 @@
       "name": "Pattern note",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [-740, -360]
+      "position": [
+        -740,
+        -360
+      ]
     },
     {
       "parameters": {
@@ -24,17 +27,25 @@
       "name": "Webhook: allowance request",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1.1,
-      "position": [-120, -40]
+      "position": [
+        -120,
+        -40
+      ]
     },
     {
       "parameters": {
-        "functionCode": "const body = $json.body || $json;\nif (!body.provider || !body.input) throw new Error('provider + input required');\nreturn [{ json: {\n  correlationId: `inv-allow-${Date.now()}-${Math.floor(Math.random()*1e6)}`,\n  startedAt: new Date().toISOString(),\n  provider: body.provider,\n  input: body.input,\n  attempt: 0,\n  maxAttempts: 3,\n  backoffMs: [2000, 4000, 8000]\n}}];"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const body = $json.body || $json;\nif (!body.provider || !body.input) throw new Error('provider + input required');\nreturn [{ json: {\n  correlationId: `inv-allow-${Date.now()}-${Math.floor(Math.random()*1e6)}`,\n  startedAt: new Date().toISOString(),\n  provider: body.provider,\n  input: body.input,\n  attempt: 0,\n  maxAttempts: 3,\n  backoffMs: [2000, 4000, 8000]\n}}];"
       },
       "id": "stamp-1",
       "name": "Stamp correlation",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [120, -40]
+      "position": [
+        120,
+        -40
+      ]
     },
     {
       "parameters": {
@@ -42,67 +53,111 @@
         "method": "POST",
         "sendBody": true,
         "contentType": "json",
-        "jsonBody": "={{ JSON.stringify({ provider: $json.provider, input: $json.input }) }}",
+        "jsonBody": "={{ { provider: $json.provider, input: $json.input } }}",
         "options": {
           "timeout": 15000,
-          "response": { "response": { "fullResponse": true, "neverError": true } }
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
         },
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth"
+        "genericAuthType": "httpHeaderAuth",
+        "specifyBody": "json"
       },
       "id": "http-1",
       "name": "Call svc /v1/allowance",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [360, -40]
+      "position": [
+        360,
+        -40
+      ]
     },
     {
       "parameters": {
-        "functionCode": "const state = $node['Stamp correlation'].json;\nconst statusCode = Number($json.statusCode ?? $json.status ?? 0);\nconst respBody = $json.body ?? $json;\nconst ok = statusCode >= 200 && statusCode < 300;\nreturn [{ json: { ...state, statusCode, ok, response: respBody } }];"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const state = $node['Stamp correlation'].json;\nconst statusCode = Number($json.statusCode ?? $json.status ?? 0);\nconst respBody = $json.body ?? $json;\nconst ok = statusCode >= 200 && statusCode < 300;\nreturn [{ json: { ...state, statusCode, ok, response: respBody } }];"
       },
       "id": "merge-1",
       "name": "Rehydrate state",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [600, -40]
+      "position": [
+        600,
+        -40
+      ]
     },
     {
       "parameters": {
-        "conditions": { "boolean": [{ "value1": "={{ $json.ok }}", "value2": true }] }
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.ok }}",
+              "value2": true
+            }
+          ]
+        }
       },
       "id": "if-ok-1",
       "name": "Allowance ok?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [840, -40]
+      "position": [
+        840,
+        -40
+      ]
     },
     {
       "parameters": {
-        "functionCode": "const s = $json;\nconst nextAttempt = (s.attempt ?? 0) + 1;\nif (nextAttempt > s.maxAttempts) return [{ json: { ...s, attempt: nextAttempt, exhausted: true } }];\nreturn [{ json: { ...s, attempt: nextAttempt, waitMs: s.backoffMs[nextAttempt - 1] } }];"
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const s = $json;\nconst nextAttempt = (s.attempt ?? 0) + 1;\nif (nextAttempt > s.maxAttempts) return [{ json: { ...s, attempt: nextAttempt, exhausted: true } }];\nreturn [{ json: { ...s, attempt: nextAttempt, waitMs: s.backoffMs[nextAttempt - 1] } }];"
       },
       "id": "incr-1",
       "name": "Increment + decide",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1080, 120]
+      "position": [
+        1080,
+        120
+      ]
     },
     {
       "parameters": {
-        "conditions": { "boolean": [{ "value1": "={{ $json.exhausted === true }}" }] }
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.exhausted === true }}"
+            }
+          ]
+        }
       },
       "id": "if-ex-1",
       "name": "Exhausted?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [1320, 120]
+      "position": [
+        1320,
+        120
+      ]
     },
     {
-      "parameters": { "amount": "={{ $json.waitMs }}", "unit": "ms" },
+      "parameters": {
+        "amount": "={{ $json.waitMs }}",
+        "unit": "ms"
+      },
       "id": "wait-1",
       "name": "Wait backoff",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
-      "position": [1560, 240]
+      "position": [
+        1560,
+        240
+      ]
     },
     {
       "parameters": {
@@ -111,13 +166,34 @@
         "sheetName": "Audit",
         "columnsUi": {
           "columnValues": [
-            { "column": "correlationId", "value": "={{ $json.correlationId }}" },
-            { "column": "op", "value": "allowance" },
-            { "column": "provider", "value": "={{ $json.provider }}" },
-            { "column": "invoiceNumber", "value": "={{ $json.input?.invoiceNumber }}" },
-            { "column": "status", "value": "={{ $json.exhausted ? 'failed-dlq' : 'allowed' }}" },
-            { "column": "result", "value": "={{ JSON.stringify($json.exhausted ? null : $json.response?.result) }}" },
-            { "column": "appliedAt", "value": "={{ new Date().toISOString() }}" }
+            {
+              "column": "correlationId",
+              "value": "={{ $json.correlationId }}"
+            },
+            {
+              "column": "op",
+              "value": "allowance"
+            },
+            {
+              "column": "provider",
+              "value": "={{ $json.provider }}"
+            },
+            {
+              "column": "invoiceNumber",
+              "value": "={{ $json.input?.invoiceNumber }}"
+            },
+            {
+              "column": "status",
+              "value": "={{ $json.exhausted ? 'failed-dlq' : 'allowed' }}"
+            },
+            {
+              "column": "result",
+              "value": "={{ JSON.stringify($json.exhausted ? null : $json.response?.result) }}"
+            },
+            {
+              "column": "appliedAt",
+              "value": "={{ new Date().toISOString() }}"
+            }
           ]
         }
       },
@@ -125,7 +201,10 @@
       "name": "Audit row",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
-      "position": [1320, -120],
+      "position": [
+        1320,
+        -120
+      ],
       "continueOnFail": true
     },
     {
@@ -137,7 +216,10 @@
       "name": "Slack dead-letter",
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.2,
-      "position": [1560, 60]
+      "position": [
+        1560,
+        60
+      ]
     },
     {
       "parameters": {
@@ -149,30 +231,136 @@
       "name": "Respond to caller",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [1560, -120]
+      "position": [
+        1560,
+        -120
+      ]
     }
   ],
   "connections": {
-    "Webhook: allowance request": { "main": [[{ "node": "Stamp correlation", "type": "main", "index": 0 }]] },
-    "Stamp correlation": { "main": [[{ "node": "Call svc /v1/allowance", "type": "main", "index": 0 }]] },
-    "Call svc /v1/allowance": { "main": [[{ "node": "Rehydrate state", "type": "main", "index": 0 }]] },
-    "Rehydrate state": { "main": [[{ "node": "Allowance ok?", "type": "main", "index": 0 }]] },
-    "Allowance ok?": { "main": [
-      [{ "node": "Audit row", "type": "main", "index": 0 }],
-      [{ "node": "Increment + decide", "type": "main", "index": 0 }]
-    ]},
-    "Increment + decide": { "main": [[{ "node": "Exhausted?", "type": "main", "index": 0 }]] },
-    "Exhausted?": { "main": [
-      [
-        { "node": "Audit row", "type": "main", "index": 0 },
-        { "node": "Slack dead-letter", "type": "main", "index": 0 }
-      ],
-      [{ "node": "Wait backoff", "type": "main", "index": 0 }]
-    ]},
-    "Wait backoff": { "main": [[{ "node": "Call svc /v1/allowance", "type": "main", "index": 0 }]] },
-    "Audit row": { "main": [[{ "node": "Respond to caller", "type": "main", "index": 0 }]] }
+    "Webhook: allowance request": {
+      "main": [
+        [
+          {
+            "node": "Stamp correlation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stamp correlation": {
+      "main": [
+        [
+          {
+            "node": "Call svc /v1/allowance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call svc /v1/allowance": {
+      "main": [
+        [
+          {
+            "node": "Rehydrate state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rehydrate state": {
+      "main": [
+        [
+          {
+            "node": "Allowance ok?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Allowance ok?": {
+      "main": [
+        [
+          {
+            "node": "Audit row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Increment + decide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Increment + decide": {
+      "main": [
+        [
+          {
+            "node": "Exhausted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exhausted?": {
+      "main": [
+        [
+          {
+            "node": "Audit row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Slack dead-letter",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait backoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait backoff": {
+      "main": [
+        [
+          {
+            "node": "Call svc /v1/allowance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit row": {
+      "main": [
+        [
+          {
+            "node": "Respond to caller",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1", "timezone": "Asia/Taipei" },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Taipei"
+  },
   "active": false,
   "pinData": {},
   "tags": []

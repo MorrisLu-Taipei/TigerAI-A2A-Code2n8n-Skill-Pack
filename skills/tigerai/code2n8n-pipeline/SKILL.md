@@ -196,12 +196,20 @@ description: End-to-end Code2n8n Path B auto-pilot. Auto-activates when the user
 - **Main 動作**：對每份 workflow JSON 跑 §3 Stage 5 critic gate 那張表的 6 項檢查；對 README 每條 claim 找 file:line 對應實作。
 - **Artefact**：`tests/vv-layer2-cd.md`。
 - **Critic gate**：6 項 contract 全綠；README ↔ implementation 100% parity。
+- **🆕 v0.30.2 — n8n node version contract checks**：runtime smoke 之前必跑下列 4 項靜態檢查（v0.30.2 抓到 einvoice 案例的 19 個 Code v2 + 5 個 HTTP v4 contract drift）：
+    1. **Code node v2+**：每個 `n8n-nodes-base.code` typeVersion ≥ 2 的節點 `parameters` 必須含 `mode + language + jsCode`。**不可有 `functionCode`**（那是舊 Function node 欄位、n8n 會默默丟掉、執行時拋 `Error: Unknown error`）。
+    2. **HTTP node v4+**：每個 `n8n-nodes-base.httpRequest` typeVersion ≥ 4 且有 `sendBody: true` 的節點 `parameters` 必須含 `specifyBody: "json"`（或對應的 form / raw）。
+    3. **HTTP node v4+ jsonBody expression**：`jsonBody` 必須是內聯物件表達式 `={{ { key: $json.x, ... } }}`，**不可**用 `={{ JSON.stringify({...}) }}` wrapper — 後者 n8n 會把字串原樣送出、不認其為 JSON object。
+    4. **SDK / wrapper baseUrl env support**：若案例的 wrapper svc 提供 sandbox / proxy 模式，確認對應的 `*_BASE_URL` env 被讀取並傳進 SDK config（einvoice 案例的 v0.30.2 patch 是樣板）。
+- **Critic gate（加強）**：四項任一不過 → VETO 回 Stage 5（workflow JSON）或 Stage 4（svc）。
 
 ### Stage 10 — Activate to n8n
 
 - **Main 動作**：依 [`feedback_n8n_import_marking`](../../../) memory 規則 — import 時加 `[Claude YYYY-MM-DD]` 前綴 + `claude-import-YYYY-MM-DD` tag。若 case 是 sub-workflow 結構，自動 PATCH `executeWorkflow` 節點的 `workflowId` 串接。
 - **Artefact**：`ACTIVATION-LOG.md`（每個 workflow 的 id + URL + activation 狀態）。
 - **Critic gate**：所有 workflow 都成功 import；sub-workflow id 都串對；tag 正確。
+- **🆕 v0.30.2 — n8n webhook registration caveat**：透過 `POST /api/v1/workflows` + `POST /api/v1/workflows/{id}/activate` 創建的 workflow，**webhook nodes 的 listener 不會自動 register**（即使 `active: true`）。`POST /webhook/{path}` 會回 404 直到操作者：(a) 開 n8n UI 點該 workflow 的 Save、(b) 重啟 n8n、或 (c) 用 `/webhook-test/{path}` + canvas 上點 "Execute workflow"。本 Stage 必含告知使用者這個步驟 — **不可宣稱「自動上架完成」如果該案例含 webhook entry**。詳見 `examples/einvoice-n8n/SECURITY-REVIEW.md` §6.4 「Documentation finding」。
+- **Critic gate（加強）**：若案例含 webhook 但 ACTIVATION-LOG 未明示「需要 UI Save 或 restart」這個 caveat → VETO。
 
 ### Stage 11 — Completion report
 
