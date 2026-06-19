@@ -1,5 +1,62 @@
 # Changelog
 
+## v0.34.1 — v3 Form HITL 修好 + runtime 雙分支驗證通過（Codex 救援 + 教訓寫入）
+
+v0.34.0 ship 的 v3 file Layer 1 通過（scanner + roundtrip）但**自己 runtime smoke 連卡 4 輪**沒跑通。曾誤判為「Wait form mode state 跨不過 boundary」，繞了 `customData → staticData → 手動 hidden field → drop Respond + lastNode mode` 全部白工。**使用者轉求 Codex 後一輪解決** — root cause 是用錯 URL 變數。
+
+### 🐛 Root cause
+
+n8n Wait node 不同 `resume` mode 使用**不同的 URL 變數**：
+
+| Wait `resume` mode | URL 變數 | URL 路徑 |
+| --- | --- | --- |
+| `webhook` | `$execution.resumeUrl` | `/webhook-waiting/{execId}` |
+| `form` | **`$execution.resumeFormUrl`** | `/form-waiting/{execId}` |
+
+我把 v2 Slack workflow 的 `$execution.resumeUrl` copy 到 v3 Form workflow — POST 路徑變 `/webhook-waiting/`，但 form session 註冊在 `/form-waiting/`，兩條互不接受對方 payload schema → form submit 永遠失敗。
+
+### ✅ Codex 給的完整修法（已 ship）
+
+1. Email 連結改用 `$execution.resumeFormUrl`
+2. 入口 Webhook 改 `responseMode: onReceived` + `responseCode: 202`（POST 立即非同步回，不卡 caller）
+3. 移除 Respond to Webhook 節點
+4. Wait form `responseMode: lastNode`
+5. 修正無效的 `responseTimeout: "4h"` 為 `limitWaitTime: true` + `limitType: afterTimeInterval` + `resumeAmount: 4` + `resumeUnit: hours`
+6. 加 `hiddenField` 型 `correlationId`，用 `fieldValue: "={{ $('Stamp correlation').first().json.correlationId }}"` 自動回填
+7. **state 直接從 `$('Stamp correlation').first().json` 取得** — n8n Wait form mode 會把 upstream runData 保存到 DB 並 reload，**根本不需要 customData/staticData**
+
+### ✅ Runtime 驗證
+
+實機 n8n 2.10.3 跑兩條分支：
+
+| exec | round | status | svc /v1/void 呼叫? | Audit 分支 |
+| --- | --- | --- | --- | --- |
+| 526 | approve | success | ✅ 呼叫（svc 回 400 NOT_FOUND for fake invoice — 符合預期） | Audit (approved) |
+| 527 | reject | success | ❌ 正確跳過 | Audit (rejected) |
+
+兩條分支 end-to-end finished=true，state 跨 Wait form boundary 完整保留。
+
+### 🔒 SECURITY-REVIEW SEC-9 v3 status 升級
+
+v0.34.0「🟡 DRAFTED but not runtime-verified」→ v0.34.1「✅ FIXED via v3 Form native pattern (Codex-rescued)」。
+
+### 🔖 Memory 新增 [feedback_n8n_resume_url_variables](memory/feedback_n8n_resume_url_variables.md)
+
+跨 session 規則：改 Wait `resume` mode 第一件事查當前 n8n 版本 docs 列出對應 URL 變數，不要從別的 mode 拷貝；遇到 form/webhook resume 失敗**先看 docker container access log** 比看 executions API runData 快得多。
+
+### 📝 教訓盤點（誠實版）
+
+| 我的錯 | 真實情況 |
+| --- | --- |
+| 假設「Wait form state 一定丟」 | n8n 2.10.x 會 reload upstream runData，直接 `$('Stamp correlation').first().json` 可用 |
+| 繞到 `customData` | customData 也 reload，但根本不需要 — 是症狀治療而非治本 |
+| 繞到 `staticData` + 手動貼 correlationId | 完全多餘 |
+| 改 `responseMode: lastNode` | 方向錯，應該用 `onReceived` + 202 |
+| Briefing 推論「Wait form 是死路 → 改 Form Trigger 子 workflow」 | 錯誤推論 |
+| 假設 n8n 1.x（沒查 version） | 實際 2.10.3 |
+
+**最關鍵教訓**：連續 3 次「state 跨不過 boundary」症狀應該觸發我質疑「是不是 form 根本沒成功 resume」而不是繼續加 persistence 機制。**遇到反覆失敗時先驗證 transport，再驗證 logic**。
+
 ## v0.34.0 — void-with-approval v3 native Form HITL（Email + n8n Form 表單核可）給台灣不用 Slack 的情境
 
 回應使用者：「Slack 在台灣很少人用，可以改別的嗎」。Ship v3 = **email 通知 + n8n Wait `resume: form`** 寫法 — 主管收 email 點連結 → 開啟 n8n 內建 HTML 表單頁（dropdown approve/reject + 核可人 email + 補充說明）→ submit → execution 自動 resume。

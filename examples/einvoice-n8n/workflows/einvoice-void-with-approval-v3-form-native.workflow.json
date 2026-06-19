@@ -17,7 +17,8 @@
       "parameters": {
         "path": "einvoice/void",
         "httpMethod": "POST",
-        "responseMode": "responseNode",
+        "responseMode": "onReceived",
+        "responseCode": 202,
         "options": {}
       },
       "id": "wh-1",
@@ -44,7 +45,7 @@
         "toEmail": "__REPLACE_ME__APPROVER_EMAIL__",
         "subject": "=🛑 VOID 核可請求 — Invoice {{ $json.input?.invoiceNumber }}",
         "emailFormat": "html",
-        "html": "=<h2>🛑 VOID 核可請求</h2>\n<table style=\"border-collapse:collapse;\">\n<tr><td><b>Invoice</b></td><td><code>{{ $json.input?.invoiceNumber }}</code></td></tr>\n<tr><td><b>Provider</b></td><td>{{ $json.provider }}</td></tr>\n<tr><td><b>Requested by</b></td><td>{{ $json.requestedBy }}</td></tr>\n<tr><td><b>Reason</b></td><td>{{ $json.reason }}</td></tr>\n<tr><td><b>Correlation</b></td><td><code>{{ $json.correlationId }}</code></td></tr>\n</table>\n<p style=\"color:#c00;font-weight:bold;\">⚠ Void 不可逆。按下「核可」即承擔此筆 audit 責任。</p>\n<p><a href=\"{{ $execution.resumeUrl }}\" style=\"display:inline-block;padding:10px 20px;background:#0066cc;color:white;text-decoration:none;border-radius:4px;font-weight:bold;\">📝 開啟核可表單</a></p>\n<p style=\"color:#666;font-size:12px;\">本連結 4 小時內有效，過期後本筆作廢請求將自動視為拒絕。</p>",
+        "html": "=<h2>🛑 VOID 核可請求</h2>\n<table style=\"border-collapse:collapse;\">\n<tr><td><b>Invoice</b></td><td><code>{{ $json.input?.invoiceNumber }}</code></td></tr>\n<tr><td><b>Provider</b></td><td>{{ $json.provider }}</td></tr>\n<tr><td><b>Requested by</b></td><td>{{ $json.requestedBy }}</td></tr>\n<tr><td><b>Reason</b></td><td>{{ $json.reason }}</td></tr>\n<tr><td><b>Correlation</b></td><td><code>{{ $json.correlationId }}</code></td></tr>\n</table>\n<p style=\"color:#c00;font-weight:bold;\">⚠ Void 不可逆。按下「核可」即承擔此筆 audit 責任。</p>\n<p><a href=\"{{ $execution.resumeFormUrl }}\" style=\"display:inline-block;padding:10px 20px;background:#0066cc;color:white;text-decoration:none;border-radius:4px;font-weight:bold;\">📝 開啟核可表單</a></p>\n<p style=\"color:#666;font-size:12px;\">本連結 4 小時內有效，過期後本筆作廢請求將自動視為拒絕。</p>",
         "options": {}
       },
       "id": "email-notify-1",
@@ -56,10 +57,15 @@
     {
       "parameters": {
         "resume": "form",
-        "formTitle": "=einvoice 作廢核可 — {{ $json.input?.invoiceNumber }}",
-        "formDescription": "=本筆作廢請求由 {{ $json.requestedBy }} 提出，原因：{{ $json.reason }}。⚠ 作廢不可逆。",
+        "formTitle": "=einvoice 作廢核可 — {{ $('Stamp correlation').first().json.input?.invoiceNumber }}",
+        "formDescription": "=本筆作廢請求由 {{ $('Stamp correlation').first().json.requestedBy }} 提出，原因：{{ $('Stamp correlation').first().json.reason }}。⚠ 作廢不可逆。",
         "formFields": {
           "values": [
+            {
+              "fieldName": "correlationId",
+              "fieldType": "hiddenField",
+              "fieldValue": "={{ $('Stamp correlation').first().json.correlationId }}"
+            },
             {
               "fieldLabel": "decision",
               "fieldType": "dropdown",
@@ -86,9 +92,12 @@
             }
           ]
         },
-        "options": {
-          "responseTimeout": "4h"
-        }
+        "responseMode": "lastNode",
+        "limitWaitTime": true,
+        "limitType": "afterTimeInterval",
+        "resumeAmount": 4,
+        "resumeUnit": "hours",
+        "options": {}
       },
       "id": "wait-form-1",
       "name": "Wait for form submission",
@@ -100,7 +109,7 @@
       "parameters": {
         "mode": "runOnceForAllItems",
         "language": "javaScript",
-        "jsCode": "// After form submission, $json contains the form field values keyed by fieldLabel.\nconst state = $node['Stamp correlation'].json;\nconst decision = ($json.decision || '').toLowerCase();\nconst approved = decision === 'approve';\nconst approver = $json.approver_email || 'form-unknown';\nconst note = $json.note || '';\nreturn [{ json: {\n  ...state,\n  decision,\n  approved,\n  approver,\n  note,\n  decidedAt: new Date().toISOString()\n}}];"
+        "jsCode": "// Wait persists execution data in n8n's database and reloads upstream run data on resume.\n// A timeout has no decision field, so it safely falls through to reject.\nconst state = $('Stamp correlation').first().json;\nconst decision = String($json.decision || 'reject').toLowerCase();\nconst approved = decision === 'approve';\nconst approver = $json.approver_email || (decision === 'reject' ? 'timeout-or-form-unknown' : 'form-unknown');\nconst note = $json.note || '';\nreturn [{ json: {\n  ...state,\n  correlationId: $json.correlationId || state.correlationId,\n  decision,\n  approved,\n  approver,\n  note,\n  decidedAt: new Date().toISOString()\n}}];"
       },
       "id": "rehydrate-1",
       "name": "Rehydrate after form",
@@ -214,18 +223,6 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4,
       "position": [1320, 80]
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ ok: !!$json.ok, correlationId: $json.correlationId, decision: $json.decision, approver: $json.approver, note: $json.note, status: $json.approved ? ($json.ok ? 'voided' : 'failed') : 'rejected' }) }}",
-        "options": {}
-      },
-      "id": "respond-1",
-      "name": "Respond to caller",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [2040, -80]
     }
   ],
   "connections": {
@@ -257,10 +254,10 @@
       "main": [[{ "node": "Audit (approved)", "type": "main", "index": 0 }]]
     },
     "Audit (approved)": {
-      "main": [[{ "node": "Respond to caller", "type": "main", "index": 0 }]]
+      "main": [[]]
     },
     "Audit (rejected)": {
-      "main": [[{ "node": "Respond to caller", "type": "main", "index": 0 }]]
+      "main": [[]]
     }
   },
   "settings": {

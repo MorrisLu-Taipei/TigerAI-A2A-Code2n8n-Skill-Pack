@@ -1,6 +1,6 @@
 {
   "name": "tigerai-code2n8n-skill-pack",
-  "version": "0.34.0",
+  "version": "0.34.1",
   "description": "TigerAI Code2n8n Skill Pack — the bridge between AI Coding (Claude Code / Codex / Antigravity) and enterprise-grade n8n workflows. Marquee skill `code-to-workflow` turns any existing program / system (Apps Script, Netlify Functions, Express, Docker stack) into a governable n8n workflow, backed by 3 real case studies (Google Workspace admin / cloud LINE customer service / on-prem LINE customer service with Qdrant RAG + Ollama). Also includes sticky-note → workflow, code → native node refactor, 8-pattern cookbook, 2,061 reference workflows, and three usage modes (cookbook copy / Q&A / example finder). Pure REST API, no MCP dependency.",
   "author": "TigerAI",
   "license": "MIT",
