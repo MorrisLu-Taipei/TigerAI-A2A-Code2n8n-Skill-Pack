@@ -1,5 +1,55 @@
 # Changelog
 
+## v0.30.3 — Meta-reflection 與 lexical schema-before-claim rule
+
+純文件 / 規則層更新。回應 v0.30.2 之後使用者的問題：「為什麼有那些 bug，你學下來了嗎」— 把 meta-lesson 寫成 (A) 永久 reflection 紀錄、(B) 強制執行的 lexical rule。
+
+### 🩹 [`examples/einvoice-n8n/REFLECTION.md`](examples/einvoice-n8n/REFLECTION.md) 加 2026-06-19 addendum
+
+完整記錄為什麼 v0.27.0 → v0.30.1 累積了 11 種語言 A2A directive、12 階段 SKILL、main/critic 雙 agent 架構之後，implementing AI 在 v0.30.2 修補 SEC-014/015/016 時**還是差點再犯**v0.27.0 同樣的「scanner + roundtrip 過了就推 release」錯誤。
+
+**核心 meta-lesson**：**寫 directive ≠ 遵守 directive**。前面的 directive 都是 behavioural rule（要求 AI 行為符合 spec），AI 在 token 壓力下仍可能繞過。
+
+### 🚨 [`code2n8n-pipeline` SKILL §1.6](skills/tigerai/code2n8n-pipeline/SKILL.md) — Lexical schema-before-claim rule
+
+新加最強制條款 — **lexical rule**（純文字位置規則）而非 behavioural rule：
+
+> 任何訊息（commit、release notes、README、回 user）裡，emit 下列受限字眼**之前**，**必須在同一條訊息更早的位置先 emit 完整的 evidence schema**。
+
+受限字眼涵蓋 11 種語言的「validated / tested / X/X ok / production-ready」同義詞與其變體（中文「驗證 / 全綠 / 可上線」、日文「検証済み」、法文「validé」等）。
+
+**Critic enforcement**：用 regex lexical scan 比 behavioural judgment 更難繞過 — 要不就有、要不就沒有、grep 一秒鐘抓得到。
+
+### 三條子規則
+
+1. Layer 2.E PENDING 時 → 只能說「Layer 1 + 2.A + 2.B PASS；2.E PENDING tracked-as v0.X.Y」，不能用「validated / tested」。
+2. 訊息有受限字眼但無 evidence schema → 整段重寫（不是補一段，是訊息違規撤回）。
+3. 用「應該可以」「跑通了」「成功了」等弱化詞繞過 → 仍違規，任何**暗示「已驗證」狀態**的詞彙都受限。
+
+### 為什麼 lexical 而不是 behavioural
+
+Behavioural rule（「請判斷有沒有 evidence」）依賴 AI 的判斷力 — 在壓力下會被「我覺得這次足夠」掩蓋。Lexical rule（「字串 A 出現前字串 B 必須先出現」）不依賴判斷。這是 SEC-014/015/016 之後寫進來的關鍵防線 — 防的是 AI 自己對自己的判斷力過度信任。
+
+### V&V evidence — gate v1（本版自我點檢）
+
+#### Layer 1 (structural)
+- JSON parse: N/A（純文件版）
+- security-scan.mjs: N/A（沒動 workflow JSON）
+- live-roundtrip.mjs: N/A（沒動 workflow JSON）
+
+#### Layer 2 (runtime)
+- npm install: N/A（沒動 svc）
+- npm audit: N/A
+- tsc --noEmit: N/A
+- /healthz 200: N/A
+- Workflow runtime contract: N/A
+- Cross-document parity: PASS — REFLECTION addendum 引用 SKILL §1.6；SKILL §1.6 引用 REFLECTION addendum
+- End-to-end runtime smoke: N/A
+
+本版**不**emit 受限字眼。
+
+---
+
 ## v0.30.2 — 真實 n8n end-to-end smoke 抓到 3 個 V&V 漏網之魚（SEC-014/015/016）
 
 實際把 einvoice-issue-from-order workflow 上架到使用者 localhost:5678 n8n、打了真的 webhook、看 svc → SDK → **Amego 公開 sandbox** 回了真實測試發票 `AA26514637`。**這是 v0.28.0 起 SECURITY-REVIEW 一直標 PENDING 的 end-to-end runtime smoke 第一次真的跑通**。

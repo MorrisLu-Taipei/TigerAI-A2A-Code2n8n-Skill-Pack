@@ -86,6 +86,67 @@ description: End-to-end Code2n8n Path B auto-pilot. Auto-activates when the user
 
 ---
 
+## 1.6 🚨 Lexical schema-before-claim rule（**最強制條款 — 加入於 v0.30.3**）
+
+**Why this section exists**: v0.27.0 → v0.30.1 累積了 11 種語言 A2A directive、12 階段 SKILL、main/critic 雙 agent 架構、§10 V&V two-layer gate — 全部規範「不可宣稱驗證除非 evidence 在場」。然後 v0.30.2 修補 SEC-014/015/016 時，implementing AI **還是直接 scanner + roundtrip 就準備推 v0.30.2 為「修好」**，差點再犯 v0.27.0 同一個錯。只因使用者推回「能不能跟我 n8n 真跑」smoke 才真的做。
+
+結論：**寫 directive ≠ 遵守 directive**。前面所有規定都是 **behavioural rule**（要求 AI 行為符合 spec），AI 在 token 預算 / 上下文壓力 / 「看起來合理」的訊號下仍會繞過。本節新增一個 **lexical rule**（純文字位置規則）— 要不就有、要不就沒有，**無法用判斷繞**。
+
+### Rule
+
+任何訊息（commit message、release notes、README、sticky note、CHANGELOG、回應 user、SECURITY-REVIEW、SKILL artefact）裡，emit 下列受限字眼**之前**，**必須在同一條訊息更早的位置先 emit 完整的 evidence schema**（依 A2A directive 格式）：
+
+**受限字眼（任一語言觸發限制）**：
+`validated` · `驗證` / `驗證通過` / `已驗證` · `検証済み` · `검증됨` · `validé` · `validiert` · `validado` · `đã xác thực` · `ผ่านการตรวจสอบ` · `disahkan` · `tervalidasi` · `tested` · `已測試` · `テスト済み` · `테스트됨` · `testé` · `getestet` · `probado` · `đã test` · `ทดสอบแล้ว` · `diuji` · `X/X ok` · `全綠` · `全件 OK` · `전부 통과` · `tout passe` · `alles grün` · `todo en verde` · `tất cả xanh` · `ผ่านทั้งหมด` · `semua hijau` · `production-ready` · `可上線` · `正式可用` · `本番対応` · `운영 가능` · `prêt pour la production` · `produktionsreif` · `listo para producción` · `sẵn sàng production` · `พร้อม production` · `sedia untuk pengeluaran` · `siap produksi`
+
+### Evidence schema（強制格式，照搬 A2A directive）
+
+```
+## V&V evidence — gate v1 (this AI ran the gate)
+
+### Layer 1 (structural)
+- JSON parse: PASS / FAIL (N files)
+- security-scan.mjs: <count> error / <count> warning  (warnings explained: yes / no)
+- live-roundtrip.mjs: <X>/<Y> ok  (tag: <tag>)
+
+### Layer 2 (runtime)
+- npm install: PASS / FAIL  (`<one-line summary>`)
+- npm audit (high+): PASS / FAIL  (<count> vulnerabilities)
+- tsc --noEmit: PASS / FAIL  (<count> errors)
+- /healthz 200: PASS / FAIL
+- Unauthenticated /v1/* → 401: PASS / FAIL
+- Negative test 1 (body limit): PASS / FAIL
+- Negative test 2 (prototype dispatch): PASS / FAIL
+- Negative test 3 (unknown enum): PASS / FAIL
+- Workflow runtime contract (per-pattern): PASS / FAIL
+- Cross-document parity: PASS / FAIL
+- End-to-end runtime smoke: PASS / PENDING / FAIL  (tracked-as: <version>)
+```
+
+### 三條子規則
+
+1. **Layer 2.E 為 PENDING 時的 fallback**：end-to-end smoke 是 PENDING → **只能說**「Layer 1 + 2.A + 2.B PASS；2.E PENDING tracked-as v0.X.Y」。**不能說**「validated / tested」。
+2. **不可省略**：訊息中如果有受限字眼但沒 evidence schema → 該訊息**整段重寫**（不是補一段 schema 在後面，是訊息違規必須撤回重發）。
+3. **不可改換用詞**：用「應該可以」「看起來 OK」「跑通了」「成功了」「就 OK 了」等弱化詞或正面斷言繞過此規則，仍違規 — 任何**暗示「已驗證」狀態**的詞彙都受限。
+
+### Critic enforcement
+
+Critic agent 在 Stage 11（completion report）以及任何 main agent 對外輸出（commit message draft、release notes draft、README claim、回 user 訊息）前必須跑 lexical scan：
+
+- regex 掃描受限字眼
+- 命中則往前找 evidence schema block
+- 找不到 → **VETO**，要求 main 改寫該訊息
+
+這條 critic check 比 §1.5 語言鎖**更容易自動化**（純 regex），critic agent 應**優先**跑這條。
+
+### 為什麼 lexical 而不是 behavioural
+
+Behavioural rule（「請判斷有沒有 evidence」）依賴 AI 的判斷力 — 在壓力下會被「我覺得這次足夠」掩蓋。Lexical rule（「字串 A 出現前字串 B 必須先出現」）不依賴判斷 — 要不就有、要不就沒有、grep 一秒鐘抓得到。這就是為什麼 SEC-014/015/016 之後加這條 — 防的是 AI 自己對自己的判斷力過度信任。
+
+關聯 reflection：[`examples/einvoice-n8n/REFLECTION.md`](../../../examples/einvoice-n8n/REFLECTION.md) 的 2026-06-19 addendum 詳述為何加這條。
+
+---
+
 ## 2. 雙 agent 架構（main + critic）
 
 ```
