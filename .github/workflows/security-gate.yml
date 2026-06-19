@@ -141,24 +141,29 @@ jobs:
         run: node scripts/security-scan.mjs examples/line-ai-customer-service-onprem/n8n_workflow_export.json --format markdown
 
   dependency-cve:
-    name: case-study npm audit
+    name: case-study npm audit (HIGH+ is a gate, not advisory — SEC-017)
     runs-on: ubuntu-latest
-    continue-on-error: true
+    # v0.36.0 SEC-017 fix: removed continue-on-error. HIGH+ CVE now fails the gate.
     strategy:
+      fail-fast: false
       matrix:
         case:
           - examples/line-ai-customer-service
           - examples/line-ai-customer-service-onprem
+          - examples/einvoice-n8n/svc
     steps:
       - uses: actions/checkout@v4
-      - name: npm audit (high+)
+      - name: npm audit (HIGH+ fails the build)
         working-directory: ${{ matrix.case }}
         run: |
           if [ ! -f package.json ]; then
             echo "No package.json — skip."
             exit 0
           fi
-          npm audit --omit=dev --audit-level=high || echo "npm audit reported findings (continue-on-error)"
+          # SEC-017: audit failures must fail the gate; no || fallback.
+          # If a transient false-positive needs to be ignored, add to package.json
+          # "overrides" or document in SECURITY-REVIEW with a tracked exception.
+          npm audit --omit=dev --audit-level=high
 
   container-scan:
     name: on-prem container image scan (Trivy)

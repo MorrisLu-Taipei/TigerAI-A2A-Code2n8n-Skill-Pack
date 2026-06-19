@@ -1,5 +1,64 @@
 # Changelog
 
+## v0.36.0 — 外部依賴安全 Tier 1：scanner 加 Code 節點惡意 jsCode 偵測 + npm audit gate 化 + exact pin + SKILL §1.8
+
+回應使用者：「我們對外部 GitHub 進來後有做 security check and enhancements 嗎? 有對惡意程式做處理嗎??」— v0.35.0 自查發現「有但是 advisory 等級不是 gate 等級，對惡意程式基本沒處理」。v0.36.0 是 Tier 1 補強。
+
+### 🆕 `scripts/security-scan.mjs` 加 Code 節點 jsCode 惡意 pattern 偵測（SEC-017）
+
+新增 8 個 regex pattern detector：
+
+| Pattern | Severity | 抓什麼 |
+| --- | --- | --- |
+| `jscode:reverse-shell` | error | `net.createConnection + spawn shell` |
+| `jscode:env-dump` | error | `JSON.stringify(process.env)` 等大量 env 序列化 |
+| `jscode:dynamic-eval` | error | `eval()` / `new Function()` / `vm.runInNewContext` |
+| `jscode:require-child-process` | error | `require('child_process'/'vm'/'dgram'/...)` |
+| `jscode:fs-write-sensitive` | error | 寫到 `/etc/` `/root/` `/home/` `C:\Windows` 等敏感路徑 |
+| `jscode:net-exfil-pattern` | error | `fetch()` 含 `process.env` / token / credential 字樣 |
+| `jscode:process-spawn` | warning | spawn / exec / execSync 等 |
+| `jscode:base64-decode-suspect` | warning | 大量 hard-coded base64 → Buffer.from decode |
+| `jscode:require-fs-with-write` | warning | `require('fs')` 一般情境用 n8n 內建即可 |
+
+**驗證**：
+- 自製 [惡意 fixture](scripts/__test__/malicious-fixture.workflow.json) → **7 error / 4 warning 全抓**
+- Pack 30 個正當 workflow → **0 false positive**（所有 warning 都是預期的 webhook:no-auth）
+
+### 🔒 `.github/workflows/security-gate.yml` `npm audit` 從 advisory 升 fail gate（SEC-017）
+
+移除 `continue-on-error: true` + 移除 `|| echo "..."` fallback。HIGH+ CVE 現在會 fail CI。matrix 加 `examples/einvoice-n8n/svc` — svc 用的 6 個 `@paid-tw/einvoice*` 套件 + hono 等也納入掃描。
+
+### 📌 `examples/einvoice-n8n/svc/package.json` caret → exact pin（SEC-017）
+
+從 `^0.3.0` / `^1.13.0` / `^4.6.0` 等改成寫死 `0.3.0` / `1.13.0` / `4.6.0`。配合 `package-lock.json` 形成完整鎖定，**杜絕 minor 自動升的 hijack 路徑**（history: event-stream / ua-parser-js / coa）。
+
+### 🆕 [`docs/socket-dev-integration.md`](docs/socket-dev-integration.md)
+
+socket.dev GitHub App 整合說明 — **行為層 SCA**（看 install script、network call、process spawn、obfuscated payload），補 `npm audit` 看不到的部分。5 分鐘可設好，免費版即足夠。
+
+### 🆕 SKILL `code2n8n-pipeline` §1.8 外部依賴 ingestion 規則
+
+新加 §1.8（在 §1.7 後）規定 AI Coder 在 npm 套件 / GitHub raw 抓取 / 外部 workflow JSON ingestion 三條情境的強制 SOP：
+
+- **A. npm 套件**：exact pin、必過 `npm audit` fail gate、必過 `security-scan.mjs`、PR template 註明
+- **B. GitHub raw**：鎖 commit hash 不讀 `main`、commit message 記錄 sha
+- **C. 外部 workflow JSON**：必過 `security-scan.mjs` 0 error 才入 git、ERROR 級 finding 一律拒收（不接受 user override）
+
+Critic gate 用 lexical regex（不靠行為自覺）：偵測訊息含 `npm install` 字樣 → 檢查 exact-pin 證據 + npm audit pass evidence，不符 → VETO。跟 §1.6 同級不可繞。
+
+### 🔒 SECURITY-REVIEW SEC-017 升級
+
+v0.35.0「🔴 OPEN — 揭露但未補」→ v0.36.0「✅ FIXED via Tier 1」。SEC-018 / SEC-019 仍 OPEN，分別於 v0.37.0 / v0.38.0 補。
+
+### Layer 1 V&V
+
+- `node scripts/security-scan.mjs scripts/__test__/malicious-fixture.workflow.json` → exit code 1，7 error / 4 warning（**符合預期，gate 生效**）
+- `node scripts/security-scan.mjs --glob "examples/**/*.workflow.json"` → 30 files, 0 error / 20 documented warnings（**無 regression**）
+
+### Layer 2 V&V
+
+- CI 跑後（push 觸發）將驗證新 audit gate 是否真的 fail（如有 HIGH+ CVE）— **PENDING tracked-as v0.36.x**（待第一個 push 後）
+
 ## v0.35.0 — einvoice 案例 SDK capability 覆蓋從 4/11 升到 11/11（補完所有 capability + capability-aware gate）
 
 回應使用者：「我們沒有全做???」— 對照 [`@paid-tw/einvoice`](https://github.com/paid-tw/einvoice) SDK 宣告的 11 個 capability，本 Pack v0.34.x 前僅覆蓋 5/11（ISSUE / VOID / ALLOWANCE / QUERY + failover routing）。v0.35.0 補完剩 6/11 + 1 個前置 gating sub-workflow。

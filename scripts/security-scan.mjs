@@ -33,6 +33,79 @@ const PLAINTEXT_PASSWORD_KEYS = /^(password|passwd|secret|api[_-]?key|apikey|tok
 const EXPRESSION_RE = /=\{\{[\s\S]*?\}\}/;
 const CREDENTIAL_REF_RE = /\$credentials\b|\$node\b/;
 
+// ---- v0.36.0 SEC-017: Code-node malicious jsCode pattern detector ---------
+// Treats jsCode in n8n Code (and Function) nodes as code-to-be-executed.
+// regex is intentionally aggressive — false positives flagged as warnings,
+// clearly-malicious patterns flagged as errors so they fail the gate.
+//
+// Categories (each with `severity` and explanation):
+//  - process-spawn: child_process / spawn / exec — only red-flag for non-Pack contexts
+//  - fs-write-sensitive: writeFileSync / appendFileSync targeting / out of /tmp
+//  - env-dump: serialising process.env wholesale (single-var read is fine)
+//  - net-exfil: fetch / http.request to non-localhost hostnames carrying env or credential
+//  - dynamic-eval: eval / Function() / vm.runInNewContext
+//  - reverse-shell: net.Socket connect + spawn shell pattern
+//  - require-suspect: require('child_process') / require('vm') in workflow code is unusual
+const MALICIOUS_JS_PATTERNS = [
+  // High-risk — almost certainly malicious in a workflow Code node:
+  { name: 'jscode:reverse-shell',
+    re: /(?:net\.createConnection|net\.Socket)[\s\S]{0,200}(?:exec|spawn|sh\b|bash\b|cmd\.exe)/i,
+    severity: 'error',
+    why: 'reverse-shell pattern: opens TCP socket then spawns a shell' },
+  { name: 'jscode:env-dump',
+    re: /JSON\.stringify\s*\(\s*process\.env\s*\)|Object\.entries\s*\(\s*process\.env\s*\)|Object\.keys\s*\(\s*process\.env\s*\)|process\.env(?!\s*[\.\[])/,
+    severity: 'error',
+    why: 'wholesale process.env dump — single-var reads OK, but stringifying all of env is exfil-shaped' },
+  { name: 'jscode:dynamic-eval',
+    re: /\beval\s*\(|new\s+Function\s*\(|vm\.runIn(?:New|This)Context\b/,
+    severity: 'error',
+    why: 'eval / Function() / vm.runInNewContext — dynamic code execution from a workflow Code node is rarely needed and high-RCE-risk' },
+  { name: 'jscode:require-child-process',
+    re: /require\s*\(\s*['"`](?:child_process|vm|dgram|cluster|worker_threads)['"`]\s*\)/,
+    severity: 'error',
+    why: 'requiring child_process / vm / dgram / cluster from a workflow Code node is almost always malicious — n8n provides node-native helpers' },
+  { name: 'jscode:fs-write-sensitive',
+    re: /\.(?:writeFile|appendFile|writeFileSync|appendFileSync|createWriteStream)\s*\(\s*['"`](?:\/etc\/|\/root\/|\/home\/|\/var\/(?!log\/)|C:\\\\Windows|C:\\\\Users|C:\\\\ProgramData)/i,
+    severity: 'error',
+    why: 'writing to system / home dirs from workflow code is RCE persistence' },
+  // Medium-risk — flag but only fail if explicitly env+net combined:
+  { name: 'jscode:net-exfil-pattern',
+    re: /(?:fetch|axios|https?\.request|https?\.get)\s*\([^)]{0,500}(?:process\.env|credential|token|password|apiKey|secret)/i,
+    severity: 'error',
+    why: 'HTTP call carrying env vars / credential-like names — likely data exfiltration' },
+  // Low-risk — warnings only:
+  { name: 'jscode:process-spawn',
+    re: /\bchild_process\b|\.spawn\s*\(|\.exec\s*\(|\.execSync\s*\(/,
+    severity: 'warning',
+    why: 'spawning subprocesses from workflow code is unusual; verify intent' },
+  { name: 'jscode:base64-decode-suspect',
+    re: /Buffer\.from\s*\(\s*['"`][A-Za-z0-9+\/=]{40,}['"`]\s*,\s*['"`]base64['"`]\s*\)/,
+    severity: 'warning',
+    why: 'large hard-coded base64 blob decoded in code — could be obfuscated payload' },
+  { name: 'jscode:require-fs-with-write',
+    re: /require\s*\(\s*['"`]fs['"`]\s*\)/,
+    severity: 'warning',
+    why: 'require("fs") in workflow code — n8n provides built-in file operations; flag for review' },
+];
+
+// Code-node types whose jsCode field we scan
+const CODE_NODE_TYPES = new Set([
+  'n8n-nodes-base.code',
+  'n8n-nodes-base.function',
+  'n8n-nodes-base.functionItem',
+]);
+
+function scanJsCode(jsCode, findings, nodeWhere) {
+  if (typeof jsCode !== 'string' || jsCode.length === 0) return;
+  for (const { name, re, severity, why } of MALICIOUS_JS_PATTERNS) {
+    const m = jsCode.match(re);
+    if (m) {
+      const sample = m[0].slice(0, 60) + (m[0].length > 60 ? '…' : '');
+      findings.push({ rule: name, severity, where: nodeWhere, sample: `${sample}  — ${why}` });
+    }
+  }
+}
+
 // ---- IO ------------------------------------------------------------------
 
 const args = process.argv.slice(2);
@@ -155,6 +228,13 @@ function scanWorkflow(filePath) {
   // Full parameter walk for secret / cleartext rules
   for (const n of nodes) {
     scanNodeParameters(n?.parameters ?? {}, findings, `node:${n?.name ?? '?'}`);
+  }
+
+  // v0.36.0 SEC-017: scan Code-node jsCode for malicious / suspicious patterns
+  for (const n of nodes) {
+    if (!CODE_NODE_TYPES.has(n?.type)) continue;
+    const jsCode = n?.parameters?.jsCode ?? n?.parameters?.functionCode;
+    scanJsCode(jsCode, findings, `node:${n?.name ?? '?'}`);
   }
 
   return findings;

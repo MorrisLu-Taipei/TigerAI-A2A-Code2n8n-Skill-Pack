@@ -10,20 +10,21 @@
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc --noEmit"
   },
+  "//security": "v0.36.0 SEC-017: exact pins (no caret) on all deps. package-lock.json is the canonical lock; manual review required before bumping. See docs/external-package-security-posture.md.",
   "dependencies": {
-    "@hono/node-server": "^1.13.0",
-    "@paid-tw/einvoice": "^0.3.0",
-    "@paid-tw/einvoice-amego": "^0.3.0",
-    "@paid-tw/einvoice-ecpay": "^0.3.0",
-    "@paid-tw/einvoice-ezpay": "^0.3.0",
-    "@paid-tw/einvoice-ezpay-crossborder": "^0.1.1",
-    "@paid-tw/einvoice-ezreceipt": "^0.1.1",
-    "hono": "^4.6.0"
+    "@hono/node-server": "1.13.0",
+    "@paid-tw/einvoice": "0.3.0",
+    "@paid-tw/einvoice-amego": "0.3.0",
+    "@paid-tw/einvoice-ecpay": "0.3.0",
+    "@paid-tw/einvoice-ezpay": "0.3.0",
+    "@paid-tw/einvoice-ezpay-crossborder": "0.1.1",
+    "@paid-tw/einvoice-ezreceipt": "0.1.1",
+    "hono": "4.6.0"
   },
   "devDependencies": {
-    "@types/node": "^20.12.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.6.0"
+    "@types/node": "20.12.0",
+    "tsx": "4.19.0",
+    "typescript": "5.6.0"
   },
   "engines": {
     "node": ">=20"

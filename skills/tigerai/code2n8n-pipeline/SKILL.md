@@ -273,6 +273,62 @@ v0.32.0 起 einvoice-n8n 案例的 `einvoice-daily-reconcile.workflow.json` 與 
 
 ---
 
+## 1.8 🛡️ 外部依賴 ingestion 規則（**加入於 v0.36.0**）
+
+**Why this section exists**：v0.27.0 → v0.35.0 期間，Pack 把「外部進來的東西」（npm 套件、外部 GitHub repo curl 抓的 doc、別人寄來的 workflow JSON）當成「我們知道是什麼」處理。實際上：
+
+- `npm install @paid-tw/einvoice*` 6 個套件 — 我們沒逐行 review 過原始碼，依賴 npm 生態的 trust
+- `curl raw.githubusercontent.com/.../README.md` 抓 SDK 介面說明 — 讀 `main` 分支，下次內容可能變
+- 收到一份別人寄的 `.workflow.json` 想 import — scanner 只看結構性疏忽，**沒看 Code 節點 `jsCode` 是否藏惡意**
+
+詳見 [`docs/external-package-security-posture.md`](../../../docs/external-package-security-posture.md) 與 SECURITY-REVIEW SEC-017 / SEC-018 / SEC-019。
+
+### Rule（v0.36.0 起對 AI Coder 強制）
+
+**A. npm 套件 ingestion**
+
+任何 `npm install` / `pnpm add` / `yarn add` 之前：
+
+1. **依套件版本固定 exact pin** — `package.json` 內**不可用** `^` / `~` / `>=` caret/tilde/range。寫死 `0.3.0` 不寫 `^0.3.0`。
+2. **必經 `npm audit --audit-level=high`** — CI 已設為 **fail gate**（v0.36.0 起），本機 PR 開出前也跑一次。
+3. **跑 `security-scan.mjs` 於 PR diff 涉及之 workflow JSON** — 新增 / 修改的 `.workflow.json` 必過 jscode 惡意 pattern 掃描。
+4. **PR template 註明套件變動原因 + 已查 socket.dev 結果**（即便沒裝 GitHub App，CLI 一次掃也行）
+
+**B. GitHub raw 內容抓取**
+
+curl / WebFetch 抓 GitHub repo 內容做為決策依據時：
+
+1. **要鎖 commit hash 而非 `main` 分支**：`raw.githubusercontent.com/owner/repo/<sha>/path` 不用 `/main/path`
+2. **抓回來的內容若有「拿來生程式碼」用途，必須記錄 sha 到 commit message** 讓未來能 reproduce
+
+**C. 外部 workflow JSON ingestion**
+
+收到別人的 `.workflow.json` 想 import：
+
+1. **跑 `scripts/security-scan.mjs` → 0 error 才可入 git**（v0.36.0 起 jscode 惡意 pattern 抓 reverse-shell / env-dump / dynamic-eval / require-child-process / fs-write-sensitive / net-exfil-pattern）
+2. **任何 ERROR 級 finding → 不論作者誰，拒收**（不接受 user override）
+3. **WARNING 級 finding → 必須 PR description 解釋為何此情境合法**
+4. v0.37.0 起會再加 `scripts/ingest-external-workflow.mjs`（enhanced scanner + 二級 review 標記）— 該流程上線後此處規則升級
+
+### Critic enforcement
+
+Critic agent 對外輸出（commit message、release notes、PR description、回 user 訊息）前：
+
+1. 偵測訊息有無 `npm install` / `pnpm add` / `yarn add` 字樣 → 檢查同一 PR 是否有 exact-pin 證據 + npm audit pass evidence。沒有 → VETO。
+2. 偵測訊息有無提到匯入外部 workflow JSON → 檢查同一 PR 是否有 security-scan.mjs 0 error 證據。沒有 → VETO。
+3. 偵測訊息有無提到讀 GitHub raw 內容 → 檢查訊息是否含 commit sha（40-char hex）。沒有 → 提醒（不一定 VETO，視文件 vs 程式碼用途）。
+
+跟 [§1.6](#16-🚨-lexical-schema-before-claim-rule最強制條款--加入於-v0303) 一樣是 **lexical regex 可檢查**的，不靠 AI 行為自覺。
+
+### Worked example
+
+v0.36.0 SEC-017 修補 commit `456c311` 之後，本 SKILL 的 critic gate 會檢：
+- `examples/einvoice-n8n/svc/package.json` 是否 caret-free（regex `: "\^`）→ 命中即 VETO
+- `.github/workflows/security-gate.yml` 的 `npm audit` 是否仍含 `continue-on-error: true`（regex 同名 key+值）→ 命中即 VETO
+- `scripts/security-scan.mjs` 是否有 `MALICIOUS_JS_PATTERNS` const → 沒有則表示 jscode 偵測未生效 → VETO
+
+---
+
 ## 2. 雙 agent 架構（main + critic）
 
 ```
