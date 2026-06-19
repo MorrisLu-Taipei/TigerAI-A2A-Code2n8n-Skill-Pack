@@ -1,0 +1,83 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "description": "v0.37.0 SEC-018 Tier 2 — dependency-update bot config. ALL PRs require human review; no automerge. Reinforces SEC-017 exact-pin policy by forcing every minor/patch bump through review.",
+  "rangeStrategy": "pin",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 4am on Monday"
+    ]
+  },
+  "vulnerabilityAlerts": {
+    "labels": [
+      "security",
+      "vulnerability"
+    ],
+    "assignees": [
+      "@MorrisLu-Taipei"
+    ],
+    "reviewers": [
+      "@MorrisLu-Taipei"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "Block automerge on EVERYTHING. SEC-018 requires human review for every external dep change.",
+      "matchPackagePatterns": [
+        "*"
+      ],
+      "automerge": false,
+      "reviewers": [
+        "@MorrisLu-Taipei"
+      ]
+    },
+    {
+      "description": "Group @paid-tw/einvoice* SDK packages — they release together; review as one PR.",
+      "matchPackagePrefixes": [
+        "@paid-tw/einvoice"
+      ],
+      "groupName": "paid-tw einvoice SDK",
+      "labels": [
+        "dependencies",
+        "high-trust-required",
+        "einvoice-sdk"
+      ]
+    },
+    {
+      "description": "Hono web framework family — review together.",
+      "matchPackagePatterns": [
+        "^hono$",
+        "^@hono/"
+      ],
+      "groupName": "hono framework",
+      "labels": [
+        "dependencies",
+        "hono"
+      ]
+    },
+    {
+      "description": "Major version bumps need extra scrutiny — label and never automerge.",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "labels": [
+        "dependencies",
+        "major-bump-review-required"
+      ],
+      "automerge": false
+    }
+  ],
+  "prConcurrentLimit": 3,
+  "prHourlyLimit": 2,
+  "schedule": [
+    "before 4am on Monday"
+  ],
+  "timezone": "Asia/Taipei",
+  "labels": [
+    "dependencies"
+  ],
+  "platformAutomerge": false
+}

@@ -339,7 +339,7 @@ The v0.28.0 review caught 13 SEC-### through code review + Layer 1 scanner + RES
 | --- | --- |
 | Severity | **High** |
 | Status (v0.35.0) | 🔴 **OPEN — 揭露但未補** |
-| Status (v0.37.0 target) | ✅ **FIXED via Tier 2** — `scripts/ingest-external-workflow.mjs` enhanced scanner + 二級 review 標記、svc Dockerfile non-root + readonly + cap-drop=ALL、base image hash pin |
+| Status (v0.37.0) | ✅ **FIXED via Tier 2** — (a) `scripts/ingest-external-workflow.mjs` 加三道 gate：security-scan 0 error / 雙人 review marker（submitter ≠ reviewer）/ node digest 人類 spot-check + JSONL audit log；(b) svc Dockerfile 升 `node:20.18.1-alpine3.20` hash-pinned、改 `npm ci`、`USER 65534:65534`、加 HEALTHCHECK；(c) `docker-compose.hardened.example.yml` 提供 runtime flags 範本：`read_only: true`、`tmpfs /tmp`、`cap_drop: [ALL]`、`security_opt: [no-new-privileges]`、`mem_limit/pids_limit`、docker secrets file-mount（非 env）；(d) CI 加 SBOM 產出（CycloneDX，90 天 retention）+ Trivy 掃描升級為 fail gate（exit-code: '1'），matrix 加 svc；(e) Renovate config 全 PR 強制人類 review（automerge: false）。 |
 | Evidence | (a) 別人寄你一個 `.workflow.json` 想 import — 目前 Pack 沒有「外部 workflow 進來前該過什麼 gate」的 SOP，也沒有 enhanced scanner 抓 Code 節點惡意 jsCode。(b) `examples/einvoice-n8n/svc/Dockerfile` 用 `node:20-alpine` 直接 RUN，沒有 `USER 65534`、沒 readonly fs、沒 `--cap-drop=ALL`、沒 `--read-only` mount。(c) base image `node:20-alpine` 沒 pin hash — 拉到的 image 可能在某次 release 後被供應鏈攻擊。 |
 | Impact | (a) 別人寄來的 workflow JSON 一鍵 import 即 RCE；Pack 沒辦法擋。(b) 即便 svc 被 RCE，container 是 root + writable fs + 全 capability → 容易 escape 到 host。(c) Base image 被入侵時被動受害。 |
 | Fix shipped | 詳見 [`docs/external-package-security-posture.md`](../../docs/external-package-security-posture.md) §3.2 Tier 2 六項。 |

@@ -1,0 +1,75 @@
+# v0.37.0 SEC-018 — hardened docker-compose example showing the runtime flags
+# that complement the hardened Dockerfile (Tier 2).
+#
+# What this adds on top of `docker-compose.example.yml`:
+#   - read_only: true                  # rootfs is immutable; only /tmp writable via tmpfs
+#   - tmpfs: /tmp                      # writable scratch for SDK / hono
+#   - cap_drop: [ALL]                  # drop every Linux capability — svc doesn't need any
+#   - security_opt: [no-new-privileges]
+#   - secrets: not env vars            # credentials mounted as files in /run/secrets/
+#   - user: "65534:65534"              # belt-and-braces: same as Dockerfile USER
+#   - no privileged: true              # explicitly NEVER
+#   - mem_limit + pids_limit           # blast-radius caps
+#
+# **DO NOT just rename to docker-compose.yml**. Read each block, verify it matches
+# your environment, then copy to docker-compose.override.yml or merge.
+
+services:
+  einvoice-svc:
+    build:
+      context: ./svc
+      dockerfile: Dockerfile  # the hardened one
+    image: einvoice-svc:0.36.0
+    container_name: einvoice-svc
+    restart: unless-stopped
+    user: "65534:65534"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64M,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 100
+    ports:
+      - "127.0.0.1:8787:8787"     # bind to loopback only — n8n reaches via docker network
+    networks:
+      - einvoice-net
+    secrets:
+      - einvoice_svc_token
+      - amego_credentials
+      - ecpay_credentials
+      - ezpay_credentials
+      - ezpay_crossborder_credentials
+      - ezreceipt_credentials
+    environment:
+      # Read secret files, not values, per SEC-018 file-mounted-secrets rule
+      EINVOICE_SVC_TOKEN_FILE: /run/secrets/einvoice_svc_token
+      AMEGO_APP_KEY_FILE: /run/secrets/amego_credentials
+      ECPAY_HASH_KEY_FILE: /run/secrets/ecpay_credentials
+      EZPAY_HASH_KEY_FILE: /run/secrets/ezpay_credentials
+      EZPAY_CB_API_KEY_FILE: /run/secrets/ezpay_crossborder_credentials
+      EZRECEIPT_TOKEN_FILE: /run/secrets/ezreceipt_credentials
+      # CORS deny by default; explicit allow-list
+      CORS_ORIGINS: ""             # empty = deny (SEC-5)
+      EINVOICE_MODE: PRODUCTION
+      PORT: "8787"
+
+networks:
+  einvoice-net:
+    driver: bridge
+
+secrets:
+  einvoice_svc_token:
+    file: ./secrets/einvoice_svc_token.txt
+  amego_credentials:
+    file: ./secrets/amego_credentials.json
+  ecpay_credentials:
+    file: ./secrets/ecpay_credentials.json
+  ezpay_credentials:
+    file: ./secrets/ezpay_credentials.json
+  ezpay_crossborder_credentials:
+    file: ./secrets/ezpay_crossborder_credentials.json
+  ezreceipt_credentials:
+    file: ./secrets/ezreceipt_credentials.json

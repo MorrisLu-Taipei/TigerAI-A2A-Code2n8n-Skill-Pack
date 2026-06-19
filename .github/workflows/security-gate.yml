@@ -166,19 +166,50 @@ jobs:
           npm audit --omit=dev --audit-level=high
 
   container-scan:
-    name: on-prem container image scan (Trivy)
+    name: container image scan (Trivy) — SEC-018 Tier 2
     runs-on: ubuntu-latest
-    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { name: on-prem case fs scan, scan-type: fs, scan-ref: examples/line-ai-customer-service-onprem }
+          - { name: einvoice svc fs scan, scan-type: fs, scan-ref: examples/einvoice-n8n/svc }
     steps:
       - uses: actions/checkout@v4
-      - name: Trivy filesystem scan on the on-prem case
+      - name: Trivy filesystem scan — ${{ matrix.target.name }}
         uses: aquasecurity/trivy-action@0.24.0
         with:
-          scan-type: fs
-          scan-ref: examples/line-ai-customer-service-onprem
+          scan-type: ${{ matrix.target.scan-type }}
+          scan-ref: ${{ matrix.target.scan-ref }}
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: '0'
+          exit-code: '1'             # v0.37.0 SEC-018: HIGH/CRITICAL is a gate, not advisory
+
+  sbom-generate:
+    name: SBOM generation (CycloneDX) — SEC-018 Tier 2
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Generate SBOM for einvoice-svc (CycloneDX)
+        working-directory: examples/einvoice-n8n/svc
+        run: |
+          if [ ! -f package.json ]; then
+            echo "No package.json — skip."
+            exit 0
+          fi
+          npm install --omit=dev --omit=optional --no-audit --no-fund
+          npx --yes @cyclonedx/cyclonedx-npm@^1.19 --output-format json --output-file sbom.json
+          echo "=== SBOM (CycloneDX 1.5) ==="
+          jq '{spec: .specVersion, version: .version, components: (.components | length)}' sbom.json
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: einvoice-svc-sbom
+          path: examples/einvoice-n8n/svc/sbom.json
+          retention-days: 90
 
   live-roundtrip:
     name: n8n REST round-trip (optional — needs secrets)

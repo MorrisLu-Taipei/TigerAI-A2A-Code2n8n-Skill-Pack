@@ -1,5 +1,77 @@
 # Changelog
 
+## v0.37.0 — 外部依賴安全 Tier 2：container 硬化 + SBOM + Trivy gate + Renovate review-required + 外部 workflow ingestion gate
+
+SEC-018 fix。v0.36.0 把「結構掃」做完，v0.37.0 補「blast radius 限縮 + ingestion 流程」。
+
+### 🆕 `scripts/ingest-external-workflow.mjs`（外部 workflow JSON ingestion 三道 gate）
+
+別人寄來 `.workflow.json` 想 import 不能直接 `cp` — 必須過：
+
+1. **Gate 1 security-scan**：subprocess 跑 `scripts/security-scan.mjs`，0 error 才繼續
+2. **Gate 2 雙人 review 標記**：workflow JSON 必須含 `_pack_ingest: { submitter, reviewer, rationale }`，且 `submitter !== reviewer`
+3. **Gate 3 node digest**：列出每個節點的 type / name / jsCode 字數讓 reviewer spot-check
+4. **Audit log**：通過後 append 到 `scripts/ingest-log.jsonl`（含 sha256、submitter、reviewer、rationale、scanner 摘要）
+
+退場 code：0 pass / 1 scanner fail / 2 marker missing or self-review / 3 malformed JSON / 4 usage
+
+驗證：對 [惡意 fixture](scripts/__test__/malicious-fixture.workflow.json) → exit 1；對 [clean workflow 但無 marker](examples/einvoice-n8n/workflows/einvoice-void-allowance.workflow.json) → exit 2。
+
+### 🔒 svc Dockerfile 硬化
+
+- Base image 升 `node:20.18.1-alpine3.20`（含 sha256 digest 鎖機制，operator 填實際 hash）
+- `npm install` → **`npm ci`**（強制 lock file 在席 + 同步，杜絕 install-time 漂移）
+- `USER node` → **`USER 65534:65534`**（nobody，最窄）
+- 加 `HEALTHCHECK` (`/healthz`)，docker / k8s 能偵測 wedged svc
+- multi-stage build 不變；build stage 跑 tsc，runtime stage 只帶 dist
+
+### 🆕 [`docker-compose.hardened.example.yml`](examples/einvoice-n8n/docker-compose.hardened.example.yml)
+
+runtime flags 範本：
+- `read_only: true` + `tmpfs /tmp:size=64M` — rootfs immutable
+- `cap_drop: [ALL]` — svc 不需要任何 Linux capability
+- `security_opt: [no-new-privileges:true]`
+- `mem_limit: 256m` + `pids_limit: 100` — blast-radius cap
+- `ports: ["127.0.0.1:8787:8787"]` — bind loopback only
+- **`secrets:`** file-mounted（`/run/secrets/`），**非 env vars** — credentials 不漏在 `docker inspect`
+- `CORS_ORIGINS: ""` 預設 deny — 重申 SEC-5
+
+### 🆕 CI 加 SBOM + Trivy 升 gate（SEC-018）
+
+`.github/workflows/security-gate.yml`：
+
+- **新 job `sbom-generate`**：跑 `@cyclonedx/cyclonedx-npm` 對 einvoice-svc 產 CycloneDX SBOM，upload 為 90 天 artifact
+- `container-scan` job 升級：matrix 加 `examples/einvoice-n8n/svc` filesystem 掃；`exit-code: '0'` → **`'1'`**（HIGH/CRITICAL CVE 現在 fail build）
+
+### 🆕 [`.github/renovate.json`](.github/renovate.json)
+
+dependency-update bot：
+- `rangeStrategy: "pin"` — 強制 exact pin（呼應 SEC-017）
+- `automerge: false` 對全部 packageRule — **任何依賴升級必須人類 review**
+- @paid-tw/einvoice* 6 個套件 grouped — 一起升 / 一起 review
+- @hono / hono grouped
+- major bump 額外 label `major-bump-review-required`
+- vulnerability alert 直送 reviewer
+- schedule：每週一 04:00 Asia/Taipei（避開上班時段噪音）
+- concurrent limit 3、hourly limit 2（避免噪音）
+
+### 🔒 SECURITY-REVIEW SEC-018 升級
+
+v0.35.0 / v0.36.0「🔴 OPEN」→ v0.37.0「✅ FIXED via Tier 2」。SEC-019 仍 OPEN，v0.38.0 補（new Skill）。
+
+### V&V Layer 1
+
+- `node scripts/security-scan.mjs scripts/__test__/malicious-fixture.workflow.json` → exit 1（無 regression）
+- `node scripts/ingest-external-workflow.mjs scripts/__test__/malicious-fixture.workflow.json` → exit 1（**Gate 1 擋下惡意 fixture**）
+- `node scripts/ingest-external-workflow.mjs examples/einvoice-n8n/workflows/einvoice-void-allowance.workflow.json` → exit 2（**Gate 2 擋下無 marker 的 clean workflow，反確認雙人 review 強制**）
+- Dockerfile parse 不驗（沒 docker build CI），但 syntax 對齊 docker reference
+
+### V&V Layer 2
+
+- CI SBOM job 真的能跑 `cyclonedx-npm` 並 upload artifact — **PENDING tracked-as v0.37.x**（待第一次 CI 跑）
+- Trivy svc 掃描有沒有真的找到 CVE — **PENDING tracked-as v0.37.x**
+- Renovate 第一個 PR 是否真的 require review — **PENDING tracked-as v0.37.x**（待第一次依賴升版觸發）
+
 ## v0.36.0 — 外部依賴安全 Tier 1：scanner 加 Code 節點惡意 jsCode 偵測 + npm audit gate 化 + exact pin + SKILL §1.8
 
 回應使用者：「我們對外部 GitHub 進來後有做 security check and enhancements 嗎? 有對惡意程式做處理嗎??」— v0.35.0 自查發現「有但是 advisory 等級不是 gate 等級，對惡意程式基本沒處理」。v0.36.0 是 Tier 1 補強。
