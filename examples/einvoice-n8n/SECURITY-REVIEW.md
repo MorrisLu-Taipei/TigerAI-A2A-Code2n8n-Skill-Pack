@@ -352,7 +352,7 @@ The v0.28.0 review caught 13 SEC-### through code review + Layer 1 scanner + RES
 | --- | --- |
 | Severity | **Medium** |
 | Status (v0.35.0) | 🔴 **OPEN — 揭露但未補** |
-| Status (v0.38.0 target) | ✅ **FIXED via Tier 3** — 新 Skill `skills/tigerai/external-dependency-security` + `code2n8n-pipeline` SKILL Stage 7 強制過 SCA gate + npm `--audit-signatures` + commit hash 鎖定 + 外部 workflow ingestion review SOP |
+| Status (v0.38.0) | ✅ **FIXED via Tier 3** — 新 Skill [`skills/tigerai/external-dependency-security`](../../skills/tigerai/external-dependency-security/SKILL.md) 上線，含 9 個 §：(1) npm 套件 review 三層 SOP（L1 audit / L2 socket.dev / L3 程式碼層 high-trust 套件 review）+ high-trust 清單 + 套件 SEC-DEP-... entry 模板；(2) npm `--audit-signatures` sigstore provenance 驗證；(3) 外部 GitHub raw 抓內容必鎖 commit sha；(4) 外部 workflow JSON ingestion SOP（呼叫 v0.37.0 `scripts/ingest-external-workflow.mjs`）+ reviewer 責任 checklist；(5) Docker base image hash pin + Trivy gate + build/runtime 雙硬化；(6) `code2n8n-pipeline` Stage 7 SCA gate integration（lexical critic gate 同 §1.6/§1.8 級不可繞）；(7) 跨 Skill 配合表；(8) SEC-019 對應；(9) 操作者 quickstart。plugin.json 註冊 role=security。 |
 | Evidence | (a) Pack 沒有「外部依賴 review SOP」Skill — AI Coder 寫 svc 時直接 `npm install @paid-tw/einvoice*` 沒過任何審核 gate。(b) curl / WebFetch 抓 GitHub raw 沒鎖 commit hash（讀 `main` 分支） — 我（Claude）2026-06-19 讀 paid-tw/einvoice/main/README.md 是現場讀，無法保證下次讀內容一致。(c) `npm install --audit-signatures` / sigstore provenance 沒整合進 CI。 |
 | Impact | AI Coder 跨案例都重複犯同樣的「直接 npm install」、「直接 curl main」、「沒驗 sigstore」— 沒有 Skill 級規則就會持續發生。 |
 | Fix shipped | 詳見 [`docs/external-package-security-posture.md`](../../docs/external-package-security-posture.md) §3.3 Tier 3 五項。 |

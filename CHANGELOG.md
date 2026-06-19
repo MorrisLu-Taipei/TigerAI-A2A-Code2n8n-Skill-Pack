@@ -1,5 +1,54 @@
 # Changelog
 
+## v0.38.0 — 外部依賴安全 Tier 3：新 Skill `external-dependency-security` 治理層 + SCA gate Stage 7 整合
+
+SEC-019 fix。完成「D 全做」goal 的最後一塊：Tier 3 治理層 Skill。Tier 1 (v0.36.0) 給工具、Tier 2 (v0.37.0) 限血量、Tier 3 (v0.38.0) **把 SOP 系統化到 AI Coder 跨案例可重用的 Skill**。
+
+### 🆕 [`skills/tigerai/external-dependency-security/SKILL.md`](skills/tigerai/external-dependency-security/SKILL.md)
+
+新 Skill，9 個 § 完整 SOP：
+
+| § | 內容 |
+| --- | --- |
+| §1 | npm 套件 review 三層 SOP — L1 `npm audit`、L2 socket.dev、L3 程式碼層 review（high-trust 套件清單 + checklist）+ SEC-DEP-... entry 模板 + exact pin 規則 |
+| §2 | npm `--audit-signatures` sigstore provenance 驗證 — PROD hard gate vs DEV 過渡策略 |
+| §3 | 外部 GitHub repo 抓內容 — 必鎖 commit sha 不讀 `main`、commit message 記 sha；純讀文件對話例外 |
+| §4 | 外部 workflow JSON ingestion review — 呼叫 v0.37.0 `scripts/ingest-external-workflow.mjs` 三道 gate、雙人 review 條件、reviewer 責任 checklist |
+| §5 | Docker base image SOP — `FROM` 必鎖 sha256 digest；image 升級必跑 Trivy + SBOM diff；build-time + runtime 雙硬化（Dockerfile + compose） |
+| §6 | `code2n8n-pipeline` Stage 7 SCA gate integration — AI Coder `npm install` 前必過此 Skill §1-§2；lexical critic gate 跟 [§1.6 / §1.8](skills/tigerai/code2n8n-pipeline/SKILL.md) 同級不可繞 |
+| §7 | 跨 Skill 配合表 — 跟 `n8n-security-governance`（我們自己 ship 的）/ `n8n-code-to-native`（減少 jsCode 攻擊面）互補 |
+| §8 | SEC entry / gap report 連結 |
+| §9 | 操作者 quickstart — 接到新案例怎麼一次過完所有 review |
+
+### 🆕 plugin.json 註冊新 Skill
+
+`skills/tigerai/external-dependency-security` 加 `role=security`，跟 `n8n-security-governance` 並列。`security-gate.yml` manifest-consistency job 自動驗 SKILL.md 在席。
+
+### 🔒 SECURITY-REVIEW SEC-019 升級
+
+v0.35.0 / v0.36.0 / v0.37.0「🔴 OPEN」→ v0.38.0「✅ FIXED via Tier 3」。
+
+### 🎯 「D 全做」goal completion
+
+對應 2026-06-19 user 設定 `/goal D 全做`：
+
+| Tier | 釋出版本 | 對應 SEC | 狀態 |
+| --- | --- | --- | --- |
+| Tier 1 — scanner 行為層偵測 + audit gate + exact pin + SKILL §1.8 | v0.36.0 | SEC-017 ✅ |
+| Tier 2 — container 硬化 + SBOM + Trivy + Renovate + ingestion gate | v0.37.0 | SEC-018 ✅ |
+| Tier 3 — 治理層 Skill | **v0.38.0** | SEC-019 ✅ |
+
+「對外部 GitHub 進來後有做 security check and enhancements 嗎? 有對惡意程式做處理嗎??」 — 從 v0.35.0「有但是 advisory 等級不是 gate 等級，對惡意程式基本沒處理」三個版本內升到 **Tier 1 + 2 + 3 全 ✅**。
+
+### V&V Layer 1
+
+- `node -e "JSON.parse(require('fs').readFileSync('plugin.json','utf8')).skills.filter(s => s.path === 'skills/tigerai/external-dependency-security').length"` → 1（manifest 註冊成功）
+- `manifest-consistency` CI job 將驗 SKILL.md 在席 — 待 push 後 CI 確認
+
+### V&V Layer 2
+
+- 此 Skill 為文件級治理 SOP，runtime behavior 取決於使用者實際呼叫。v0.36.x / v0.37.x 已 ship 的 scanner / ingest gate / Trivy / Renovate 即為 Tier 3 SOP 的執行工具。
+
 ## v0.37.0 — 外部依賴安全 Tier 2：container 硬化 + SBOM + Trivy gate + Renovate review-required + 外部 workflow ingestion gate
 
 SEC-018 fix。v0.36.0 把「結構掃」做完，v0.37.0 補「blast radius 限縮 + ingestion 流程」。
