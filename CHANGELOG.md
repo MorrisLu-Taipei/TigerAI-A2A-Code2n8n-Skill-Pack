@@ -1,5 +1,75 @@
 # Changelog
 
+## v0.41.0 — einvoice 案例結案（CLEARED）+ docker vendor 模擬器 deprecated (SEC-022) + Pack README V&V/security capability showcase
+
+回應 user 四件事：
+1. 不需要 docker vendor 模擬器（也是假的） — 對，v0.41.0 deprecate
+2. 其他 4 家 provider 不測 — 對，n8n workflow 14 個全留著
+3. 把 Amego 通過記錄進結案報告 — 新 `tests/v0.41-final-validation-report.md`
+4. README 詳細說明 security + 惡性程式檢查 + V&V 驗證程序與能力 — 新增大段 section
+
+### 🆕 [`examples/einvoice-n8n/tests/v0.41-final-validation-report.md`](examples/einvoice-n8n/tests/v0.41-final-validation-report.md)
+
+結案驗證單元（中文單語，依 §1.5）。9 個 §：
+
+- §0 結案結論（10/10 Amego runtime / 14 workflow / 22 SEC entry 收尾）
+- §1 Amego 10/10 capability runtime 明細 + 11 張真實發票 trace
+- §2 14 個 n8n workflow 完整清單 + 對應 capability / runtime 狀態
+- §3 SEC entry 收尾總表（v0.27 → v0.41，21 entry）
+- §4 V&V two-layer evidence schema（依 A2A directive）
+- §5 範圍 disclaimer（範圍內 ✅ / 範圍外 ⚠ / 已棄用 🚫）
+- §6 SEC-022 meta-lesson：docker vendor 模擬器是 over-engineering，SDK MockProvider 早已內建
+- §7 對外可宣稱清單（含 ✅ 可宣稱 + ❌ 不可宣稱，依 §1.6 lexical rule）
+- §8 下一步建議
+- §9 延伸閱讀
+
+**對外可宣稱**：Pack 內**第一個 case study 以真實 vendor sandbox runtime evidence ship CLEARED**。
+
+### 🆕 SECURITY-REVIEW SEC-022
+
+「docker vendor 模擬器是 over-engineering；SDK MockProvider 早已內建」— Low severity，📋 DOCUMENTED + deprecated。完整 root cause（v0.30.1 implementing AI 沒讀完 SDK README）+ impact（漂移 / 信心差 / 下游誤導）+ fix（5 個 vendor router 標 @deprecated，email/sheet/slack 三個保留，SKILL §8 改先指向 SDK MockProvider，critic gate 新加 lexical 偵測）。
+
+### 🆕 SKILL `code2n8n-pipeline` §8 sandbox build directive 修訂（v0.41.0）
+
+Stage 8 sandbox build directive 加 **Step 0**：main agent **必須**先讀 SDK README 看是否提供 mock implementation。**有 → 跳過 sandbox 自蓋，用 SDK 內建 mock**。Critic gate lexical regex 偵測 `MockProvider` / `mock provider` / `failNext` / `stub` 字眼於 Stage 8 commit 範圍，沒 evidence 證已查過 → VETO。對非 SDK 服務（Email / Sheet / Slack）模擬器仍永遠值得建。
+
+### 📝 `examples/einvoice-n8n/README.md` 大段擴寫
+
+加入兩大 section：
+
+**1. 🏆 結案驗證單元（v0.41.0）**
+- 重點數字表（Amego 10/10 / 14 workflow / 20 SEC ✅ / 真實發票 trace）
+- Amego 10/10 capability 驗證明細表（含真實發票號）
+- 驗證方式說明（caller → n8n → svc → SDK → 真實 Amego sandbox）
+- 其他 4 provider 範圍誠實 disclaimer
+
+**2. 🔒 安全、惡性程式檢查、V&V 驗證程序與能力**
+- V&V 兩層 gate（含 §1.6 lexical schema-before-claim）
+- 4-Tier external-dependency 治理（v0.36-39 release 對照）
+- 4 層解的問題對照（workflow JSON 惡意 / 套件 hijack / container escape / base image / AI Coder 不照做 / 跨 AI 換手）
+- 惡性程式 9 條 pattern 清單（error 6 + warning 3）+ fixture 驗證
+- 對 Amego 真實 sandbox 驗證程序（可 reproduce 的 bash 指令）
+- 為何不用 docker 模擬器（對比表 + SEC-022 連結）
+
+### 📝 Pack-level `README.md` 加 case study + V&V/security showcase
+
+**1. Case studies 表加 einvoice**：第 4 個 case，⭐ v0.41.0 CLEARED，標明「first to ship as CLEARED with real-vendor-sandbox runtime evidence」。
+
+**2. 🛡️ V&V + Security capabilities section（新）**：
+- V&V two-layer gate 對所有 case 一致 enforce（A2A directive 11 國語言）
+- 4-Tier external-dependency security 完整表
+- 惡性程式偵測 concrete 9 條 pattern 列表 + fixture 驗證證據
+- Case study 驗證信心對照表（GW / LINE cloud / LINE on-prem / einvoice）
+
+### Layer 1 V&V
+
+- `node scripts/security-scan.mjs --glob "examples/**/*.workflow.json"` → 30 files, 0 error / 20 warning（regression 無）
+
+### Layer 2 V&V
+
+- 本 release 文件級（report / README / SKILL），無新 runtime 驗證
+- 既有 v0.40.0 的 Amego 10/10 ground truth + v0.34.1 的 v3 Form HITL exec 526/527 + 全 V&V Layer 1 + Tier 1-4 CI gates 已驗證 PASS
+
 ## v0.40.0 — Amego 10/10 capability 對真實 Amego sandbox 跑通 + 揭露 1 個 SDK gap (SEC-021)
 
 回應 user：「Amego 這個完整測試就好」。v0.35.0 ship 了 11/11 capability workflow 但 runtime 只測過 5/55 cell；v0.40.0 把 Amego 那一欄補完到 10/10。

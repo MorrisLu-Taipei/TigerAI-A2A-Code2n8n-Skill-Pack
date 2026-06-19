@@ -346,6 +346,19 @@ The v0.28.0 review caught 13 SEC-### through code review + Layer 1 scanner + RES
 | Owner | Pack |
 | Target | v0.37.0 |
 
+### SEC-022 — 本地 docker vendor 模擬器是 over-engineering；SDK 早已有 MockProvider（v0.41.0 結案 meta-lesson）
+
+| Field | Value |
+| --- | --- |
+| Severity | **Low**（meta-lesson，非 security 漏洞，但同樣值得文件化以避免未來案例重蹈） |
+| Status (v0.41.0) | 📋 **DOCUMENTED + deprecated** |
+| Evidence | v0.30.1 起 implementing AI 自蓋了 5 個 router 假裝是 Amego/ECPay/ezPay/ezPay-CB/ezReceipt HTTP API。但 SDK [paid-tw/einvoice](https://github.com/paid-tw/einvoice) README 早就明示 `MockProvider` **跑與真實轉接器相同的 Zod 驗證、模擬狀態機（作廢後不可再作廢/折讓）、依宣告的 capabilities 拒絕不支援操作、可用 `failNext()` 注入一次性錯誤**。MockProvider 比我們手寫的 docker stub **嚴格得多**：(a) Zod schema 與真實 adapter 同一份；(b) 狀態機內建；(c) capabilities 強制（會擋 SCHEDULED_ISSUE on Amego — 比 SEC-021 那個真實 SDK runtime 還嚴）；(d) in-process，無需 docker。 |
+| Impact | 多花時間蓋了多餘的 docker stack；驗證信心反而比 MockProvider 低（自蓋的會跟真實 adapter 漂移）；對下游使用者誤導，以為「驗 workflow 需要 docker sandbox」實際不需要。 |
+| Root cause | v0.30.1 寫 SKILL §8 sandbox build directive 時 implementing AI **沒讀完 SDK README**，看到「testing without credentials」就自己刻，沒注意 SDK 已附 mock — 同 v0.40 「3 個偽 PASS」教訓：沒先讀完 source 就動手會繞遠路。 |
+| Fix shipped (v0.41.0) | (a) `sandbox/src/routers/{amego,ecpay,ezpay,ezpay-cb,ezreceipt}.ts` 標 `@deprecated`；(b) SKILL §8 sandbox build directive 改為**先指向 SDK MockProvider**，僅在 SDK 真沒附 mock 時才刻 stub；(c) critic gate 新加 lexical 偵測 `MockProvider`/`mock provider`/`stub`/`simulator` 字眼於 §8 範圍 → 要求已查過 SDK 不提供 mock 的 evidence；(d) `email.ts` / `sheet.ts` / `slack.ts` 三個非 provider 模擬器**保留**（這些 SDK 沒有，且解決 SMTP/OAuth/workspace 離線測試問題）。 |
+| Owner | Pack |
+| Target | v0.41.0 documented + deprecated |
+
 ### SEC-021 — SDK `capabilities[]` 宣告與 `issue()` runtime 行為不一致（SCHEDULED_ISSUE on Amego）— v0.40.0 真實 sandbox 測試發現
 
 | Field | Value |

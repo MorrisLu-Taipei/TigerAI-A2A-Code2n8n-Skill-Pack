@@ -303,8 +303,61 @@ TigerAI-Code2n8n-Skill-Pack/
 | [Google Workspace admin workflow](examples/google-workspace-admin-workflow/) | 1,373-line Apps Script → core + entry n8n workflows | Line-by-line `PROVENANCE.md`; static lint 0 err / 0 warn; n8n REST import 7/7; live execution needs your Google Workspace credentials |
 | [LINE AI customer service (cloud)](examples/line-ai-customer-service/) | Netlify Functions + Supabase → n8n runtime + approach-C admin UI | Static lint 0 err / 0 warn; n8n REST import 6/6; live execution needs your LINE + Supabase credentials |
 | [LINE AI customer service (on-prem)](examples/line-ai-customer-service-onprem/) | Docker + Postgres + Redis + Qdrant + Ollama + n8n | 37-node workflow; 5-phase V&V; security audit disclosed major defects — **DO NOT DEPLOY AS-IS** |
+| [**Taiwan e-invoice (einvoice-n8n)**](examples/einvoice-n8n/) ⭐ **v0.41.0 CLEARED** | `@paid-tw/einvoice` SDK (5 providers, MIG 4.0) → svc Hono wrapper + 14 n8n workflows | **Amego 10/10 SDK capability verified against real Amego sandbox** (11 invoice traces); 22 SEC entries tracked; 4-Tier external-dependency security CI-enforced; A2A directives in Chinese + English |
 
 The third case deliberately preserves the upstream POC's security defects and documents them in [`SECURITY-CAVEATS.md`](examples/line-ai-customer-service-onprem/SECURITY-CAVEATS.md). This isn't "failed acceptance swept under the rug" — it's Code2n8n's core principle: **AI-written software that runs is not automatically software an enterprise can deploy.**
+
+The fourth case (einvoice) is the **first to ship as CLEARED with real-vendor-sandbox runtime evidence** — see its [final validation report](examples/einvoice-n8n/tests/v0.41-final-validation-report.md).
+
+---
+
+## 🛡️ V&V + Security capabilities (what the Pack actually enforces)
+
+> Pack 對外宣稱「能補足 AI Coding 的稽核、安全、透明可控」（[full story](docs/why-code2n8n-audit-security-transparency.md)）— 此 section 給工程主管 / 稽核 / 法遵窗口看真的 ship 了什麼。
+
+### V&V two-layer gate（依 [A2A directive](docs/code2n8n-vv-a2a.md) 11 國語言 machine-readable）
+
+| Layer | 工具 | 通過條件 |
+| --- | --- | --- |
+| **Layer 1** structural | `JSON.parse` + [`scripts/security-scan.mjs`](scripts/security-scan.mjs) + [`scripts/live-roundtrip.mjs`](scripts/live-roundtrip.mjs) | 0 error + N/N roundtrip |
+| **Layer 2** runtime | `npm install/audit/tsc` + `/healthz` + auth 401 + body limit + op enum reject + per-workflow runtime contract + cross-document parity + **真實 vendor sandbox end-to-end smoke** | 詳見每案例 SECURITY-REVIEW + final-validation report |
+
+[**§1.6 Lexical schema-before-claim rule**](skills/tigerai/code2n8n-pipeline/SKILL.md)：訊息含「validated / 驗證通過 / production-ready / X/X ok / 全綠」等受限字眼前，**同訊息更早位置必須先 emit 完整 evidence schema**。Critic gate lexical regex enforce — AI Coder 無法用「我覺得 OK」繞過。
+
+### 4-Tier external-dependency security（v0.36-39 ship 完）
+
+> 「我們對外部 GitHub 進來後有做 security check 嗎? 有對惡意程式處理嗎?」 — v0.35.0 自查答：有但是 advisory 等級。v0.36-39 升到自動 gate。詳見 [external-package-security-posture.md](docs/external-package-security-posture.md)。
+
+| Tier | Release | 涵蓋 |
+| --- | --- | --- |
+| **Tier 1** 偵測層 | v0.36.0 | scanner 加 9 條 Code 節點惡意 jsCode pattern + npm audit 升 fail gate + svc deps caret → exact pin + socket.dev 整合 doc |
+| **Tier 2** 限縮層 | v0.37.0 | container 硬化（USER 65534、npm ci、hash-pin base image）+ docker-compose runtime flags（read_only / cap_drop:[ALL] / tmpfs / secrets file-mount）+ SBOM (CycloneDX) CI artifact + Trivy gate（exit 1）+ Renovate 全 PR require human review + 外部 workflow JSON ingestion 三道 gate（scanner 0 error / 雙人 review marker / audit log） |
+| **Tier 3** 治理層 | v0.38.0 | 新 [Skill external-dependency-security](skills/tigerai/external-dependency-security/SKILL.md) 9 § |
+| **Tier 4** 自動 enforce 層 | v0.39.0 | Skill 規則升為**真實 gate**：CI `ext-dep-skill-enforcement` 4 道 + pre-commit hook + [`CODEOWNERS`](.github/CODEOWNERS) + [PR template](.github/pull_request_template.md) + [A2A directive 中英雙語](docs/external-dependency-security-a2a.md) |
+
+### 惡性程式偵測（concrete patterns scanned）
+
+[`security-scan.mjs`](scripts/security-scan.mjs) `MALICIOUS_JS_PATTERNS` 對 workflow JSON Code 節點 `jsCode` 抓 9 條：
+
+| Severity | 抓什麼 |
+| --- | --- |
+| **error** | reverse-shell pattern · env-dump (`JSON.stringify(process.env)`) · dynamic-eval (`eval` / `new Function` / `vm.runInNewContext`) · `require('child_process'/'vm'/'dgram')` · 寫 sensitive 路徑（`/etc/` `/root/` `/home/` `C:\Windows`）· net-exfil (`fetch(...)` 含 credential-like names) |
+| **warning** | `spawn` / `exec` / `execSync` · base64 large literal decode · `require('fs')` |
+
+自製惡意 [fixture](scripts/__test__/malicious-fixture.workflow.json) 驗 **7 error + 4 warning 全捉**；Pack **30 個正當 workflow 0 false positive**。
+
+外部來 workflow 進 Pack 走 [`scripts/ingest-external-workflow.mjs`](scripts/ingest-external-workflow.mjs) 三道 gate（scanner 0 error / 雙人 review marker `_pack_ingest` 含 submitter ≠ reviewer / node digest spot-check + JSONL audit log）。
+
+### Case study 驗證信心對照
+
+| Case | 驗證信心級別 | 證據類型 |
+| --- | --- | --- |
+| GW admin | 🟢 Layer 1 全綠 + 結構性 V&V | `PROVENANCE.md` + Pack 自家 scanner |
+| LINE CS cloud | 🟢 Layer 1 全綠 + 結構性 V&V | scanner + live-roundtrip |
+| LINE CS on-prem | 🟡 已 ship 但 SECURITY-CAVEATS 標 **DO NOT DEPLOY AS-IS** | 5-phase V&V + security audit disclosed defects |
+| **einvoice** ⭐ | 🟢🟢 **真實 vendor sandbox runtime ground truth**（Amego 10/10）+ 22 SEC entry 全管理 + 4-Tier 自動 enforce | 11 張真實 Amego 發票 + final validation report |
+
+einvoice 案例是 Pack 內**第一個** case study ship 真實 vendor sandbox runtime evidence。其他 case study 屬「結構層通過 + caller 需自己對接 production」。
 
 ---
 
