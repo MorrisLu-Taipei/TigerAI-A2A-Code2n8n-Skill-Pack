@@ -51,7 +51,7 @@ The Pack does **not** reimplement any of the above and does **not** try to be yo
 | Metrics endpoint (`/metrics`) | — | ⛔ Self-hosted n8n exposes Prometheus `/metrics`; **dashboards / alerting / SLO are IT's observability stack** |
 | ERP / CRM / DB / SaaS / LLM integration | Design guidance on how to use them | ⛔ Actual integration = n8n nodes |
 | 2,061 reference workflows | Search-and-design corpus mined from [Zie619/n8n-workflows](https://github.com/Zie619/n8n-workflows) (MIT, secrets scrubbed) | 🟡 Reference material — **not** all of them have been imported into n8n or validated in a production environment |
-| Hero PNG self-attribution | v0.25 stamps the "Platform capabilities by n8n & n8n Enterprise — not by this Pack" subtext directly into the bottom bar of both hero images via PowerShell `System.Drawing` ([`scripts/stamp-hero.ps1`](../scripts/stamp-hero.ps1)) — the image is no longer stranded if shared standalone | ✅ Done |
+| Hero PNG self-attribution | v0.25 stamps the platform ownership subtext directly into the hero images. Future edits must follow the hero image asset log so corrected logos do not regress. | ✅ Done; see [`docs/hero-image-assets.md`](hero-image-assets.md) |
 | Installer ergonomics | `install.sh` / `install.ps1` and `uninstall.sh` / `uninstall.ps1` now support `--target claude\|antigravity\|all`, `--dry-run`, `--help`; install verifies 14/14 skill folders landed and exits non-zero on shortfall; CI gate parses & dry-runs all four scripts | ✅ Done in v0.25 |
 
 Legend: ✅ done · 🟡 partial / in progress · ⛔ explicitly out of Pack scope (owned elsewhere)

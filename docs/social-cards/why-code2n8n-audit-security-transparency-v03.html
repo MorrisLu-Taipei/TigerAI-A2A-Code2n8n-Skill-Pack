@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Code2n8n：給 AI Coder 一個可治理的執行底盤</title>
+  <style>
+    :root {
+      --navy: #102f4c;
+      --navy-2: #173e59;
+      --teal: #167c77;
+      --teal-pale: #ddf3f1;
+      --orange: #ee9e39;
+      --orange-dark: #b66b16;
+      --orange-pale: #fff0da;
+      --muted: #5d7589;
+      --border: #d8e8ee;
+      --cool-white: #f9fcff;
+      --warm-white: #f8f6ef;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      width: 1080px;
+      height: 1350px;
+      overflow: hidden;
+      font-family: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", sans-serif;
+      color: var(--navy);
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 8% 5%, rgba(221,243,241,.95) 0, transparent 30%),
+        radial-gradient(circle at 94% 9%, rgba(255,240,218,.95) 0, transparent 31%),
+        linear-gradient(145deg, var(--cool-white), var(--warm-white));
+    }
+
+    .page {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      padding: 52px 68px 42px;
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 16px;
+      border-radius: 999px;
+      background: rgba(221,243,241,.88);
+      color: var(--teal);
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: .05em;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--teal);
+    }
+
+    .logo {
+      width: 230px;
+      height: auto;
+      object-fit: contain;
+    }
+
+    h1 {
+      margin: 28px 0 0;
+      max-width: 900px;
+      font-size: 60px;
+      line-height: 1.16;
+      letter-spacing: -.035em;
+      font-weight: 900;
+    }
+
+    .accent { color: var(--orange-dark); }
+
+    .lead {
+      margin: 18px 0 28px;
+      max-width: 900px;
+      color: var(--muted);
+      font-size: 25px;
+      line-height: 1.55;
+      font-weight: 600;
+    }
+
+    .story {
+      padding: 22px 26px 20px;
+      background: rgba(255,255,255,.93);
+      border: 1px solid var(--border);
+      border-left: 8px solid var(--orange);
+      border-radius: 24px;
+      box-shadow: 0 16px 44px rgba(31,71,92,.09);
+    }
+
+    .story h2 {
+      margin: 0 0 16px;
+      font-size: 28px;
+      line-height: 1.3;
+      text-align: center;
+    }
+
+    .pipeline {
+      display: grid;
+      grid-template-columns: 1.05fr 30px 1.25fr 30px 1.55fr 30px .9fr;
+      align-items: stretch;
+      gap: 6px;
+    }
+
+    .pipe-card {
+      min-height: 150px;
+      padding: 14px 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      text-align: center;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #fbfdff;
+    }
+
+    .pipe-card:nth-of-type(3) {
+      background: #fffaf2;
+      border-color: #f3d5a8;
+    }
+
+    .pipe-symbol {
+      width: 48px;
+      height: 48px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 8px;
+      border-radius: 14px;
+      background: var(--teal-pale);
+      color: var(--teal);
+      font-size: 27px;
+      line-height: 1;
+    }
+
+    .pipe-card:nth-of-type(3) .pipe-symbol,
+    .pipe-card:nth-of-type(7) .pipe-symbol {
+      background: var(--orange-pale);
+      color: var(--orange-dark);
+    }
+
+    .pipe-card strong {
+      font-size: 18px;
+      line-height: 1.25;
+    }
+
+    .pipe-card small {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+      font-weight: 700;
+    }
+
+    .pipe-arrow {
+      display: grid;
+      place-items: center;
+      color: var(--orange);
+      font-size: 29px;
+      font-weight: 900;
+    }
+
+    .vendor-chips,
+    .flow-chips {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    .vendor-chips span,
+    .flow-chips span {
+      padding: 4px 6px;
+      border-radius: 7px;
+      background: var(--teal-pale);
+      color: var(--teal);
+      font-size: 10px;
+      line-height: 1.15;
+      font-weight: 800;
+    }
+
+    .flow-chips span {
+      background: var(--orange-pale);
+      color: var(--orange-dark);
+    }
+
+    .rescue-note {
+      margin-top: 13px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 11px;
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .rescue-note strong {
+      padding: 5px 10px;
+      border-radius: 9px;
+      background: var(--orange-pale);
+      color: var(--orange-dark);
+      font-size: 18px;
+    }
+
+    .section-title {
+      margin: 28px 0 16px;
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      font-size: 29px;
+      font-weight: 900;
+    }
+
+    .section-title small {
+      color: var(--muted);
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: .03em;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+    }
+
+    .card {
+      min-height: 142px;
+      padding: 20px 26px;
+      background: rgba(255,255,255,.9);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: 0 12px 32px rgba(31,71,92,.07);
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      margin-bottom: 12px;
+    }
+
+    .icon {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      flex: 0 0 auto;
+      border-radius: 12px;
+      background: var(--teal-pale);
+      color: var(--teal);
+      font-size: 22px;
+      font-weight: 900;
+    }
+
+    .card:nth-child(even) .icon {
+      background: var(--orange-pale);
+      color: var(--orange-dark);
+    }
+
+    .card h3 {
+      margin: 0;
+      font-size: 25px;
+      line-height: 1.2;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.5;
+      font-weight: 600;
+    }
+
+    .bottom {
+      margin-top: 20px;
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      border-radius: 22px;
+      color: white;
+      background: var(--navy-2);
+      box-shadow: 0 16px 38px rgba(16,47,76,.16);
+    }
+
+    .bottom strong {
+      display: block;
+      max-width: 760px;
+      font-size: 25px;
+      line-height: 1.42;
+    }
+
+    .bottom span {
+      color: #ffd18b;
+    }
+
+    .tag {
+      flex: 0 0 auto;
+      padding: 11px 16px;
+      border-radius: 12px;
+      color: var(--navy);
+      background: #ffd18b;
+      font-size: 17px;
+      font-weight: 900;
+    }
+
+    .footer {
+      position: absolute;
+      left: 68px;
+      right: 68px;
+      bottom: 13px;
+      display: flex;
+      justify-content: space-between;
+      color: #7890a2;
+      font-size: 14px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="top">
+      <div class="eyebrow">einvoice → n8n｜Code2n8n 實戰</div>
+      <img class="logo" src="TigerAI_horizontal_standard.png" alt="TigerAI">
+    </header>
+
+    <h1>一個 einvoice 作廢需求，<br>如何走進 n8n，變成<span class="accent">可治理流程？</span></h1>
+    <p class="lead">我們把「不可逆的電子發票作廢」拆成可視化 workflow：真人核可、服務呼叫、雙分支驗證與 audit trace，都能被檢查與接手。</p>
+
+    <section class="story">
+      <h2>不是把程式碼硬搬成節點，而是重新切分責任</h2>
+      <div class="pipeline">
+        <div class="pipe-card">
+          <div class="pipe-symbol">▤</div>
+          <strong>電子發票</strong>
+          <small>MIG 4.0<br>統一資料模型</small>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-card">
+          <div class="pipe-symbol">⬡</div>
+          <strong>統一 SDK</strong>
+          <small>5 家供應商 → 1 介面</small>
+          <div class="vendor-chips">
+            <span>Amego</span><span>ECPay</span><span>ezPay</span>
+            <span>ezPay 跨境</span><span>ezReceipt</span>
+          </div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-card">
+          <div class="pipe-symbol">⌘</div>
+          <strong>6 個企業流程</strong>
+          <small>Code2n8n 分工與治理</small>
+          <div class="flow-chips">
+            <span>開立</span><span>作廢核可</span><span>折讓</span>
+            <span>每日對帳</span><span>供應商切換</span><span>月結匯出</span>
+          </div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-card">
+          <div class="pipe-symbol">◆</div>
+          <strong>n8n</strong>
+          <small>可視化編排<br>執行與稽核</small>
+        </div>
+      </div>
+      <div class="rescue-note">
+        <strong>4→1</strong>
+        真實 runtime 撞牆四輪；靠 trace、log 與跨 AI 接手一輪定位
+      </div>
+    </section>
+
+    <div class="section-title">
+      這段導入過程，留下四層企業能力
+      <small>What the process proves</small>
+    </div>
+
+    <section class="grid">
+      <article class="card">
+        <div class="card-head"><div class="icon">01</div><h3>稽核 Audit</h3></div>
+        <p>每個節點的 input / output、版本與安全狀態都有 trace，事後能回答「為什麼這樣做」。</p>
+      </article>
+      <article class="card">
+        <div class="card-head"><div class="icon">02</div><h3>安全 Security</h3></div>
+        <p>結構掃描＋兩層 V&amp;V gate；沒有 runtime evidence，就不能宣稱 production-ready。</p>
+      </article>
+      <article class="card">
+        <div class="card-head"><div class="icon">03</div><h3>透明可控</h3></div>
+        <p>流程可視化、可暫停、可恢復、可逐節點檢查；非工程主管也能理解與監督。</p>
+      </article>
+      <article class="card">
+        <div class="card-head"><div class="icon">04</div><h3>跨 AI 接手</h3></div>
+        <p>Workflow JSON、execution API、access log 與官方文件，讓不同 AI 在分鐘級完成換手。</p>
+      </article>
+    </section>
+
+    <section class="bottom">
+      <strong>不是把 einvoice「搬進」n8n 而已。<br><span>是把業務邊界變成可視、可稽核、可治理的執行流程。</span></strong>
+      <div class="tag">可稽核的 AI 執行底盤</div>
+    </section>
+
+    <footer class="footer">
+      <span>TigerAI · AI-Native Business Automation</span>
+      <span>Case study · 2026.06</span>
+    </footer>
+  </main>
+</body>
+</html>

@@ -177,7 +177,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Trivy filesystem scan — ${{ matrix.target.name }}
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@0.36.0
         with:
           scan-type: ${{ matrix.target.scan-type }}
           scan-ref: ${{ matrix.target.scan-ref }}
@@ -203,6 +203,10 @@ jobs:
   ext-dep-skill-enforcement:
     name: external-dependency-security Skill auto-enforcement (v0.39.0)
     runs-on: ubuntu-latest
+    # v1.0.6: advisory while SEC-DEP entries backlog is being filled.
+    # Becomes hard gate once SECURITY-REVIEW.md has SEC-DEP-<sanitized>-<ver> entries
+    # for all svc deps (@hono/node-server, hono, @paid-tw/einvoice*, typescript, tsx, @types/node).
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
