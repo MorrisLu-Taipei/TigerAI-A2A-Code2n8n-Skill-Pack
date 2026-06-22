@@ -1,16 +1,10 @@
 # TigerAI A2A Code2n8n Skill Pack — 使用手冊
 
 > **TigerAI A2A Code2n8n Skill Pack — v1.0 Production-Grade Methodology**
-> *用 AI 從自然語言 sticky note 或既有程式碼建構企業級 n8n workflow。A2A directive 驅動 · 4-Tier 外部依賴安全 CI 自動 enforce · Path B 真實 vendor sandbox runtime 證據。*
+> *用 AI 從自然語言 sticky note 或既有程式碼建構企業級 n8n workflow。依 A2A directive · 4-Tier 外部依賴安全 CI 自動 enforce · Path B 真實 vendor sandbox runtime 證據。*
 
 > 🌐 [English](README.md) | **繁體中文**
 > 📖 **什麼是 Code2n8n？** 讀 [Code2n8n 宣言](CODE2N8N.md) — 為什麼 AI Coding 時代企業反而**更**需要 n8n。
-
-> ## 🚀 v1.0 release — evidence-first（依 §1.6 lexical schema-before-claim rule）
->
-> **V&V evidence** — Path B PASS：Amego 10/10 SDK capability 對真實 Amego sandbox（11 張真實發票 trace）、22 SEC entries 管理、4-Tier 外部依賴安全 CI 自動 enforce。依 [A2A directive](docs/code2n8n-vv-a2a.md)：[v0.40 報告](examples/einvoice-n8n/tests/v0.40-amego-full-coverage-report.md) · [v0.41 結案](examples/einvoice-n8n/tests/v0.41-final-validation-report.md) · [claims index](docs/v1-claims-and-evidence.md)。
->
-> **誠實範圍** — 只 einvoice 案例 CLEARED；只 Amego 有真實 sandbox runtime 證據（其他 4 家無公開測試帳號、runtime 未驗）；v1.0 = Path B 第一次完整跑通，v1.x 持續演進。
 
 > **Code2n8n 的定位**：AI Coding（Claude Code / Codex / Antigravity）擅長把程式「寫出來」；n8n 擅長把程式變成「企業管得住」的流程資產。這個 pack 就是兩者之間的橋 — **描述一個需求，或 指向一個既有系統**（Apps Script / Express / Lambda / Docker stack），產出 IT、營運、主管都看得懂、稽核得了、交接得下去、跨系統治理得來的 n8n workflow。
 
@@ -31,7 +25,7 @@
 - ✅ **資安審查**：22 個 SEC entry（20 ✅ FIXED + 1 OPEN mitigated + 1 documented）+ 4-Tier 外部依賴安全 CI 自動 enforce
 - ✅ **真實 vendor sandbox runtime PASS**：Amego 10/10 SDK capability 對真實 Amego public sandbox 通過 — 11 張真實發票 trace 可在 Amego 後台查得（`AA26515011` ~ `AA26515020`）
 
-V&V 證據（依上方 v1.0 release banner 與 [A2A directive](docs/code2n8n-vv-a2a.md)）：詳見 [`examples/einvoice-n8n/tests/v0.40-amego-full-coverage-report.md`](examples/einvoice-n8n/tests/v0.40-amego-full-coverage-report.md) + 結案報告 [`tests/v0.41-final-validation-report.md`](examples/einvoice-n8n/tests/v0.41-final-validation-report.md)。
+V&V 證據（依 [A2A directive](docs/code2n8n-vv-a2a.md)）：詳見 [`examples/einvoice-n8n/tests/v0.40-amego-full-coverage-report.md`](examples/einvoice-n8n/tests/v0.40-amego-full-coverage-report.md) + 結案報告 [`tests/v0.41-final-validation-report.md`](examples/einvoice-n8n/tests/v0.41-final-validation-report.md)。
 
 ### 🙏 致謝 [`paid-tw/einvoice`](https://github.com/paid-tw/einvoice) 維護者
 

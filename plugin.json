@@ -1,6 +1,6 @@
 {
   "name": "tigerai-code2n8n-skill-pack",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "TigerAI A2A Code2n8n Skill Pack v1.0 — Production-Grade Methodology for building enterprise-grade n8n workflows. Natural-language sticky notes or existing code (Apps Script / Netlify Functions / Express / Docker stack / TypeScript SDK) → governable workflows. A2A directives (V&V two-layer + external-dependency security; Chinese + English machine-readable specs). 4-Tier external-dependency security CI-enforced (scanner with 9 malicious jsCode patterns, npm audit fail-gate, container hardening, Skill rules → real CI gates). Path B real-vendor-sandbox runtime evidence: Taiwan e-invoice case CLEARED with Amego 10/10 SDK capability verified against real Amego public sandbox (11 invoice traces). 4 case studies (Google Workspace admin / cloud LINE customer service / on-prem LINE customer service / Taiwan e-invoice). Pure REST API, no MCP dependency.",
   "author": "TigerAI",
   "license": "MIT",

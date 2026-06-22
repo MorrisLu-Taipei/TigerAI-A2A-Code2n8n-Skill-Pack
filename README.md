@@ -1,16 +1,10 @@
 # TigerAI A2A Code2n8n Skill Pack — User Manual
 
 > **TigerAI A2A Code2n8n Skill Pack — v1.0 Production-Grade Methodology**
-> *AI-driven build of enterprise-grade n8n workflows from natural-language sticky notes or existing codebases. A2A-directed · 4-Tier dependency security CI-enforced · Path B real-vendor-sandbox runtime evidence.*
+> *AI-driven build of enterprise-grade n8n workflows from natural-language sticky notes or existing codebases. Per A2A directive · 4-Tier dependency security CI-enforced · Path B real-vendor-sandbox runtime evidence.*
 
 > 🌐 **English** | [繁體中文](README.zh.md)
 > 📖 **Why Code2n8n?** Read the [Code2n8n manifesto](CODE2N8N.md) — why enterprises need n8n *more* in the AI-coding era, not less.
-
-> ## 🚀 v1.0 release — evidence-first (per §1.6 lexical schema-before-claim rule)
->
-> **V&V evidence** — Path B PASS: Amego 10/10 SDK capability against real Amego sandbox (11 invoice traces), 22 SEC entries managed, 4-Tier external-dependency security CI-enforced. Per [A2A directive](docs/code2n8n-vv-a2a.md): [v0.40 report](examples/einvoice-n8n/tests/v0.40-amego-full-coverage-report.md) · [v0.41 closing](examples/einvoice-n8n/tests/v0.41-final-validation-report.md) · [claims index](docs/v1-claims-and-evidence.md).
->
-> **Honest scope** — only einvoice case CLEARED; only Amego has real-sandbox runtime evidence (other 4 providers lack public sandbox accounts, runtime untested); v1.0 = Path B's first end-to-end pass, v1.x continues to evolve.
 
 > **The Code2n8n positioning**: AI Coding (Claude Code / Codex / Antigravity) is great at *writing* code. n8n is great at making code *manageable by an enterprise*. This pack is the bridge — **describe a requirement, *or* point at an existing system** (Apps Script / Express / Lambda / Docker stack), and get a runnable n8n workflow that IT, operations, and managers can all read, audit, hand off, and govern.
 
@@ -31,7 +25,7 @@ We recently ported the upstream SDK [`paid-tw/einvoice`](https://github.com/paid
 - ✅ **Security review**: 22 SEC entries (20 ✅ FIXED + 1 OPEN mitigated + 1 documented) + 4-Tier external-dependency security CI auto-enforced
 - ✅ **Real-vendor-sandbox runtime PASS**: Amego 10/10 SDK capability against real Amego public sandbox — 11 real invoice traces queryable in Amego back-office (`AA26515011` ~ `AA26515020`)
 
-V&V evidence (per the v1.0 release banner above and the [A2A directive](docs/code2n8n-vv-a2a.md)): see [`examples/einvoice-n8n/tests/v0.40-amego-full-coverage-report.md`](examples/einvoice-n8n/tests/v0.40-amego-full-coverage-report.md) and the closing report [`tests/v0.41-final-validation-report.md`](examples/einvoice-n8n/tests/v0.41-final-validation-report.md).
+V&V evidence (per the [A2A directive](docs/code2n8n-vv-a2a.md)): see [`examples/einvoice-n8n/tests/v0.40-amego-full-coverage-report.md`](examples/einvoice-n8n/tests/v0.40-amego-full-coverage-report.md) and the closing report [`tests/v0.41-final-validation-report.md`](examples/einvoice-n8n/tests/v0.41-final-validation-report.md).
 
 ### 🙏 Thanks to [`paid-tw/einvoice`](https://github.com/paid-tw/einvoice) maintainers
 

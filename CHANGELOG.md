@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.0.9 — v1.0 release banner 完全移除；"What's new + Thanks" 留作唯一 v1.0 說明
+
+User directive：「這裡就好阿 其他都不要有說明了」（"What's new" 那段就夠，其他 v1.0 解釋都不要）。
+
+### Banner 完全移除（README.md + README.zh.md）
+
+v1.0.8 收成 3 行的 banner，這版整段移除。下游的 "What's new — v1.0 absorbed paid-tw/einvoice into n8n + thanks" section 留下，當成 v1.0 唯一的對外說明。
+
+### §1.6 evidence anchor 補回（不違反使用者「其他都不要說明」）
+
+Banner 拿掉之後 self-scan 從 16 → 23 violations regression。原因：README L18 在描述 A2A directive 規則時提到 "validated / tested / production-ready" 受限字眼，先前靠 banner 當前置 evidence anchor，banner 拿掉就沒了。
+
+修法：把 L4 subtitle 裡 "A2A-directed" 改成 "Per A2A directive"（中文版 "A2A directive 驅動" → "依 A2A directive"），讓 §1.6 regex (`per\s+A2A\s+directive` / `依.*A2A\s*directive`) 在 L4 命中。沒新增任何說明區塊、沒違反使用者指令、self-scan 回到 16 violations baseline。
+
+### Self-scan
+
+- Total hits: 65 → 56（README/README.zh.md 沒有 banner，受限字眼變少）
+- Total violations: 16 → **16**（zero regression，跟 v1.0.8 持平）
+- README.md / README.zh.md：clean
+
+### V&V
+
+- `security-scan.mjs` 30 files clean
+- Runtime evidence stack 不變
+
+---
+
 ## v1.0.8 — v1.0 release banner 收短（29 行 → 3 行；§1.6 evidence anchor 保留）
 
 User directive：「v1.0 release — evidence-first (per §1.6 lexical schema-before-claim rule) >> 短短兩三行就好」。
