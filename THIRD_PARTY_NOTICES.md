@@ -77,6 +77,20 @@ The Taiwan e-invoice case (the v1.0 milestone case) is built on top of:
 
 ---
 
+## 5. n8n.io public templates — statistics only (not redistributed)
+
+Statistics and node-usage patterns in `research/` were derived from the public
+template library at https://n8n.io/workflows/ (official template API). Those
+templates carry no open-source license; they are governed by the n8n terms of
+service and each author's template-sharing terms.
+
+- **What is in this repo**: aggregate counts (node types, categories, tags, trigger
+  and error-handling rates) and a small number of cited template IDs.
+- **What is not in this repo**: the template JSON files, the full title index, and
+  any author personal data (names, bios, avatars, links).
+
+---
+
 ## License of the rest
 
 The rest of this repository (TigerAI-authored skills, cookbook, specs,
