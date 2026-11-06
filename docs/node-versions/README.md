@@ -54,8 +54,9 @@ node scripts/dump-node-versions.mjs --out docs/node-versions/2.46.6.json --n8n-v
 | `deprecated` | 目錄明確標示棄用時為 `true` |
 | `hidden` | 目錄把該節點標為隱藏（不供新建）時為 `true` |
 | `replacedBy` | 目錄標示的取代節點 type（只有部分棄用節點有） |
+| `credentials` | 節點的憑證需求，`[{name, required, conditional?}]`；沒有需求為空陣列。`name` 是憑證 type（例如 `telegramApi`），`required` 是目錄標示必要；`conditional` 為 `true` 表示該憑證的所有必要條目都帶顯示條件（只有在特定參數組合才需要，例如 HTTP Request 要選了憑證式認證方式才要）。沒有 `conditional` 的 `required` 才是「無條件需要」。只含 type 與旗標，沒有任何憑證值 |
 
-同一個 type 在目錄中可能有多筆條目（例如 Set 有 v3 系列與 v1／v2 兩筆），腳本把它們合併：`versions` 取聯集，`latest` 取最大值，`default` 取各條目 `defaultVersion` 的最大值。`deprecated` 為任一條目標示棄用就是 `true`；`hidden` 要所有條目都隱藏才是 `true`。
+同一個 type 在目錄中可能有多筆條目（例如 Set 有 v3 系列與 v1／v2 兩筆），腳本把它們合併：`versions` 取聯集，`latest` 取最大值，`default` 取各條目 `defaultVersion` 的最大值。`deprecated` 為任一條目標示棄用就是 `true`；`hidden` 要所有條目都隱藏才是 `true`。`credentials` 依 `name` 取聯集：任一條目 `required` 為真則為真；只有當所有 `required` 條目都帶顯示條件時才標 `conditional`。
 
 ## 怎麼用
 
@@ -80,6 +81,6 @@ AI 在產生 workflow 前，對每個要用的節點照下列順序查**目標 n
 
 ## 限制
 
-- 只記錄節點目錄公開的版本資訊，不含各版本的參數差異；需要參數細節時仍用 `get_node` 查。
+- 只記錄節點目錄公開的版本資訊與憑證需求，不含各版本的參數差異（`conditional` 的實際條件也不收錄）；需要參數細節時仍用 `get_node` 查。
 - 社群節點（community nodes）只有在實例已安裝時才會出現在目錄。
 - 三份現有 JSON 來自預設設定的全新空實例；管理員用環境變數排除或加入節點的實例，結果會不同。

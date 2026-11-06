@@ -7,6 +7,16 @@ description: Convert n8n Code (JS) nodes into native declarative nodes (Set / Fi
 
 The audience for these workflows is **n8n experts who read the canvas but cannot read JavaScript**. A Code node is opaque to them. Replacing it with declarative native nodes — even if the result has more nodes — is the right trade-off.
 
+## Restricted Agent mode (Portal)
+
+> Check for the host marker `[PORTAL-RESTRICTED-AGENT-MODE v1]` (system prompt or session context; rules in [`spec/agent-restricted-mode.en.md`](../../../spec/agent-restricted-mode.en.md)). **No marker: this Skill applies as written. Marker present: the adjustments below override the steps they name.** This text is only a hint; real enforcement is the host's tool allowlist.
+
+- **Input and output**: the workflow JSON comes from the user's paste or a host read-only tool (names per the host); the result is JSON only. The Step 1 helper script is not run (no shell); do the inventory by reading the JSON.
+- **Credentials of existing nodes**: keep them exactly as they are. Converting Code nodes never adds, renames or "fixes" a credential; no `STUB-` fake credentials and no invented names. If an existing credential reference is not in the host's `credentialMap`, do not change it; list it under "Credentials to be added" in the Layer 3 note and tell the user.
+- **Step 5 (pre-commit check)**: the manual n8n import and test run are **not available**; use the host's static check tool (at most N rounds, set by the host) and report its result as it is. Never say the converted workflow "passed", is "safe", or is "ready to deploy".
+- **Interaction step 5 (commit and push)**: not available; no Git writes. The Step 4 change-history line in the sticky note still applies, and the before/after Code node counts go into the `native-first:code-node` line as usual.
+- **Closing blocks**: the security scan result is a faithful restatement of the host's check result, or "Security scan not run: <reason>".
+
 ## Hard rules
 
 1. **Every conversion bumps the workflow's sticky note** with a `v<N> <date>: ...` change-history line. The first sticky note in the file is the change log. Do not skip this — it is the audit trail.

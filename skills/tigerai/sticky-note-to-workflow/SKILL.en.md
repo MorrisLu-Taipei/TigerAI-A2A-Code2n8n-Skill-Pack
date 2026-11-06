@@ -7,6 +7,21 @@ description: Core skill that converts a Layer 1 Sticky Note (DSL-formatted user 
 
 > 🌐 **English** | [繁體中文](SKILL.md)
 
+## Restricted Agent mode (Portal)
+
+> First check whether the host placed the marker `[PORTAL-RESTRICTED-AGENT-MODE v1]` (in the system prompt or session context; format and full rules in [`spec/agent-restricted-mode.en.md`](../../../spec/agent-restricted-mode.en.md)). **No marker: this Skill applies as written (single-machine mode). Marker present: the adjustments below apply and override the rest of this file.** This text is only a hint; real enforcement is the host's tool allowlist, and in this mode the Skill's behavior is "comply with the host's restrictions".
+
+| Where | Adjustment in restricted mode |
+|---|---|
+| §2 input (existing workflow ID) | Do not go through `n8n-api-bridge`; read only with read-only tools provided by the host (names per the host); if none, ask the user to paste the JSON |
+| Step 4 (top-level fields) | `active` is always `false` |
+| **Step 4.2** | **Becomes "reference the credentialMap only"**: use only credential names from the host's `credentialMap`, copied character for character; a node writes only `{ "<type>": { "name": "<name>" } }` and **never `credentials.id`** (the host fills in the id server-side from the name, and flags a credential as missing and reports it when no match is found); **`STUB-` fake credentials and any invented name are forbidden**; for a needed credential that is not in the map, the node gets no `credentials` field, and its `notes` and the Layer 3 "Credentials to be added" state "Administrator must create: type=..., suggested name=...". Connection-type triggers are handled the same way, with a reminder that only an administrator activates |
+| Step 6 (Layer 3) | Add a "Credentials to be added" list beside "Required credentials" and tell the user that CI will fail until the credentials exist, which is expected and correct |
+| **Step 7** | **Becomes "do not write to n8n, output JSON only"**: no PUT, no activation; call the host's static check tool instead, apply legitimate fixes for blocking codes, at most N rounds (set by the host, starting at 3); if it still fails, hand the reasons to the user faithfully |
+| Step 8 (closing blocks) | "Security scan result" is a faithful restatement of the host's check result (rule names and node names only); if it did not run, write "Security scan not run: <reason>" |
+| §5 output format, §7 conversation rules | Do not put `passed` in `metadata.validation`; use the host precheck's own wording (for example "no blocking codes", "not prechecked"); never say "passed", "safe", "ready to deploy", "activated" or "imported" |
+| §8 chaining | No write-back through `n8n-api-bridge`; the product goes to the host's draft flow |
+
 ## 1. Trigger conditions
 
 **Explicit triggers**:
@@ -131,6 +146,8 @@ function safeWebhookNodeName(s) { return s.replace(/[^A-Za-z0-9]/g, ''); }
 - "`webhookId` auto-generated as `<uuid>`; webhook URL is `https://<n8n>/webhook/<configured-path>`"
 - If node was renamed, list before/after for human maintainers
 
+> **Restricted Agent mode (Portal)**: with the marker, this whole step does not apply; it becomes "reference the credentialMap only, write the name and never `credentials.id`, no `STUB-`". See "Restricted Agent mode (Portal)" above.
+
 ### Step 4.2: Activation-friendly design (v0.9.0 R3 enforced)
 
 n8n has two-tier credential validation: activate checks ref exists; execute checks DB. To allow immediate activation (even before user configures real credentials), AI MUST add stub credentials for **non-connection action nodes**:
@@ -182,6 +199,8 @@ Same n8n instance can't have 2 active workflows sharing `webhook + path`. When g
   6. Mapping to user requirements (each @trigger / @step / @output / @on-error)
 - Apply anti-pattern check (`research/patterns.md` §3) — if any triggers, add to "Known limits"
 - Per Chapter 4 of [`spec/references-disclosure.en.md`](../../../spec/references-disclosure.en.md), add the "References", "Recommendations" and "Security scan result" blocks right after the title (see Step 8); these three blocks are the official record of recommendations and information
+
+> **Restricted Agent mode (Portal)**: with the marker, this step does not write to n8n and only outputs JSON. See "Restricted Agent mode (Portal)" above.
 
 ### Step 7: Validate
 - Via `n8n-api-bridge` Skill, PUT JSON back to n8n (n8n runs built-in schema validation)

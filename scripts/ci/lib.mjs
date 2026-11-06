@@ -155,6 +155,7 @@ const SOURCE_TITLES = {
   'node-catalog': '舊節點（建議）',
   'workflow-refs': 'workflow 引用（建議）',
   activation: '觸發節點（建議）',
+  credentials: '憑證欄位（建議）',
   matrix: '多版本對照（建議）',
   'n8n-run': '動態檢查提示',
   ci: '其他提示',

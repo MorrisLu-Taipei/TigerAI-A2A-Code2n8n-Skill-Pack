@@ -7,6 +7,10 @@ description: Standard SOP for reading and writing n8n workflows via the n8n REST
 
 > 🌐 [English](SKILL.en.md) | **繁體中文**
 
+> **受限 Agent 模式（Portal）：寫入與啟用停用。**
+> 宿主在系統提示或工作階段上下文放了標記 `[PORTAL-RESTRICTED-AGENT-MODE v1]` 時（格式與規則見 [`spec/agent-restricted-mode.md`](../../../spec/agent-restricted-mode.md)），本 Skill 的 `POST`／`PUT`／`PATCH`／`DELETE`、`activate`／`deactivate` 與直接 SQL **全部停用**；不使用 `N8N_API_URL`／`N8N_API_KEY`，也不自行組 HTTP 請求。讀取（列出、讀 workflow、看 execution）只能經宿主提供的唯讀工具（名稱以宿主為準）；§4.2 的合併寫回、§4.3 的冪等寫回、§7 的範例一律不執行，改為只輸出 workflow JSON，由宿主負責寫入。沒有標記時，本檔全文照舊。
+> 這段文字只是提示；真正的強制是宿主的工具白名單與環境設定（Agent 環境不放 n8n 金鑰、不開通往 n8n 的網路）。
+
 ## 1. 觸發條件
 
 **精確**：

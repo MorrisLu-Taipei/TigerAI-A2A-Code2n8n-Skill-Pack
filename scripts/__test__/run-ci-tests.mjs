@@ -132,6 +132,17 @@ try {
   const dep = check(stage(['fail-function-node.workflow.json']));
   expect(dep.code === 1 && dep.report.blocking.some(b => b.code === 'NODE_DEPRECATED') && !dep.report.advisories.some(a => a.rule === 'node:hidden-legacy'), 'deprecated 且 hidden 的節點：只應是 NODE_DEPRECATED 阻擋，不重複列為 hidden 建議');
 
+  // ---- credentials:missing-field（建議，不阻擋） ----------------------------------------------------
+  const cf = check(stage(['advisory-credential-field-missing.workflow.json']));
+  expect(cf.code === 0 && cf.report.status === 'pass' && cf.report.blocking.length === 0, 'credentials:missing-field：應為 pass 且沒有阻擋項');
+  const cfa = cf.report.advisories.filter(a => a.rule === 'credentials:missing-field');
+  expect(cfa.length === 1 && cfa[0].node === 'Send message' && /telegramApi/.test(cfa[0].message) && /待補憑證/.test(cfa[0].message) && /可能誤報/.test(cfa[0].message), 'credentials:missing-field：建議項的節點或訊息不對');
+  expect(cf.comment.includes('憑證欄位（建議）') && cf.comment.includes('credentials:missing-field') && !cf.comment.includes('### 阻擋項'), 'credentials:missing-field：註解的建議區應列出該規則');
+  const cx = check(stage(['pass-credential-field-exempt.workflow.json']));
+  expect(cx.code === 0 && cx.report.advisories.length === 0, 'credentials:missing-field：有 credentials 欄位、authentication 為 none、已停用的節點都不應被提醒');
+  const cmix = check(stage(['advisory-credential-field-missing.workflow.json', 'fail-function-node.workflow.json']));
+  expect(cmix.report.blocking.length === 1 && cmix.report.blocking[0].code === 'NODE_DEPRECATED', 'credentials:missing-field 與 fail 同批：阻擋項不因此增加');
+
   // ---- sub-workflow 引用 ------------------------------------------------------------------------
   const sub = stage(['advisory-unknown-subworkflow.workflow.json']);
   const sub1 = check(sub);
@@ -211,7 +222,7 @@ try {
   expect(cBoth.includes('結果：失敗') && cBoth.includes('### 未完成項') && cBoth.indexOf('### 阻擋項') < cBoth.indexOf('### 未完成項'), '三態：失敗且未完成時，結果為失敗並仍列出未完成項');
   for (const c of [cPass, cFail, cInc, cUnk, cBoth]) expect(c.split('\n')[0].includes('建議項不會讓 CI 失敗'), '三態：註解第一行都應有建議項說明');
   expect(cInc.includes('多版本對照（建議）') && !cInc.includes('#### matrix'), 'matrix 來源的建議項應顯示中文標題，不是原始鍵值');
-  for (const src of ['security-scan', 'native-first', 'node-catalog', 'workflow-refs', 'activation', 'matrix', 'n8n-run', 'ci']) {
+  for (const src of ['security-scan', 'native-first', 'node-catalog', 'workflow-refs', 'activation', 'credentials', 'matrix', 'n8n-run', 'ci']) {
     const c = lib.renderComment(lib.finalizeReport({ target: '2.44.6', blocking: [], advisories: [{ source: src, rule: 'x:y', file: 'f.json', node: null, message: 'm' }], counts: { files: 1 } }));
     expect(!c.includes(`#### ${src}`), `來源 ${src}：註解的標題不應是原始鍵值`);
   }
@@ -247,6 +258,12 @@ try {
   expect(nomap.code === 0 && nomap.report.advisories.some(a => a.rule === 'credential-map-not-provided'), '未提供 --credential-map：應略過檢查並以建議項說明');
   const inlineMap = check(one, ['--credential-map', '{"httpHeaderAuth":["only-this-one"]}'], { map: false });
   expect(inlineMap.code === 1 && inlineMap.report.blocking.some(b => b.code === 'CREDENTIAL_MISSING'), '行內 JSON 的 --credential-map：名稱不在清單應為 CREDENTIAL_MISSING');
+
+  // 受限 Agent 模式：STUB 假憑證在提供 credentialMap 時一律被擋；未提供清單時此檢查略過（所以宿主必須提供）
+  const stub = check(stage(['fail-stub-credential.workflow.json']));
+  expect(stub.code === 1 && stub.report.blocking.some(b => b.code === 'CREDENTIAL_MISSING' && /STUB-openAiApi/.test(b.message ?? '')), 'STUB 假憑證：應為 CREDENTIAL_MISSING 且訊息點名該憑證名稱');
+  const stubNoMap = check(stage(['fail-stub-credential.workflow.json']), [], { map: false });
+  expect(stubNoMap.code === 0 && stubNoMap.report.advisories.some(a => a.rule === 'credential-map-not-provided'), 'STUB 假憑證：未提供 --credential-map 時不會被擋，僅以建議項說明（受限模式要求宿主一定提供）');
 
   // ---- 使用錯誤與缺少版本目錄 ---------------------------------------------------------------
   const run = (...a) => spawnSync(process.execPath, [checker, ...a], { cwd: root, encoding: 'utf8' });

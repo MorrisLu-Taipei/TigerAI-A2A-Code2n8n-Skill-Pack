@@ -61,6 +61,27 @@ for (const entry of catalog) {
   byName.get(entry.name).push(entry);
 }
 
+// 憑證需求：條目的 credentials 為 [{name, required, displayOptions?}]。
+// 同名多筆取聯集：任一條目 required 為真則為真；conditional 表示「所有 required 的條目都帶 displayOptions」，
+// 也就是只有在某些參數組合下才需要（例如 authentication 選了該憑證才要），沒有 conditional 才是無條件需要。
+function credentialNeeds(entries) {
+  const needs = new Map();
+  for (const e of entries) {
+    for (const c of Array.isArray(e.credentials) ? e.credentials : []) {
+      if (typeof c?.name !== 'string') continue;
+      const cur = needs.get(c.name) ?? { required: false, unconditional: false };
+      if (c.required === true) {
+        cur.required = true;
+        if (!c.displayOptions) cur.unconditional = true;
+      }
+      needs.set(c.name, cur);
+    }
+  }
+  return [...needs]
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([name, v]) => (v.required && !v.unconditional ? { name, required: true, conditional: true } : { name, required: v.required }));
+}
+
 const nodes = [];
 for (const [name, entries] of byName) {
   const versions = [...new Set(entries.flatMap((e) => [].concat(e.version ?? [])))].sort(num);
@@ -75,6 +96,7 @@ for (const [name, entries] of byName) {
     // 目錄明確標示才為 true：deprecated 任一條目為 true；hidden 須所有條目皆為 true
     deprecated: entries.some((e) => e.deprecated === true),
     hidden: entries.every((e) => e.hidden === true),
+    credentials: credentialNeeds(entries),
   };
   const replacedBy = entries.find((e) => e.replacedByNodeType)?.replacedByNodeType;
   if (replacedBy) node.replacedBy = replacedBy;

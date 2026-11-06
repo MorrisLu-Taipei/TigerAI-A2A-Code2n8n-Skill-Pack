@@ -12,6 +12,7 @@
     "pass-schedule-http.workflow.json":     { "status": "pass", "blocking": [], "advisories": [] },
     "pass-manual-set.workflow.json":        { "status": "pass", "blocking": [], "advisories": [] },
     "pass-subworkflow-callee.workflow.json":{ "status": "pass", "blocking": [], "advisories": [] },
+    "pass-credential-field-exempt.workflow.json":{ "status": "pass", "blocking": [], "advisories": [] },
     "pass-subworkflow-caller.workflow.json":{ "status": "pass", "blocking": [], "advisories": [], "with": ["pass-subworkflow-callee.workflow.json"] },
 
     "advisory-webhook-no-auth.workflow.json":      { "status": "pass", "blocking": [], "advisories": ["security-scan:webhook:no-auth"] },
@@ -19,6 +20,7 @@
     "advisory-code-replaceable.workflow.json":     { "status": "pass", "blocking": [], "advisories": ["native-first:code-node-replaceable"] },
     "advisory-external-trigger.workflow.json":     { "status": "pass", "blocking": [], "advisories": ["activation:trigger:external-registration"] },
     "advisory-hidden-legacy-node.workflow.json":   { "status": "pass", "blocking": [], "advisories": ["node-catalog:node:hidden-legacy"] },
+    "advisory-credential-field-missing.workflow.json": { "status": "pass", "blocking": [], "advisories": ["credentials:credentials:missing-field"] },
     "advisory-unknown-subworkflow.workflow.json":  { "status": "pass", "blocking": [], "advisories": ["workflow-refs:workflow:unknown-subworkflow-reference"] },
 
     "fail-json-invalid.workflow.json":        { "status": "fail", "blocking": ["JSON_INVALID"] },
@@ -31,6 +33,7 @@
     "fail-function-node.workflow.json":       { "status": "fail", "blocking": ["NODE_DEPRECATED"] },
     "fail-typeversion.workflow.json":         { "status": "fail", "blocking": ["TYPEVERSION_INVALID"] },
     "fail-credential-missing.workflow.json":  { "status": "fail", "blocking": ["CREDENTIAL_MISSING"] },
+    "fail-stub-credential.workflow.json":     { "status": "fail", "blocking": ["CREDENTIAL_MISSING"] },
     "fail-webhook-dup-a.workflow.json":       { "status": "fail", "blocking": ["WEBHOOK_PATH_CONFLICT"], "with": ["fail-webhook-dup-b.workflow.json"] },
     "fail-webhook-dup-b.workflow.json":       { "status": "fail", "blocking": ["WEBHOOK_PATH_CONFLICT"], "with": ["fail-webhook-dup-a.workflow.json"] }
   },

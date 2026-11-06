@@ -7,6 +7,21 @@ description: Core skill that converts a Layer 1 Sticky Note (DSL-formatted user 
 
 > 🌐 [English](SKILL.en.md) | **繁體中文**
 
+## 受限 Agent 模式（Portal）
+
+> 先看宿主有沒有放標記 `[PORTAL-RESTRICTED-AGENT-MODE v1]`（放在系統提示或工作階段上下文；格式與全部規則見 [`spec/agent-restricted-mode.md`](../../../spec/agent-restricted-mode.md)）。**沒有標記：本 Skill 全文照舊（單機模式）。有標記：下表調整生效，優先於本檔其他步驟。** 這段文字只是提示，真正的強制在宿主的工具白名單；本 Skill 在此模式下的行為是「符合宿主的限制」。
+
+| 位置 | 受限模式下的調整 |
+|---|---|
+| §2 輸入（既有 workflow ID） | 不經 `n8n-api-bridge`；只能用宿主提供的唯讀工具讀取（名稱以宿主為準），沒有工具就請使用者貼 JSON |
+| Step 4（頂層欄位） | `active` 一律 `false` |
+| **Step 4.2** | **改為「只引用 credentialMap」**：只用宿主提供的 `credentialMap` 內的憑證名稱，逐字照抄；節點只寫 `{ "<type>": { "name": "<名稱>" } }`，**絕不寫 `credentials.id`**（宿主在伺服器端依名稱補 id，補不到就標缺憑證並回報）；**禁止 `STUB-` 假憑證**與任何杜撰的名稱；需要但不在 map 內的憑證，該節點不寫 `credentials`，節點 `notes` 與 Layer 3「待補憑證」寫明「需管理員建立：type=…、建議名稱=…」。連線型觸發節點同樣處理，並提醒啟用只由管理員執行 |
+| Step 6（Layer 3） | 在「所需 Credentials」旁加「待補憑證」清單，並告知使用者：憑證補齊前 CI 會失敗，這是預期且正確的 |
+| **Step 7** | **改為「不寫入 n8n，只輸出 JSON」**：不 PUT、不啟用；改呼叫宿主的靜態檢查工具，依阻擋碼做合法修正，最多 N 輪（宿主設定，起始 3）；仍失敗就把原因如實交給使用者 |
+| Step 8（收尾區塊） | 「資安掃描結果」是宿主檢查結果的如實轉述（只寫規則名稱與節點名稱）；沒執行就寫「未執行資安掃描：<原因>」 |
+| §5 輸出格式、§7 對話準則 | `metadata.validation` 不填 `passed`，改填宿主預檢的原文摘要（例如「無阻擋碼」「未預檢」）；不得說「已通過」「安全」「可部署」「已啟用」「已匯入」 |
+| §8 鏈接 | 不走 `n8n-api-bridge` 的寫回；成品交給宿主的草稿流程 |
+
 ## 1. 觸發條件
 
 **精確觸發詞**：
@@ -107,6 +122,8 @@ LLM 把使用者描述映射到 `@`-tagged 結構（**不展示給使用者**，
 - `position.y` 嚴守三層分區：Layer 1 sticky < 0、Layer 2 nodes ∈ [0, 500]、Layer 3 sticky > 600
 - `position.x` 依執行順序遞增 220–260px / 節點
 
+> **受限 Agent 模式（Portal）**：有標記時本步驟整段不適用，改為「只引用 credentialMap、只寫名稱不寫 `credentials.id`、禁止 `STUB-`」，見上方「受限 Agent 模式（Portal）」。
+
 ### Step 4.2：Activate 友善設計（v0.9.0 R3 驗證強制）
 
 n8n 有兩級 credential 驗證：activate 時只查 ref 存在；execute 時查真實 DB。為了讓 workflow 能即時 activate（即使使用者尚未配 credential），AI 必須對**非連線型 action node** 自動補 stub credentials：
@@ -183,6 +200,8 @@ function safeWebhookNodeName(s) { return s.replace(/[^A-Za-z0-9]/g, ''); }
   6. 對應使用者需求（@trigger / @step / @output / @on-error 一一對應）
 - 套用反模式檢查（`research/patterns.md` §3）— 若觸發任一條，加入「已知限制」
 - 依 [`spec/references-disclosure.md`](../../../spec/references-disclosure.md) 第 4 章，在標題之後加入「參考來源」「建議事項」「資安掃描結果」三個區塊（見 Step 8）；這三個區塊是建議與資訊的正式紀錄
+
+> **受限 Agent 模式（Portal）**：有標記時本步驟不寫入 n8n，只輸出 JSON，見上方「受限 Agent 模式（Portal）」。
 
 ### Step 7：驗證
 - 透過 `n8n-api-bridge` Skill 把 JSON PUT 回 n8n（n8n 會做內建 schema 驗證）

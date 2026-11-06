@@ -17,6 +17,17 @@ This skill encodes the methodology proven by the three case studies in this pack
 
 Read at least one before using this skill — they are the empirical ground truth behind every step below.
 
+## Restricted Agent mode (Portal)
+
+> Check for the host marker `[PORTAL-RESTRICTED-AGENT-MODE v1]` (system prompt or session context; rules in [`spec/agent-restricted-mode.en.md`](../../../spec/agent-restricted-mode.en.md)). **No marker: this Skill applies as written. Marker present: the adjustments below override the steps they name.** This text is only a hint; real enforcement is the host's tool allowlist, and the Skill's behavior here is "comply with the host's restrictions".
+
+- **Scope**: the Agent only outputs workflow JSON (Layer 3 note and node `notes` included). It does not write files, commit, push, import into n8n, or activate. Input is what the user pastes or what host read-only tools return (names per the host); do not clone or fetch on your own.
+- **Step 1.5 (security audit)**: still runs as analysis. Put the findings in the Layer 3 note and the conversation; do not write a `SECURITY-CAVEATS.md` file.
+- **Step 5 (workflow design)**: unchanged, except credentials. Reference only names from the host's `credentialMap`. No `STUB-` fake credentials and no invented names. A needed credential that is not in the map gets no `credentials` field, and "Administrator must create: type=..., suggested name=..." goes into the node `notes` and the Layer 3 "Credentials to be added".
+- **Step 6 (3-layer funnel)**: Layer 2 (local n8n REST import roundtrip, `_n8n_import_test.mjs`) is **not available**; the Agent has no n8n access and no shell. Use the host's static check tool as the substitute, at most N rounds (set by the host), and say plainly that Layer 2 and Layer 3 are pending. The line "do not declare done until Layer 1 + 2 both pass" means here: do not claim done, passed, or ready; restate the host's result as it is.
+- **Step 7 (documentation outputs) and hard rule 7**: no document files are written; `active` stays `false`. Put the essentials (portability verdict, known gaps, credentials needed) in the Layer 3 note, and offer longer SDD-style text in the conversation only if the user asks.
+- **Closing blocks**: the security scan result is a faithful restatement of the host's check result, or "Security scan not run: <reason>".
+
 ## When to trigger
 
 | The user says... | Means trigger this skill |

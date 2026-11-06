@@ -9,6 +9,19 @@ description: End-to-end Code2n8n Path B auto-pilot. Auto-activates when the user
 >
 > 本 SKILL 是 Code2n8n Path B 的 end-to-end pipeline 自動化規格。當使用者丟一個 MIT GitHub 專案進來、要求自動化完成 Path B 的全套流程（從 Inventory 到上架），AI **必須**依本 SKILL 的 12 階段、main/critic 雙 agent 架構執行。
 
+## 受限 Agent 模式（Portal）
+
+> 先看宿主有沒有放標記 `[PORTAL-RESTRICTED-AGENT-MODE v1]`（系統提示或工作階段上下文；規則見 [`spec/agent-restricted-mode.md`](../../../spec/agent-restricted-mode.md)）。**沒有標記：本 Skill 全文照舊。有標記：下列調整優先於本檔其他內容。** 這段文字只是提示，真正的強制在宿主的工具白名單；本 Skill 在此模式下的行為是「符合宿主的限制」。
+
+本管線依賴 git、shell、`live-roundtrip.mjs`、對 n8n 的 import 與 activate，以及 main/critic 雙 agent；受限 Agent 沒有這些能力。因此在受限模式：
+
+- **只支援縮減版**：依使用者貼來的內容或宿主唯讀工具讀到的內容，做 Stage 1–3 的分析與 Stage 5 的 workflow JSON 產出。**完整的 12 階段請在單機模式（沒有標記）執行**，並如實告訴使用者「受限模式下本管線無法完整執行」。不降級成自我審查（§5 第 3 條不變）。
+- **Stage 4（寫程式與檔案）、Stage 6–9（需要 shell、腳本與 n8n）**：不執行；以宿主的靜態檢查工具代替結構檢查，最多 N 輪（宿主設定），並說明 Layer 2 與執行期檢查尚未做。
+- **Stage 10（Activate to n8n）**：**停用**，不 import、不 activate、不產生 `ACTIVATION-LOG.md`；寫入由宿主處理，啟用只由 n8n 管理員執行。
+- **Stage 11（完工報告）**：不寫成檔案，不簽 sign-off；§1.6 的字詞規則照舊，不得宣稱「已通過」「安全」「可部署」「已啟用」。
+- **憑證**：只引用宿主提供的 `credentialMap` 內的名稱；禁止 `STUB-` 假憑證與杜撰名稱；缺的憑證寫進 Layer 3「待補憑證」。
+- **收尾區塊**：資安掃描結果是宿主檢查結果的如實轉述，沒執行就寫「未執行資安掃描：<原因>」。
+
 ## 1. 啟動條件
 
 **自動觸發 — 任一情境即啟動，不需使用者特地說 SKILL 名字**：

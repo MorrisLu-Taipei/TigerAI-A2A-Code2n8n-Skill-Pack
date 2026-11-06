@@ -42,6 +42,7 @@ PR 開啟或更新
 | `node-catalog` | 規則 `node:hidden-legacy`：目錄標示 `hidden: true` 但未 `deprecated` 的舊節點。訊息為「此節點在節點面板中已隱藏，屬舊節點，建議評估新版替代」；本 Pack 在 2.44.6、2.46.6 實測這類節點仍可匯入，是否阻擋以實測為準，不以 hidden 旗標為準 |
 | `workflow-refs` | 規則 `workflow:unknown-subworkflow-reference`：Execute Workflow 節點的 `workflowId` 在同一批檔案與 `--existing-workflow-ids` 清單中都找不到。可能指向目標環境既有的 workflow，所以只提醒 |
 | `activation` | 規則 `trigger:external-registration`：workflow 含需要向外部服務註冊的觸發節點（Telegram、GitHub、Slack、IMAP 等）。訊息：此 workflow 的觸發節點需要對外註冊，無法在無網路測試環境驗證啟用，建議在 staging 實測 |
+| `credentials` | 規則 `credentials:missing-field`：節點類型在目標版本目錄中有「無條件需要」的憑證（`required` 為真且不帶 `conditional`），但節點沒有 `credentials` 欄位（或為空物件）。`disabled` 節點、以及 `parameters.authentication` 為 `none` 或 `genericCredentialType` 的節點不提醒。訊息會提示：若憑證尚未建立，請依受限模式在節點 notes 與 Layer 3「待補憑證」說明，需管理員建立；並註明可能誤報。誤報率評估見下方「`credentials:missing-field` 建議規則的誤報率評估」 |
 | `matrix` | 規則 `matrix:version-difference`：`matrix.sh` 的跨版本差異（同一個檔案在不同 n8n 版本的匯入或啟用結果不同） |
 | `n8n-run` | 動態檢查的提示：`NO_TRIGGER`（沒有觸發節點，屬於模式範本）、`activate:unverified-external`（啟用失敗但屬外部註冊或網路造成）、`activate:unverified-unknown`（啟用失敗但無法歸類，**需人工複核**，整體狀態為 `incomplete`）、`workflow:timeout`（單一 workflow 逾時，屬基礎設施問題，請重跑；整體狀態為 `incomplete`）、執行狀態為 error（假憑證下預期會發生）、假憑證建立失敗 |
 | `ci` | 沒有提供憑證允許清單而略過檢查、webhook path 是運算式而無法靜態比對 |
@@ -237,12 +238,52 @@ jobs:
 - 「合併前需主管核准」「合併後才由 CD 匯入正式 n8n（預設不啟用）」屬於分支保護與 CD 的設定，不在這些腳本的範圍。
 - PR 上的 CI 不應持有可以寫入正式 n8n 的金鑰；`CI_N8N_URL` 指向的實例要能隨時整個丟掉。
 
+## `credentials:missing-field` 建議規則的誤報率評估
+
+評估日期：2026-11-06。這份數字用來決定規則維持建議還是升為阻擋；**阻擋清單由 Founder 決定，不因這份評估擴大**。
+
+### 樣本與方法
+
+- 樣本：公開 n8n 範本庫的 13,947 個範本（全部可解析），共 308,884 個啟用中的節點（略過 `disabled`），其中 303,731 個的類型在 2.44.6 目錄內。
+- 節點目錄：`docs/node-versions/2.44.6.json` 的 `credentials` 欄位。
+- 把規則套在每個範本上，計算「目錄要求憑證、節點卻沒有 `credentials` 欄位（或為空物件）」的節點。範本是社群作者寫成、在 n8n 裡可用的 workflow，所以這個比例是「規則對正常 workflow 誤提醒」的**上限估計**，不是精確的誤報率。
+- 比較兩種判斷口徑：
+  - 寬鬆口徑：目錄中任一憑證 `required` 為真就算需要。
+  - 採用口徑（目前實作）：只算 `required` 為真且無 `conditional`（不依參數組合）的憑證。
+
+### 結果
+
+| 項目 | 寬鬆口徑 | 採用口徑 |
+|---|---|---|
+| (a) 有 required 憑證需求的節點實例 | 110,555 | 31,776 |
+| (b) 其中沒有 `credentials` 欄位 | 65,921（59.6%） | 13,336（42.0%） |
+| (d) 再套用 authentication 排除後 | 63,395（57.3%） | 13,336（42.0%） |
+| (e) 含至少一個提醒的範本占全部範本 | 83.7% | 27.4%（3,825 個） |
+
+- 寬鬆口徑誤報嚴重，主因是 HTTP Request、Webhook、AI Agent、Wait、Respond to Webhook、Form Trigger 這類節點的憑證只在特定參數組合才需要；誤報最多的類型依序為 `httpRequest`（73.2%）、`agent`（99.9%）、`googleSheets`（47.3%）、`wait`、`webhook`、`respondToWebhook`、`gmail`、`slack`、`lmChatOpenAi`、`telegram`、`formTrigger`、`googleDrive`、`openAi`、`httpRequestTool`、`postgres`。`authentication` 為 `none` 或 `genericCredentialType` 的比例很低（約 2 個百分點），排除效果有限。因此採用口徑。
+- 採用口徑的誤報最多類型（缺欄位數／實例數）：`lmChatOpenAi`（35.1%）、`telegram`（38.8%）、`openAi`（40.9%）、`postgres`（60.6%）、`lmChatGoogleGemini`（29.4%）、`emailSend`（49.7%）、`notion`（44.1%）、`whatsApp`（56.3%）、`googleCalendar`（54.8%）、`lmChatAnthropic`（42.2%）、`telegramTrigger`（35.8%）、`lmChatOpenRouter`（31.3%）、`redis`（55.0%）、`embeddingsOpenAi`（35.5%）、`googleGemini`（30.2%）。這 15 種缺欄位的節點都沒有設定 `authentication`，所以 (d) 的排除對採用口徑沒有影響。
+- 這些缺欄位的主因是範本資料本身：把「範本內完全沒有任何節點帶 `credentials` 欄位」的範本分開看，該群的缺欄位比例是 100%（11,731 個節點），推測是發布範本時憑證資訊被移除，不是作者的 workflow 真的缺憑證。
+- 只看「範本內至少有一個節點帶 `credentials` 欄位」的範本（排除上述被移除的情況）：採用口徑的缺欄位為 1,605／20,045（8.0%），含至少一個提醒的範本占該群 7.3%（642／8,752）。這群的提醒多集中在 `telegram`、`postgres`、`lmChatOpenAi`、`emailSend`、`openAi`，可能是作者漏設，也可能是子節點或別的設定方式，無法由 JSON 區分。
+
+### 限制
+
+- 範本不是受限模式 Agent 的產出；受限模式下 Agent 會在 notes 說明待補憑證，實際比例會不同。這份數字只能當上限的參考。
+- 範本資料的憑證欄位有被移除的情況，無法精確區分「真缺」與「被移除」，所以才另列至少有一個節點帶欄位的子群。
+- 只用 2.44.6 目錄；其他版本的目錄差異很小（有 `required` 憑證的節點數：2.37.3 為 786、2.44.6 為 797、2.46.6 為 798），結論不變。
+- 採用口徑會漏報條件式憑證節點（HTTP Request、Slack、Gmail 等）；這是刻意用漏報換低誤報。
+
+### 判斷
+
+**維持建議，不升為阻擋。** 上限估計 42.0% 明顯偏高；即使排除被移除憑證的範本，仍有 8.0% 的節點被提醒，且無法由 JSON 區分真缺與其他設定方式。依 Portal 端的原則（誤報率明顯偏高就維持建議）與使用者決策（護欄與提醒只是建議，不使 CI 失敗），規則只輸出在 PR 註解。若日後要重評，先累積受限模式 Agent 實際產出的資料，再以相同方法計算。
+
 ## 限制
 
 - **動態檢查用的是假憑證**：能確認匯入、啟用、webhook 註冊與節點設定是否被該版本接受，**不代表**真實服務（Slack、Google、LLM 等）可用，也不代表真實憑證有效。執行紀錄為 error 在假憑證下是預期的結果。
 - 目標版本必須有 `docs/node-versions/<版本>.json`；沒有就無法做節點與 `typeVersion` 檢查。目錄只含該實例預設載入的節點，未安裝的社群節點會被判為 `NODE_NOT_FOUND`。
 - 靜態的 `typeVersion` 檢查比 n8n 本身嚴格：例如 Webhook 2.2 不在 2.37.3 的目錄內，但該版本實際仍可匯入與啟用；以目錄為準是刻意的選擇。`hidden` 但未棄用的節點不阻擋，只出 `node:hidden-legacy` 建議。
 - 憑證只比對「類型加名稱」是否在允許清單，不檢查憑證內容、權限或是否過期。
+- `credentials:missing-field` 只看目錄標示「無條件需要」的憑證；像 HTTP Request、Webhook、Slack、Gmail 這類要看 `authentication` 等參數才需要憑證的節點，因為工作流 JSON 通常省略預設參數值，無法可靠判斷，一律不提醒（會漏報，不會誤報）。仍可能誤報的情況見下方評估。
+- 受限模式禁止 `STUB-` 假憑證，提供 credentialMap 時此類憑證會被擋（`CREDENTIAL_MISSING`，夾具 `fail-stub-credential`）；沒有提供 credentialMap 時這項檢查會略過，所以接入 Portal 的宿主一定要提供。規則見 [`spec/agent-restricted-mode.md`](../spec/agent-restricted-mode.md)。
 - webhook path 的靜態比對只認字面值；以運算式組出的 path 會略過並在建議項說明。同一個 path 是否已被其他啟用中的 workflow 使用，要靠既有清單或動態檢查啟用時的 409。
 - 沒有觸發節點的 workflow 無法啟用，這在動態檢查只是提示（`NO_TRIGGER`）。
 - 需要對外註冊的觸發節點（Telegram、GitHub、IMAP 等）無法在無網路的測試環境驗證啟用；2.44.6 以上的啟用 API 還會對這類失敗回 200（見「啟用失敗的分類」），務必另在 staging 實測。

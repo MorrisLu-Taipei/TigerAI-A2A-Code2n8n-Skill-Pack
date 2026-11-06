@@ -7,6 +7,10 @@ description: Standard SOP for reading and writing n8n workflows via the n8n REST
 
 > 🌐 **English** | [繁體中文](SKILL.md)
 
+> **Restricted Agent mode (Portal): writing and activation are disabled.**
+> When the host places the marker `[PORTAL-RESTRICTED-AGENT-MODE v1]` in the system prompt or session context (format and rules in [`spec/agent-restricted-mode.en.md`](../../../spec/agent-restricted-mode.en.md)), every `POST`/`PUT`/`PATCH`/`DELETE`, `activate`/`deactivate` and direct SQL in this Skill is **disabled**; do not use `N8N_API_URL`/`N8N_API_KEY` or build HTTP requests yourself. Reading (listing, reading a workflow, viewing executions) goes only through read-only tools provided by the host (names per the host). The merge write-back of §4.2, the idempotent write-back of §4.3 and the example in §7 are never executed; output the workflow JSON only and let the host write it. Without the marker, this file applies as written.
+> This text is only a hint; real enforcement is the host's tool allowlist and environment (no n8n key in the Agent environment, no network path to n8n).
+
 ## 1. Trigger conditions
 
 **Explicit**:

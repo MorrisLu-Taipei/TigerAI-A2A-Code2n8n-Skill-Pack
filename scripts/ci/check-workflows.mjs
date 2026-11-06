@@ -11,7 +11,8 @@
 // 建議項（永遠不使 CI 失敗）：scripts/security-scan.mjs 的護欄警告、scripts/native-first-check.mjs 的原生節點提醒、
 //   node:hidden-legacy（目錄標示 hidden 但未 deprecated 的舊節點，實測仍可匯入啟用）、
 //   workflow:unknown-subworkflow-reference（Execute Workflow 指向的 workflow 在同批與既有清單都找不到）、
-//   trigger:external-registration（觸發節點需要對外註冊，無法在無網路環境測試啟用）。
+//   trigger:external-registration（觸發節點需要對外註冊，無法在無網路環境測試啟用）、
+//   credentials:missing-field（節點類型在目錄中有「無條件需要」的憑證，但節點沒有 credentials 欄位；可能誤報，見 docs/ci-for-n8n-workflows.md）。
 // 退出碼：0 無阻擋項；1 有阻擋項；2 使用錯誤或內部工具失敗。
 // 輸出與日誌只寫規則名稱、檔名、節點名，不印任何疑似機密的原文。
 
@@ -91,6 +92,12 @@ const advisories = [];
 const clean = v => (v == null ? null : scrub(v));
 const block = (code, file, node, message) => blocking.push({ code, file, node: clean(node), message: scrub(message) });
 const advise = (source, rule, file, node, message) => advisories.push({ source, rule, file, node: clean(node), message: scrub(message) });
+
+// 目錄的 credentials 需求：required 且不帶 conditional（不依參數組合）的才算「一定要有」；authentication 明示不用預定義憑證時排除
+const NO_PREDEFINED_AUTH = new Set(['none', 'genericCredentialType']);
+const unconditionalCreds = entry =>
+  (Array.isArray(entry?.credentials) ? entry.credentials : []).filter(c => c?.required === true && c.conditional !== true).map(c => c.name);
+const hasCredentialField = n => isObj(n.credentials) && Object.keys(n.credentials).length > 0;
 
 const normPath = p => String(p).trim().replace(/^\/+|\/+$/g, '');
 const normMethod = m => String(m).trim().toUpperCase();
@@ -195,6 +202,14 @@ for (const f of files) {
     if (!n.disabled && isExternalTrigger(n.type)) {
       advise('activation', 'trigger:external-registration', f.rel, n.name,
         '此 workflow 的觸發節點需要對外註冊，無法在無網路測試環境驗證啟用，建議在 staging 實測');
+    }
+
+    if (entry && !n.disabled && !hasCredentialField(n) && !NO_PREDEFINED_AUTH.has(n.parameters.authentication)) {
+      const need = unconditionalCreds(entry);
+      if (need.length > 0) {
+        advise('credentials', 'credentials:missing-field', f.rel, n.name,
+          `${n.type} 需要憑證（${need.slice(0, 3).join('、')}），但沒有 credentials 欄位；若憑證尚未建立，請依受限模式在節點 notes 與 Layer 3「待補憑證」說明，需管理員建立。依目錄判斷，可能誤報`);
+      }
     }
 
     for (const [ctype, ref] of Object.entries(n.credentials ?? {})) {
