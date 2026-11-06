@@ -107,6 +107,11 @@ native-first-check-tests:
   script:
     - node scripts/__test__/run-native-first-tests.mjs
 
+ci-check-scripts-tests:
+  stage: scan
+  script:
+    - node scripts/__test__/run-ci-tests.mjs
+
 dependency-cve:
   stage: scan
   allow_failure: true

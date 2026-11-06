@@ -1,0 +1,51 @@
+{
+  "name": "ci-fixture advisory unknown sub-workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "mt",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "ci-missing-sub-0001",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "ew",
+      "name": "Run Sub-workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        260,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Run Sub-workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

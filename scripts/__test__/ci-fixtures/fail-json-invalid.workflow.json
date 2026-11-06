@@ -1,0 +1,4 @@
+{
+  "name": "ci-fixture fail invalid json",
+  "nodes": [
+    { "name": "Manual Trigger", "type": "n8n-nodes-base.manualTrigger",

@@ -1,0 +1,180 @@
+{
+  "name": "ci-fixture pass webhook branch",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ci-fixture-branch",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "wh",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "00000000-0000-4000-8000-041562077665",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "ci-header-auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.body.name }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if",
+      "name": "Has name?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        360,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1-a",
+              "name": "result",
+              "value": "named",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "s1",
+      "name": "Named",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        600,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s2-a",
+              "name": "result",
+              "value": "anonymous",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "s2",
+      "name": "Anonymous",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        600,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "rs",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        840,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Has name?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has name?": {
+      "main": [
+        [
+          {
+            "node": "Named",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Anonymous",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Named": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anonymous": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

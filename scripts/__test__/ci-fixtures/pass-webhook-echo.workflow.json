@@ -1,0 +1,109 @@
+{
+  "name": "ci-fixture pass webhook echo",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ci-fixture-echo",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "wh",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "00000000-0000-4000-8000-851013712611",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "1",
+          "name": "ci-header-auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1-a",
+              "name": "greeting",
+              "value": "hello",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "s1",
+      "name": "Add field",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        360,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "rs",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "CI fixture: webhook with header auth",
+        "height": 80,
+        "width": 240
+      },
+      "id": "st",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -200
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Add field",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add field": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
