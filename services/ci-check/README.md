@@ -8,7 +8,8 @@
 
 | 檔案 | 說明 |
 | --- | --- |
-| `static-service.mjs` | 靜態檢查服務：`POST /v1/check/static`、`GET /healthz`、`GET /version` |
+| `static-service.mjs` | 靜態檢查服務：`POST /v1/check/static`、`POST /v1/review/build-input`、`POST /v1/review/validate`（AI 審查，見第 2.1 節）、`GET /healthz`、`GET /version` |
+| `review-api.mjs` | AI 審查兩個端點的輸入檢核與包裝（組輸入與驗證輸出的邏輯在 `scripts/review/`，這裡不重寫） |
 | `dynamic-front.mjs` | 動態檢查前端：`POST /v1/check/dynamic`、`GET /v1/jobs/{jobId}`、`DELETE /v1/jobs/{jobId}`、`GET /v1/capacity`、`GET /healthz`、`GET /version` |
 | `dynamic-result.mjs` | 前端用：執行器結果的檢核、重算與 PR 註解渲染 |
 | `shared.mjs` | 共用零件：錯誤格式、認證、限流、輸入檢查、記錄、註解的縱深防禦 |
@@ -34,13 +35,38 @@ STATIC_API_TOKEN_CURRENT=<至少 32 字元的亂數> node services/ci-check/stat
 | `PACK_ROOT` | 本檔往上兩層 | Pack 根目錄 |
 | `WORK_ROOT` | 系統暫存區下的 `ci-check-static` | 臨時目錄的位置；建議指向 tmpfs（`noexec,nosuid,size=64m`）。啟動時會清空這個資料夾，不要與其他用途共用 |
 | `CHECK_TIMEOUT_MS`、`MAX_CONCURRENT` | `30000`、`4` | 單次處理逾時、並行上限（另可排隊 8 個、最久 5 秒） |
-| `RATE_PER_MINUTE`、`RATE_BURST` | `60`、`20` | 每個呼叫者的速率與突發量（只套在 POST） |
+| `RATE_PER_MINUTE`、`RATE_BURST` | `60`、`20` | 每個呼叫者的速率與突發量（只套在 POST；`/v1/review/validate` 不計） |
+| `REVIEW_MAX_INPUT_CHARS` | `150000` | AI 審查送進模型的資料字元數預算（見 2.1） |
 
 行為重點：
 
 - 請求內容寫進臨時目錄（路徑逐一檢查），以不經 shell 的子行程呼叫 `check-workflows.mjs`，子行程環境只有 `PATH`、`TMPDIR`、`HOME`、`LANG`（不繼承 token）；逾時殺整個行程群組；`finally` 一律刪除臨時目錄。
 - 記錄是一行一筆的 JSON（stdout），只含 requestId、callerId、來源 IP、端點、狀態碼、耗時、版本、檔名、各阻擋碼與建議規則的次數、錯誤碼；寫入前再過一次欄位白名單。
 - 同一個 `ci-report` 的內容與直接跑 CLI 相同（測試會逐項比對）。
+
+### 2.1 AI 審查端點（只給建議，不影響任何檢查）
+
+兩個端點掛在靜態服務上，沿用同一把 Bearer token、來源白名單、`Content-Type: application/json` 規則、5 MB 本文上限與 `{ error }` 錯誤格式。它們**不呼叫任何模型、不做任何對外連線**：呼叫模型是宿主（例如管線 n8n）的事，這裡只做「組輸入」與「驗證輸出」兩段。邏輯在 Pack 的 `scripts/review/build-input.mjs` 與 `validate-review.mjs`（映像內 `/opt/pack/scripts/review/`），端點只做輸入檢核與包裝。規格見 `spec/agent-reviewer-mode.md`，宿主怎麼接見 `docs/ai-review-in-pr.md`。
+
+**`POST /v1/review/build-input`**：請求（未定義的欄位回 400）
+
+| 欄位 | 必填 | 說明 |
+| --- | --- | --- |
+| `requestId` | 是 | 8 至 64 字元，與靜態檢查相同規則 |
+| `workflowsAfter` | 是 | `[{ path, content }]`，規則同 `/v1/check/static` 的 `workflows`（最多 50 個、單檔 1 MB、路徑檢查） |
+| `workflowsBefore` | 否 | 同上；新建（沒有前一版）時省略或給 `[]` |
+| `staticReport`、`dynamicReport` | 否 | 檢查服務回應的 `report`／`result`；只留 `status`、`target`、`complete`、`state`、`counts`、`blocking`、`advisories`（各項欄位與長度受限），其餘丟棄 |
+| `targetEnv` | 否 | 目標環境快照，**只有名稱**：`environment`、`n8nVersion`、`credentialMap`（`{ 類型: [憑證名稱] }`）、`existingWebhookPaths` |
+| `prMeta` | 否 | `number`、`title`、`body`、`baseRef`、`headRef`、`author`、`repo`、`targetEnv`、`sha`（皆受長度限制，不含機密） |
+
+回應 200：`{ requestId, service, serviceVersion, apiVersion, packVersion, messages, nonce, parts, reduced, tooLarge, inputChars, allowedReferences, nodeNames, durationMs }`。`messages` 是可直接送給 OpenAI 相容 `/v1/chat/completions` 的 `[system, user]`：system 是 `skills/tigerai/n8n-review-mode/SKILL.md` 第 3 節的原文（含 `[PORTAL-REVIEWER-AGENT-MODE v1]` 標記，測試會逐字比對）加上宿主參考清單；user 是帶隨機 nonce 的不可信資料區塊（先遮罩機密樣式、改寫偽造的分隔標記）。`allowedReferences` 與 `nodeNames` 原樣交給 validate。資料超過字元預算時先省略 `workflow_before` 並在 `reduced` 註明；仍超過則 `tooLarge: true`、`messages: null`（**不靜默截斷**，宿主應顯示「AI 審查未執行」）。
+
+**`POST /v1/review/validate`**：請求 `{ output, allowedReferences?, nodeNames?, notRun?, requestId? }`。`output` 是模型的原始回覆；`notRun` 為 `unavailable` 或 `timeout` 時不讀 `output`，直接回該未執行結果（宿主在模型不可用、逾時時用同一套呈現）。回應 `{ requestId, service, serviceVersion, apiVersion, packVersion, result, markdown, durationMs }`：`result` 是 `validate-review.mjs` 的結果物件（`status` 為 `ok` 或 `not-run`、`injectionSuspected`、`suggestions`、`dropped` 等），`markdown` 是含橫幅『AI 建議，僅供參考，不能取代人工審核』與『參考了哪些資料』的呈現。
+
+- **通過認證後一律回 200**：輸出無效、疑似遭提示注入、請求本身有問題（壞 JSON、欄位錯、Content-Type 錯、本文過大）都只是 `result` 的內容（`status: "not-run"`），不會回錯誤碼。唯一例外是存取控制：沒有或錯的 token 仍回 401、來源不在白名單回 403、連續認證失敗被封鎖回 429。
+- `output` 超過 32,768 字元一律視為無效（`output-too-large`）：`validate-review.mjs` 有幾條正規表示式對長字串是二次方時間（實測 60,000 字元約 3 秒），先在這裡設上限避免單一請求拖住服務；3,000 tokens 的輸出遠小於此值。
+- 被丟棄的內容只留原因代碼，不出現在回應與記錄；記錄不含 workflow 內容、PR 標題、模型輸出。
+- 這個端點不是閘門：沒有任何選項能讓它的結果影響檢查狀態，宿主也不應該這麼用。
 
 ## 3. 動態檢查前端與執行器
 
@@ -151,6 +177,7 @@ node services/ci-check/test/run-service-tests.mjs static     # static、dynamic�
 bash services/ci-check/test/run-executor-smoke.sh [版本]       # 需要 docker 與本機的 n8n 映像
 ```
 
+- AI 審查：系統提示與 SKILL.md 逐字比對、build-input 與直接呼叫 Pack 函式逐字相同、機密遮罩與偽造標記、輸入檢核、validate 端點的各種壞請求都回 200、假模型（`eval/mock-model/review-server.mjs`）17 種模式走完 build-input 與 validate、提示注入整份丟棄、記錄不含內容。
 - 靜態：Pack 的 `ci-fixtures` 逐一送出，斷言回應符合 schema（`test/schemas/`，是規格 schema 去掉說明文字後的副本）、阻擋碼與 `expected.json` 相符、與直接跑 CLI 的結果逐項相同；各種錯誤碼、路徑穿越、逾時與行程群組擊殺、並行與速率、token 不外洩、臨時目錄清除。
 - 動態：以模擬執行器寫 `status.json`／`result.json`，涵蓋建立到讀回、冪等、惡意或造假的結果、重試與隔離、reaper、取消、佇列、容量與健康、多版本矩陣、前端重啟後復原。
 - 執行器：用假的 n8n 與假的 `run-on-n8n` 跑真正的 `executor-loop.mjs`，另有前端與執行器串接的測試。

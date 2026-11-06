@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 檢查服務（靜態服務、動態前端、執行器驅動程式）的測試。只用 Node 內建模組；不需要 docker 或 n8n。
-// 用法：node services/ci-check/test/run-service-tests.mjs [static|dynamic|executor|misc ...]
+// 用法：node services/ci-check/test/run-service-tests.mjs [static|dynamic|executor|review|misc ...]
 // 執行器容器的煙霧測試另見 run-executor-smoke.sh（需要 docker）。
 // 印出每個區段的檢查數與總數；退出碼 0 全過、1 有失敗。
 
@@ -17,6 +17,7 @@ try {
   if (want('static')) { const { runStatic } = await import('./static-tests.mjs'); await runStatic(); }
   if (want('dynamic')) { const { runDynamic } = await import('./dynamic-tests.mjs'); await runDynamic(); }
   if (want('executor')) { const { runExecutor } = await import('./executor-tests.mjs'); await runExecutor(); }
+  if (want('review')) { const { runReview } = await import('./review-tests.mjs'); await runReview(); }
   if (want('misc')) { const { runMisc } = await import('./misc-tests.mjs'); await runMisc(); }
 } finally {
   cleanupTemps();

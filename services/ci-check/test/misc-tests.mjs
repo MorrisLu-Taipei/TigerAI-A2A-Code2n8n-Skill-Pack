@@ -112,7 +112,7 @@ export async function runMisc() {
     const walk = d => { for (const e of readdirSync(d)) { const p = join(d, e); if (statSync(p).isDirectory()) walk(p); else files.push(p); } };
     walk(SERVICES);
     const srcs = files.filter(f => /\.(mjs|sh)$/.test(f)).map(f => [f, readFileSync(f, 'utf8')]);
-    const servers = ['shared.mjs', 'static-service.mjs', 'dynamic-front.mjs', 'dynamic-result.mjs'].map(n => [n, readFileSync(join(SERVICES, n), 'utf8')]);
+    const servers = ['shared.mjs', 'static-service.mjs', 'dynamic-front.mjs', 'dynamic-result.mjs', 'review-api.mjs'].map(n => [n, readFileSync(join(SERVICES, n), 'utf8')]);
     for (const [name, text] of servers) {
       check(!/\bfetch\s*\(/.test(text) && !/http\.(request|get)\b/.test(text) && !/node:https|node:tls|node:dns|node:dgram|WebSocket|XMLHttpRequest/.test(text) && !/\bnet\.(connect|createConnection)\b/.test(text), `${name}：不得有對外網路呼叫`);
       check(!/docker\.sock|\/var\/run\/docker/.test(text), `${name}：不得碰 docker.sock`);

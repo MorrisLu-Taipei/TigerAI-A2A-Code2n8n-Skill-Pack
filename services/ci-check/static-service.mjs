@@ -9,13 +9,14 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { buildInput, validateAlways, validateBuildInputRequest, validateRequestOf } from './review-api.mjs';
 import {
   ApiError, checkContentHeaders, checkCredentialMap, checkInt, checkKeys, checkRequestId, checkStringList, checkVersion,
   checkWorkflowShapes, cleanText, createAuth, createGate, createJsonServer, createLogger, createRateLimiter, guardComment,
   isObj, jsonDepthExceeds, listen, parseCidrs, parseJsonBody, readBody, REQUEST_ID_RE, routeOf, tokensFromEnv, validatePaths,
 } from './shared.mjs';
 
-export const SERVICE_VERSION = '1.0.0';
+export const SERVICE_VERSION = '1.1.0';
 export const BLOCKING_CATALOG_VERSION = 1;
 export const STATIC_BLOCKING_CODES = [
   'JSON_INVALID', 'STRUCTURE_INVALID', 'SECRET_DETECTED', 'MALICIOUS_CODE', 'CREDENTIAL_PLAINTEXT',
@@ -39,6 +40,7 @@ export function configFromEnv(env = process.env) {
     maxConcurrent: num('MAX_CONCURRENT', 4),
     ratePerMinute: num('RATE_PER_MINUTE', 60),
     rateBurst: num('RATE_BURST', 20),
+    reviewMaxInputChars: num('REVIEW_MAX_INPUT_CHARS', 150000),
   };
 }
 
@@ -302,6 +304,43 @@ export async function createStaticService(userConfig) {
       ctx.extra.targetVersion = req.targetVersion;
       ctx.extra.files = req.workflows.map(w => w.path);
       return { status: 200, body: await runCheck(ctx, req) };
+    }
+    // AI 審查（只給建議）：組模型輸入。邏輯在 Pack 的 scripts/review/build-input.mjs，這裡只做輸入檢核與包裝；不呼叫任何模型
+    if (path === '/v1/review/build-input' && method === 'POST') {
+      checkContentHeaders(ctx.req);
+      ctx.callerId = auth.authenticate(ctx.ip, ctx.req.headers.authorization);
+      rate.take(ctx.callerId);
+      const buf = await readBody(ctx.req, cfg.maxBodyBytes);
+      const body = parseJsonBody(buf, 8);
+      if (isObj(body) && typeof body.requestId === 'string' && REQUEST_ID_RE.test(body.requestId)) ctx.requestId = body.requestId;
+      const req = validateBuildInputRequest(body, cfg);
+      ctx.extra.kind = 'review-build-input';
+      ctx.extra.files = req.after.map(w => w.path);
+      const out = await buildInput(req, cfg);
+      ctx.extra.count = out.parts.length;
+      return {
+        status: 200,
+        body: { service: 'static-check', serviceVersion: SERVICE_VERSION, apiVersion: 'v1', packVersion, ...out, durationMs: Date.now() - ctx.started },
+      };
+    }
+    // AI 審查：檢查模型的原始回覆。通過認證後一律回 200 與結果物件（驗證失敗、請求有問題都只是結果內容，不是錯誤碼）；
+    // 只有認證與來源（401、403、認證失敗封鎖的 429）維持原本的錯誤碼。邏輯在 Pack 的 scripts/review/validate-review.mjs。
+    if (path === '/v1/review/validate' && method === 'POST') {
+      ctx.callerId = auth.authenticate(ctx.ip, ctx.req.headers.authorization);
+      const out = await validateAlways(async () => {
+        checkContentHeaders(ctx.req);
+        const buf = await readBody(ctx.req, cfg.maxBodyBytes);
+        const body = parseJsonBody(buf, 4);
+        if (isObj(body) && typeof body.requestId === 'string' && REQUEST_ID_RE.test(body.requestId)) ctx.requestId = body.requestId;
+        return validateRequestOf(body);
+      }, cfg);
+      ctx.extra.kind = 'review-validate';
+      ctx.extra.state = out.result.status;
+      ctx.extra.count = out.result.suggestions.length;
+      return {
+        status: 200,
+        body: { requestId: ctx.requestId, service: 'static-check', serviceVersion: SERVICE_VERSION, apiVersion: 'v1', packVersion, result: out.result, markdown: out.markdown, durationMs: Date.now() - ctx.started },
+      };
     }
     throw new ApiError('NOT_FOUND');
   }

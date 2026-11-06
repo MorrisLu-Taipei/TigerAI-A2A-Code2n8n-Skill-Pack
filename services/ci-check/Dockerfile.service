@@ -13,7 +13,8 @@ COPY --chmod=0644 VERSION /opt/pack/VERSION
 COPY --chmod=0644 docs/node-versions/ /opt/pack/docs/node-versions/
 COPY --chmod=0644 scripts/ci/ /opt/pack/scripts/ci/
 COPY --chmod=0644 scripts/security-scan.mjs scripts/native-first-check.mjs /opt/pack/scripts/
-COPY --chmod=0644 services/ci-check/static-service.mjs services/ci-check/dynamic-front.mjs services/ci-check/dynamic-result.mjs services/ci-check/shared.mjs /opt/pack/services/ci-check/
+COPY --chmod=0644 scripts/review/build-input.mjs scripts/review/validate-review.mjs /opt/pack/scripts/review/
+COPY --chmod=0644 services/ci-check/static-service.mjs services/ci-check/dynamic-front.mjs services/ci-check/dynamic-result.mjs services/ci-check/review-api.mjs services/ci-check/shared.mjs /opt/pack/services/ci-check/
 # 目錄需要可進入；檔案只讀，服務（node 使用者）不能改自己的程式
 RUN find /opt/pack -type d -exec chmod 0755 {} + && chown -R root:root /opt/pack
 
