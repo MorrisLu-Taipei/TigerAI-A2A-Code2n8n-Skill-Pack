@@ -145,6 +145,8 @@ jobs:
         run: node scripts/__test__/run-native-first-tests.mjs
       - name: CI check scripts (scripts/ci) static regression + meta tests
         run: node scripts/__test__/run-ci-tests.mjs
+      - name: Portal bundle (flatten + check) regression tests
+        run: node scripts/__test__/run-portal-bundle-tests.mjs
 
   dependency-cve:
     name: case-study npm audit (HIGH+ is a gate, not advisory — SEC-017)

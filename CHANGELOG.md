@@ -1,7 +1,8 @@
 # Changelog
 
-## 未發布
+## v1.1.0 — 2026-11-06
 
+- **Portal 內建支援**：含 Portal 受限 Agent 模式規格；新增 `scripts/portal/flatten-bundle.mjs`、`check-bundle.mjs` 與範例白名單（把 Skill 攤平成一層、附授權聲明與來源記錄、檢查內容與 Pack 逐位元組相同），測試 `scripts/__test__/run-portal-bundle-tests.mjs` 已接上 CI，更新程序見 `docs/portal-bundle-sync.md`。
 - `skills/_vendor/` 的 6 個 Skill 從上游 n8n-skills v1.9.0 同步到 v1.37.1（commit e037563，2026-10-24）。覆蓋前確認舊檔與 v1.9.0 逐位元組相同，沒有本地修改。
 - 新增 `skills/_vendor/upstream-pins.json`（記錄上游版本、收錄與排除名單、實測過的 n8n 版本）與 `scripts/check-upstream.mjs`（對照釘選版與上游最新版，不在 CI 內執行）；重寫 `skills/_vendor/SOURCE.md` 與同步步驟。
 - 修三支範本（`handover-trace`、`human-approval-gate`、`retry-with-backoff`）的棄用節點：`n8n-nodes-base.function` 改為 `n8n-nodes-base.code`（typeVersion 2）。n8n 2.44.6 以上會拒絕匯入 Function 節點。

@@ -112,6 +112,11 @@ ci-check-scripts-tests:
   script:
     - node scripts/__test__/run-ci-tests.mjs
 
+portal-bundle-tests:
+  stage: scan
+  script:
+    - node scripts/__test__/run-portal-bundle-tests.mjs
+
 dependency-cve:
   stage: scan
   allow_failure: true
