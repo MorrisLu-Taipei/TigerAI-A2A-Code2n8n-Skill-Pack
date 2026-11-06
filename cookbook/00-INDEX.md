@@ -25,13 +25,13 @@
 | # | 範例 | 適用情境 | 主要節點 |
 |---|---|---|---|
 | 01 | [Webhook → Slack 通知](01-webhook-to-slack.md) | 接收外部事件，立即通知團隊 | webhook, slack |
-| 02 | [定時抓資料 → Email 報表](02-schedule-report.md) | 每日/每週統計報表自動寄送 | scheduleTrigger, http, code, gmail |
+| 02 | [定時抓資料 → Email 報表](02-schedule-report.md) | 每日/每週統計報表自動寄送 | scheduleTrigger, httpRequest, code, gmail |
 | 03 | [Form → 驗證 → 寫入資料庫](03-form-to-database.md) | 表單收集資料，寫入後端系統 | formTrigger, if, postgres |
-| 04 | [AI 分類 → 條件分支](04-ai-classify-route.md) | 收信/收訊息後 AI 分類自動處理 | webhook, openAi, switch |
+| 04 | [AI 分類 → 條件分支](04-ai-classify-route.md) | 收信/收訊息後 AI 分類自動處理 | webhook, openAi（langchain 套件）, switch |
 | 05 | [檔案處理 Pipeline](05-file-process-pipeline.md) | PDF/MP3/圖片切分、轉檔、上傳 | formTrigger, httpRequest (FastAPI Worker), code |
 | 06 | [錯誤處理與重試模式](06-error-retry-pattern.md) | API 不穩需要 retry / 失敗回報 | wait, errorTrigger, slack |
 | 07 | [多來源合併](07-multi-source-merge.md) | 同時從多 API 拉資料合併輸出 | merge, set, splitInBatches |
-| 08 | [迴圈批次處理](08-loop-batch-processing.md) | 批次處理大量項目（每筆/每頁）| splitInBatches, code, ifEmpty |
+| 08 | [迴圈批次處理](08-loop-batch-processing.md) | 批次處理大量項目（每筆/每頁）| splitInBatches, set, sendGrid, if, wait |
 
 ---
 

@@ -10,7 +10,7 @@ description: Core skill that converts a Layer 1 Sticky Note (DSL-formatted user 
 ## 1. Trigger conditions
 
 **Explicit triggers**:
-- "build the workflow" / "generate it" / "产 workflow" / "produce workflow"
+- "build the workflow" / "generate it" / "產 workflow" / "produce workflow"
 - User pastes a sticky note draft containing `@trigger:` `@step:` etc. OR plain natural language
 
 **Implicit triggers**:
@@ -68,7 +68,7 @@ Echo in user's original language (don't show DSL).
 - **Failure**: missing `@trigger` or `@step` → if NL path, return to Step 0.1 to retranslate (warn user); if DSL path, refuse and ask for completion
 
 ### Step 2: Pick skeleton
-- Compare against `research/patterns.md` §2 seven Patterns (A–G)
+- Compare against the 14 skeletons in `research/patterns.md` §2 (`webhook-api`, `schedule`, `batch-loop`, ...; names are in that section's overview table); the decision flow is in §5 of that file
 - Highest match wins; ties → simpler one
 - Record "why X over Y" → write to Layer 3 "Node choices"
 
@@ -77,8 +77,16 @@ Echo in user's original language (don't show DSL).
   1. Apply DSL §4 vocabulary mapping
   2. If not found → check `research/node-frequency.md` Top 30 + AI knowledge base
   3. Still not found → DSL §6.2 "downgrade rule"
-- For `@trigger`: apply DSL §3 dictionary (v1.1+ has telegram/slack/discord/googleDrive)
+- For `@trigger`: apply DSL §3 dictionary (v1.1+ has telegram/slack/googleDrive; `discord` has no native trigger node, so the dictionary maps it to Webhook, see the note in DSL §3)
 - For `@branch`: produce `switch` node + multiple outputs; auto-add fallback if missing
+
+### Step 3.5: Native-first
+
+Before creating nodes (Step 4), run the gate in Section 6 of [`spec/native-first.en.md`](../../../spec/native-first.en.md); do not leave it until afterwards:
+
+- List the steps you plan to do with Code, run each through the decision order (expression -> Edit Fields -> native node -> Code), and go native wherever possible; the job-to-node table is in Section 3 of that spec.
+- The DSL §4 vocabulary table maps "aggregate, statistics" and "custom code" to `code`; do not adopt that blindly, run the gate first.
+- For each Code node that remains, write one "Why Code" line in `notes` and add short comments in the code (Section 5 of that spec).
 
 ### Step 4: Generate nodes array
 - Each node fields:
@@ -87,12 +95,14 @@ Echo in user's original language (don't show DSL).
     "id": "<unique>",
     "name": "<ASCII-only-PascalCase>",
     "type": "<typeFromMapping>",
-    "typeVersion": <latest stable>,
+    "typeVersion": <target version's default; latest when default is null>,
     "position": [x, y],
     "parameters": { ... },
-    "notes": "<maps to which Layer 1 @step>"
+    "notes": "<write only for non-obvious settings, explaining why they are set this way; leave obvious nodes empty>"
   }
   ```
+- Always look up `type` and `typeVersion` in the lookup tables of [`docs/node-versions/`](../../../docs/node-versions/README.md) for the target n8n version: a `type` missing from the catalog cannot be used, nodes with `deprecated` or `hidden` set to `true` are not used in new workflows, and the version number is `default` (`latest` when `default` is null); never carry over numbers from another version
+- Write node `notes` per Chapter 7 of [`spec/references-disclosure.en.md`](../../../spec/references-disclosure.en.md); a recommendation about that node (security, native-first) is also written here as one short line (§4.4); the trace back to Layer 1 is carried by the Layer 3 "Mapping to user requirements" block
 - `position.y` strictly enforces three-layer zones: Layer 1 sticky < 0; Layer 2 nodes ∈ [0, 500]; Layer 3 sticky > 600
 - `position.x` increments 220–260px per node by execution order
 
@@ -144,7 +154,7 @@ n8n has two-tier credential validation: activate checks ref exists; execute chec
 | `n8n-nodes-base.telegram` (action) | `telegramApi` |
 
 **Connection-type triggers (CANNOT use stubs)**:
-- `telegramTrigger`, `emailReadImap`, `slackTrigger`, `discordTrigger`, etc.
+- `telegramTrigger`, `emailReadImap`, `slackTrigger`, etc. (n8n has no native `discordTrigger`; see the note in DSL §3)
 - AI MUST use ⚠️ red-flagged warning in Layer 3: "real credential required in n8n before activate"
 - Stubs cause activate to fail (n8n calls real API to verify token)
 
@@ -170,12 +180,19 @@ Same n8n instance can't have 2 active workflows sharing `webhook + path`. When g
   4. Test recipe (≥ 2 cases: golden + error)
   5. Known limits
   6. Mapping to user requirements (each @trigger / @step / @output / @on-error)
-- Apply anti-pattern check (patterns.md §3) — if any triggers, add to "Known limits"
+- Apply anti-pattern check (`research/patterns.md` §3) — if any triggers, add to "Known limits"
+- Per Chapter 4 of [`spec/references-disclosure.en.md`](../../../spec/references-disclosure.en.md), add the "References", "Recommendations" and "Security scan result" blocks right after the title (see Step 8); these three blocks are the official record of recommendations and information
 
 ### Step 7: Validate
 - Via `n8n-api-bridge` Skill, PUT JSON back to n8n (n8n runs built-in schema validation)
 - 422 → AI self-fixes per error message → re-PUT
 - Still fails → report to user with specific issues
+
+### Step 8: After completion: references, recommendations and scan result
+
+- **Log as you go**: from Step 0 on, record every source that was actually read and affected the design in the "reference log" (Step 2 skeleton choice and Step 3 node resolution add the most).
+- **Where this happens**: write it into the Layer 3 note in Step 6; after Step 7 and before delivery, run the security scan on the final workflow JSON and update the note with the result (if the JSON changes again, rescan the final version).
+- Write the references, recommendations and scan result into the Layer 3 note and the relevant node notes, and put only a summary in the conversation. Order, format, statuses and honesty rules follow Chapter 4 of [`spec/references-disclosure.en.md`](../../../spec/references-disclosure.en.md) (scan in Chapter 8) and are not repeated here; the content rules of the recommendations are in [`spec/security-guardrails.en.md`](../../../spec/security-guardrails.en.md) and [`spec/native-first.en.md`](../../../spec/native-first.en.md).
 
 ---
 
@@ -199,7 +216,7 @@ Returns JSON:
   "success": true,
   "workflow": { "name": "...", "nodes": [...], "connections": {...}, "settings": {...} },
   "metadata": {
-    "skeleton_pattern": "B",
+    "skeleton_pattern": "webhook-api",
     "node_count": 11,
     "layer3_warnings": ["missing @on-error; suggested mode B"],
     "downgraded_actions": [],

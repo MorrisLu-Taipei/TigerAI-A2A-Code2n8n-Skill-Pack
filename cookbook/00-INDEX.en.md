@@ -25,13 +25,13 @@ Page contents:
 | # | Recipe | Best for | Key nodes |
 |---|---|---|---|
 | 01 | [Webhook → Slack](01-webhook-to-slack.en.md) | Receive external event, notify team | webhook, slack |
-| 02 | [Schedule → Email report](02-schedule-report.en.md) | Daily/weekly auto reports | scheduleTrigger, http, code, gmail |
+| 02 | [Schedule → Email report](02-schedule-report.en.md) | Daily/weekly auto reports | scheduleTrigger, httpRequest, code, gmail |
 | 03 | [Form → DB insert](03-form-to-database.en.md) | Form data into backend | formTrigger, if, postgres |
-| 04 | [AI classify → route](04-ai-classify-route.en.md) | Auto-route emails by AI classification | webhook, openAi, switch |
+| 04 | [AI classify → route](04-ai-classify-route.en.md) | Auto-route emails by AI classification | webhook, openAi (langchain package), switch |
 | 05 | [File processing pipeline](05-file-process-pipeline.en.md) | PDF/MP3/image split, transcode, upload | formTrigger, httpRequest (FastAPI Worker), code |
 | 06 | [Error retry pattern](06-error-retry-pattern.en.md) | Flaky API needs retry / failure alert | wait, errorTrigger, slack |
 | 07 | [Multi-source merge](07-multi-source-merge.en.md) | Pull from multiple APIs and merge | merge, set, splitInBatches |
-| 08 | [Loop batch processing](08-loop-batch-processing.en.md) | Same processing per item over a batch | splitInBatches, code, ifEmpty |
+| 08 | [Loop batch processing](08-loop-batch-processing.en.md) | Same processing per item over a batch | splitInBatches, set, sendGrid, if, wait |
 
 ---
 

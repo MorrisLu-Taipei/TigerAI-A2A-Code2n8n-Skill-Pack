@@ -1,4 +1,4 @@
-# Sticky Note Three-Layer Structure Spec v1.0
+# Sticky Note Three-Layer Structure Spec v1.1
 
 > 🌐 **English** | [繁體中文](sticky-note-three-layer.md)
 
@@ -69,7 +69,9 @@ Every Layer 1 sticky must contain at least one DSL block. Minimal parsable examp
 ### 3.1 Rules
 - All non-sticky-note nodes belong to this layer
 - `position.y` between `0` and `500`
-- Each node's `notes` field is **required**: one-line mapping to Layer 1's `@step` or `@trigger`
+- A node's `notes` field is written **only for non-obvious settings**, and says why the node is configured that way (see [`references-disclosure.en.md`](references-disclosure.en.md) Chapter 7); obvious nodes are left empty.
+- **Recommendations about the node are written here too** (security recommendations, native-first, why a Code node was used instead of a native node, and so on): one short line using the rule ID; the form is in §4.4 of [`references-disclosure.en.md`](references-disclosure.en.md). Again, only when a reminder is useful.
+- The mapping from nodes to Layer 1 `@step` / `@trigger` is not carried by per-node `notes`. The Layer 3 note carries it through "Node choices" and "Mapped to user requirements" (see §4.2). When a node's `notes` happens to need to say which `@step` it implements, it may do so in passing.
 - `connections` must be complete with no orphan nodes
 
 ### 3.2 Mapping rules
@@ -102,6 +104,17 @@ Every Layer 1 sticky must contain at least one DSL block. Minimal parsable examp
 ```markdown
 ### 🤖 AI implementation notes — <matching Layer 1 block name>
 
+**References**
+- <one line per category; the form, and the wording for "no external template", are in §4.3 of references-disclosure.en.md>
+
+**Recommendations**
+- `<rule ID>`: <Adopted / User chose not to adopt / Cannot be checked automatically yet> (<one-line note, optional>)
+- Not applicable: `<rule ID>`, `<rule ID>`
+- (when there are no recommendations the whole block reads "Recommendations: none")
+
+**Security scan result**
+- <rule name> @ <node name> (<error/warning/acknowledged>); with no hits write "no rule hits found"; format in §8.3 of references-disclosure.en.md
+
 **Node choices**
 - `<node-type>`: rationale (why not alternatives)
 
@@ -120,8 +133,10 @@ Every Layer 1 sticky must contain at least one DSL block. Minimal parsable examp
 - <e.g., No retry implemented; if API fails, will fail directly>
 
 **Mapped to user requirements**
-- @trigger: ... / @step: ...
+- List every Layer 1 `@trigger` / `@step` / `@on-error` and the node (by node name) that implements it: `@step: ...` -> `<node name>`
 ```
+
+The "References", "Recommendations" and "Security scan result" blocks sit right after the title in a fixed order. Their content rules, status names, the conciseness rules for notes and the JSON-string rules **all follow Chapter 4 of [`references-disclosure.en.md`](references-disclosure.en.md)** and are not repeated here. These three blocks are the **official record** of recommendations and information; the conversation carries only a summary. With several Layer 3 notes, they go in the leftmost one.
 
 ### 4.3 Why mandatory?
 - Users understand what decisions AI made without reading code
@@ -206,13 +221,13 @@ When AI parses a workflow, in these cases **must refuse and report**:
   "parameters": {
     "color": 5,
     "width": 400,
-    "height": 280,
-    "content": "### 🤖 AI implementation notes\n\n**Node choices**\n- `webhook`: maps to @trigger\n- `if`: validate amount\n- `googleSheets`: append mode\n\n**Required credentials**\n- [ ] Google Sheets OAuth2\n\n**Test recipe**\n1. POST valid amount → should write\n2. POST amount=-1 → should be blocked by if"
+    "height": 420,
+    "content": "### 🤖 AI implementation notes\n\n**References**\n- No external template was consulted; designed from the requirements and the Pack's built-in spec.\n- Skeleton and statistics knowledge: research/patterns.md §2.1 webhook-api\n- Official/community Skills: none\n- Target n8n version: unspecified (exercised range in docs/n8n-version-compat.md)\n\n**Recommendations**\n- `secret:hardcoded`: Adopted (Google Sheets credentials are referenced through n8n credentials)\n- `webhook:no-auth`: User chose not to adopt\n- `native-first:code-node`: Adopted (no Code nodes used)\n- Not applicable: form:no-auth, exec:ssh\n\n**Security scan result**\n- Rule-based scan (does not mean there are no other risks): 0 hits, 1 acknowledged\n  - `webhook:no-auth` @ Webhook (acknowledged)\n\n**Node choices**\n- `webhook`: maps to @trigger\n- `if`: validate amount\n- `googleSheets`: append mode\n\n**Required credentials**\n- [ ] Google Sheets OAuth2\n\n**Test recipe**\n1. POST valid amount → should write\n2. POST amount=-1 → should be blocked by if"
   }
 }
 ```
 
 ---
 
-**Version**: v1.0
-**Status**: spec locked. All cookbook / DSL / Skills derive from this file.
+**Version**: v1.1
+**Status**: spec locked. All cookbook / DSL / Skills derive from this file. The v1.1 Layer 3 template adds the "References", "Recommendations" and "Security scan result" blocks, defined in Chapter 4 of [`references-disclosure.en.md`](references-disclosure.en.md).

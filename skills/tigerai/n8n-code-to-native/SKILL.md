@@ -16,6 +16,15 @@ The audience for these workflows is **n8n experts who read the canvas but cannot
 5. **Do NOT introduce IIFE `(() => { ... })()` in expressions.** That is JS in disguise and defeats the purpose. If the logic needs IIFE, either (a) split into two sequential Set nodes so each step is one expression, or (b) keep it as a Code node.
 6. **Keep what genuinely belongs in code.** See "Keep as Code" below. Forcing every Code node into native makes things worse.
 
+## Native-first
+
+This Skill is not only for "convert when the user asks". It is also the **self-check step after generating** a workflow, under [`spec/native-first.en.md`](../../../spec/native-first.en.md):
+
+- **After any Skill generates or modifies a workflow**, if the result contains Code nodes (`n8n-nodes-base.code`, or the legacy `function` / `functionItem`), first run the gate in Section 6 of that spec on each one: expression -> Edit Fields -> native node -> Code (the job-to-node table is in its Section 3). Only then decide whether to convert.
+- **A Code node that passes the gate stays**, with a "Why Code" line in its `notes` and short comments in its code. A Code node with no specific reason is converted using the rubric in Step 2 below.
+- **Without a user request**, converting in place (one Code node becoming one native node) is allowed as part of the self-check; anything that adds nodes or re-wires connections (rule 2 above) still needs the user's go-ahead.
+- This does not change the rules below; it only adds a second entry point. The "Keep as Code" list below and Section 4 of the spec describe the same kind of cases.
+
 ## Process
 
 ### Step 1 — Inventory
@@ -44,15 +53,15 @@ for f in sorted(glob.glob("*.json")):
 | Pure-JS crypto polyfill (SHA-1, UUID v5) | **Crypto node** (n8n native) for SHA-1; UUID v5 needs Crypto + Set + bit-twiddling expressions — feasible but separate effort. Default: keep |
 | Dynamic nested object/filter assembly with conditional branches (e.g. Qdrant filter built from for-loops) | **Keep as Code** |
 
-### Step 3 — Convert in-place (Set node, typeVersion 3.4)
+### Step 3 — Convert in-place (Set node)
 
-The Set v3.4 node shape used in these workflows:
+The Set node (v3 family) shape used in these workflows. Take `typeVersion` from the target n8n version's lookup table in [`docs/node-versions/`](../../../docs/node-versions/README.md) (the `default` of `n8n-nodes-base.set` is 3.5 in 2.37.3, 2.44.6 and 2.46.6; the lookup table is authoritative):
 
 ```json
 {
   "name": "Build Callback",
   "type": "n8n-nodes-base.set",
-  "typeVersion": 3.4,
+  "typeVersion": 3.5,
   "parameters": {
     "assignments": {
       "assignments": [
@@ -85,9 +94,15 @@ Format: `v<file-internal-version> <YYYY-MM-DD>: <what changed in plain language>
 
 ### Step 5 — Verify before committing
 
-- Re-read the node JSON: type is `n8n-nodes-base.set`, typeVersion is `3.4`, parameters has `assignments.assignments[]`.
+- Re-read the node JSON: type is `n8n-nodes-base.set`, typeVersion matches the lookup table's `default` for the target version, parameters has `assignments.assignments[]`.
 - Node count and connections unchanged for in-place swaps (count by `n['type']` before/after; connections map is by name → still valid).
 - Manually import one converted workflow into n8n and run an execution if the user can spare the time; otherwise list the converted nodes in the commit message so the user can spot-check.
+
+### Step 6 — After completion: references, recommendations and scan result
+
+- **Where this happens**: after Step 5, before delivering the converted workflow. Log as you go from Step 1: record what you actually read that affected the conversion (for example the "Keep as Code" list, an official Skill under `skills/_vendor/`, the target n8n version). Run the security scan on the final workflow JSON (after the Step 4 change-log edit), not on an earlier copy.
+- Write the references, recommendations and scan result into the Layer 3 note (if the workflow has one, keep earlier entries) and the relevant node notes, and put only a summary in the conversation. Order, format, statuses and honesty rules follow Chapter 4 of [`spec/references-disclosure.md`](../../../spec/references-disclosure.md) (scan in Chapter 8) and are not repeated here.
+- **Conversion-specific detail**: the `native-first:code-node` line in the recommendations ([`spec/native-first.md`](../../../spec/native-first.md) Chapter 7) is the place to state the before/after count of `n8n-nodes-base.code` nodes (the Step 1 inventory gives "before", the Step 5 count gives "after") and how many were deliberately kept as Code, with a reason per kept node in that node's `notes`.
 
 ## What to KEEP as Code (do not convert)
 
@@ -118,7 +133,7 @@ Format: `v<file-internal-version> <YYYY-MM-DD>: <what changed in plain language>
 
 ## Common pitfalls
 
-- **`includeOtherFields` semantics**: by default Set v3.4 returns ONLY the assigned fields. To preserve input fields and add new ones, set `parameters.includeOtherFields: true` at the parameter level (NOT inside `options`). Verify in the n8n UI after import.
+- **`includeOtherFields` semantics**: by default the Set v3 family (3.4 and later) returns ONLY the assigned fields. To preserve input fields and add new ones, set `parameters.includeOtherFields: true` at the parameter level (NOT inside `options`). Verify in the n8n UI after import.
 - **`$('NodeName').first()` errors** if the referenced node hasn't run on this execution path. Wrap with `?.`: `{{ $('X')?.first()?.json?.y ?? 0 }}`. If the original Code wrapped this in try/catch, that's a signal the node may be optional — preserve safety.
 - **Sticky note encoding**: workflow JSONs are UTF-8. When editing via Python, open with `encoding='utf-8'` and dump with `ensure_ascii=False` to keep Chinese readable in the JSON.
 - **Don't rename nodes.** Connections key by node name. Renaming requires also updating `d['connections']`. Not worth it.

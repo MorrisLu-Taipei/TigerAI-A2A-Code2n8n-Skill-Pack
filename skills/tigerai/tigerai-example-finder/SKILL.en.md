@@ -232,7 +232,7 @@ Rules:
 4. **Say honestly when nothing is found**: say "no close example, I suggest designing directly" and suggest Q&A mode; do not stretch a weak match.
 5. **Do not pretend to know**: if unsure what a template does, say so; if you did not read its content, do not describe details.
 6. **Ask before querying**: always get the user's consent before connecting to n8n.io, and consent again before fetching full content.
-7. **Name the reference**: every non-local example needs an ID, title and URL so the user knows which one was referenced.
+7. **Name the reference**: every non-local example needs an ID, title and URL so the user knows which one was referenced (this is the in-conversation "Referenced template" label; it is also written into the note in the end, see Section 10).
 8. **Never copy or import**: do not paste template JSON into the output, do not import into the user's n8n, do not store in the repo.
 
 ---
@@ -243,3 +243,11 @@ Rules:
 - **Vs `cookbook/`**: first search source
 - **Vs `research/`**: digested skeleton and anti-pattern knowledge, the basis for judging and gatekeeping
 - **Vs `sticky-note-to-workflow`**: hand off once the user picks an approach
+
+---
+
+## 10. After completion: references, recommendations and scan result
+
+- **Where this happens**: this Skill does not generate workflows itself. When the user picks an approach and you hand off to `sticky-note-to-workflow`, pass along the local examples that were consulted and the n8n.io templates the user agreed to look up (ID, title, URL, old-vs-new differences) so they go into the reference log.
+- The "Referenced template" format in Section 6 stays as the immediate label during example selection; the final references are written into the Layer 3 note and the relevant node notes by Step 8 of `sticky-note-to-workflow`, with only a summary in the conversation. Order, format and honesty rules follow Chapter 4 of [`spec/references-disclosure.en.md`](../../../spec/references-disclosure.en.md) and are not repeated here.
+- If the user picks no example and no workflow is produced, none of this is needed.

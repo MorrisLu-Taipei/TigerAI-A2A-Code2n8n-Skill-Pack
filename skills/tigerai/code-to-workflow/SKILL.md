@@ -142,6 +142,8 @@ Build the workflow with **n8n native nodes by default**, HTTP Request only when 
 2. APIs with no native n8n node at all (LINE Messaging API, Google Gemini at the moment).
 3. Multi-resource batch operations where the native node would require 5+ chained nodes when 1 HTTP call does the same.
 
+**Native-first applies to Code nodes too.** Before creating nodes, run the gate in Section 6 of [`spec/native-first.en.md`](../../../spec/native-first.en.md): list every step you were about to write as a Code node, run each through expression -> Edit Fields -> native node -> Code, and keep Code only for what remains. This matters most here, because ported source code is full of loops and helper functions that look like Code nodes but are usually Summarize, Aggregate, Merge, Filter, Remove Duplicates or HTTP Request pagination. Every Code node that stays carries a "Why Code" line in its `notes` and short comments in its code.
+
 **Mark every HTTP fallback with a 🟡 sticky note explaining why** — it's the difference between "I lazily reached for HTTP" and "this is the only correct path." The Google Workspace example has 3 sticky-noted HTTP fallbacks; everything else is native.
 
 ### Step 6 — 3-layer validation funnel
@@ -179,6 +181,12 @@ Every Code2n8n port ships with these documents. They are not optional — they a
 | `TODO.md` | What was *not* finished, decision points, scope deferrals | LINE CS cloud has the model TODO |
 
 Every preserved data item (subfolder names, sheet headers, default rows, dropdown choices) **goes into PROVENANCE.md with the upstream line number**, pinned to a specific commit SHA. This is the difference between "we ported it" and "we ported it and can prove it."
+
+## After completion: references, recommendations and scan result
+
+- **Where this happens**: at the end of Step 7, for every workflow the port produced. From Step 1 on, log each source that was actually read and affected the design (a case-study example you modelled the architecture on, `research/` sections, sibling or vendored Skills, n8n.io templates the user agreed to look up). The code being ported is a different thing: it is credited in `CREDITS.md` / `PROVENANCE.md` (Step 7), not here.
+- Write the references, recommendations and scan result into each workflow's Layer 3 note and the relevant node notes, and put only a summary in the conversation. Order, format, statuses and honesty rules follow Chapter 4 of [`spec/references-disclosure.en.md`](../../../spec/references-disclosure.en.md) (scan in Chapter 8) and are not repeated here.
+- Run `node scripts/security-scan.mjs <workflow.json>` on each final workflow JSON before delivery and put the result in the note; it complements the Step 6 static lint and does not replace it. The 🟡 sticky note for every HTTP fallback (Step 5) stays.
 
 ## Real-world gotchas catalogue
 

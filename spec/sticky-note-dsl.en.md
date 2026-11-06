@@ -152,9 +152,13 @@ Cross-branch shared steps (e.g. all paths must write audit log) — don't repeat
 | `error` | `n8n-nodes-base.errorTrigger` | `@trigger: error` (build global error workflow) |
 | `telegram` | `n8n-nodes-base.telegramTrigger` | `@trigger: telegram bot receives message` |
 | `slack` | `n8n-nodes-base.slackTrigger` | `@trigger: slack message event` |
-| `discord` | `n8n-nodes-base.discordTrigger` | `@trigger: discord` |
+| `discord` | `n8n-nodes-base.webhook` (n8n has no native Discord trigger node; see note below) | `@trigger: discord` |
 | `googleDrive` | `n8n-nodes-base.googleDriveTrigger` | `@trigger: googleDrive new file` |
 | `executeWorkflow` | `n8n-nodes-base.executeWorkflowTrigger` | `@trigger: executeWorkflow` (sub-workflow entry) |
+
+> **Whether a node exists is decided by [`docs/node-versions/`](../docs/node-versions/README.md)**: every node type in the table above is present in the node catalogs of n8n 2.37.3, 2.44.6 and 2.46.6, except `discord`.
+>
+> **Discord trigger**: none of these three catalogs contains `n8n-nodes-base.discordTrigger`; n8n has no native Discord trigger node. For `@trigger: discord`, the AI generates `n8n-nodes-base.webhook` instead, with the user's Discord bot or a relay service forwarding events to that Webhook URL, and states in Layer 3 that "n8n has no native Discord trigger node; events must be forwarded by you". (Tried on 2.46.6: the API accepts a workflow containing `discordTrigger`, but activating it returns `Unrecognized node type`.) Trigger nodes from community packages (community templates have used `n8n-nodes-discord-trigger`) are not in the native catalog; the AI does not use them by default, and when the user explicitly asks for one, Layer 3 must flag the risk. To send messages to Discord, use `n8n-nodes-base.discord` (see §4.3).
 
 ---
 
@@ -202,7 +206,7 @@ Cross-branch shared steps (e.g. all paths must write audit log) — don't repeat
 ### 4.5 Files
 | Keywords | Node |
 |---|---|
-| "save temp", "write file" | `writeBinaryFile` / `readWriteFile` |
+| "save temp", "write file" | `readWriteFile` (`writeBinaryFile` is marked hidden in the 2.37.3, 2.44.6 and 2.46.6 catalogs; do not use it in new workflows) |
 | "FastAPI Worker", "call worker" | `httpRequest` (TigerAI convention) |
 
 ---
@@ -292,7 +296,7 @@ When user-described action has no native node, AI must downgrade in this order:
 |---|---|
 | "log to console", "print log" | `noOp` + Layer 3 "n8n has no console; check execution log" |
 | "ignore error", "fail silently" | `continueOnFail=true` on the failing node |
-| "cleanup file", "rm -rf", "delete temp" | `executeCommand` (if host enables) or Layer 3 "build separate cleanup workflow" |
+| "cleanup file", "rm -rf", "delete temp" | None of the three catalogs contains `executeCommand`, so do not generate it. State in Layer 3 "build a separate cleanup mechanism", or call the Worker's cleanup endpoint with `httpRequest`; the `ssh` node exists but is high-risk, so assess it against [`security-guardrails.en.md`](security-guardrails.en.md) first |
 | "wait N minutes then redo" | `wait` + same node re-execute |
 | "send system notification" (no service specified) | `slack` default; no credential → `gmail`; none → `httpRequest` to any webhook |
 | Nothing matches | **Refuse** + list "ambiguous actions" for user clarification |

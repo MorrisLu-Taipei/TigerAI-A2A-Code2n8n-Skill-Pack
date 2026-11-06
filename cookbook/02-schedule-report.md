@@ -83,7 +83,7 @@ On failure, notify Slack #ops-alert.
 ### 🤖 AI 實作說明 — 銷售日報
 
 **節點選型**
-- `scheduleTrigger`：比 cron 節點新且支援多種頻率定義
+- `scheduleTrigger`：比 cron 節點新（cron 在 2.37.3、2.44.6、2.46.6 的節點目錄都標為隱藏）且支援多種頻率定義
 - `code`：統計邏輯用 JS 一次寫完，比多個 `set` + `aggregate` 簡潔
 - `gmail`：原生節點，自動處理 OAuth refresh
 

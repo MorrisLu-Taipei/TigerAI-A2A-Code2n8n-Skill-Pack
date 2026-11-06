@@ -406,6 +406,8 @@ v0.36.0 SEC-017 修補 commit `456c311` 之後，本 SKILL 的 critic gate 會�
 
 - **Main 動作**：套 [`examples/templates/`](../../../examples/templates/) 三個模板（retry-with-backoff / human-approval-gate / handover-trace），加上案例特定 workflow（入口 webhook / scheduler / 對帳 / 月結 / failover）。
 - **Artefact**：`<case-dir>/workflows/*.workflow.json`。
+- **原生節點優先**：產生 workflow 前先依 [`spec/native-first.md`](../../../spec/native-first.md) 第 6 章過一次閘門（列出打算用 Code 的步驟 → 運算式 → Edit Fields → 原生節點 → 才用 Code）。保留的 Code 節點，`notes` 寫「為什麼用 Code」一行並加程式註解；§1.7 的 `[TEST]` 測試注入節點屬正當用途，但仍計入 Code 節點數（理由寫「測試注入，預設停用」）。
+- **Critic gate（原生節點優先）**：每個 Code 節點是否都有 notes 理由？能用 Summarize／Aggregate／Merge／Filter／Crypto／XML／HTTP Request 分頁等原生節點處理的，是否仍被寫成 Code？
 - **Critic gate**：是否套 v0.28.0 HTTP `fullResponse: true`、`$execution.resumeUrl`、`responseNode` 固定 schema、`Asia/Taipei` (或對應 tz)、`Convert to File`？dead-letter 是否實際接線（非 orphan node）？
 
 ### Stage 6 — V&V Layer 1
@@ -478,6 +480,11 @@ v0.36.0 SEC-017 修補 commit `456c311` 之後，本 SKILL 的 critic gate 會�
   - **無禁用詞彙**（依 v0.28.1 A2A directive 禁用詞表 — 中英共 9 種同義詞）。
   - PENDING 行明確標註原因。
 - **Sign-off**：critic 簽 `REVIEW-SIGN-OFF.md`，含 critic agent 識別 + 時間戳。
+
+### 完成後：參考來源、建議事項與掃描結果
+
+- **在哪個步驟做**：本 Skill 是管線型 Skill，這一步在**管線最後一個階段（Stage 11）** 執行；Stage 0–10 邊做邊記「參考紀錄」，不在中途各自寫入。每個子階段實際讀過且影響設計的資料都彙總進同一份紀錄（例如 Stage 2 的 partition 依據、Stage 3 的 SECURITY-REVIEW 參考、Stage 5 產生 workflow 所用的骨架與範例、Stage 10 的目標 n8n 版本），同一來源在不同階段用到就合併成一條。
+- 把參考來源、建議事項與掃描結果寫進每個產出 workflow 的 Layer 3 便條與相關節點 notes，對話只放摘要；`COMPLETION-REPORT.md` 只摘要並指向這些註解。順序、格式、狀態與誠實規則依 [`spec/references-disclosure.md`](../../../spec/references-disclosure.md) 第 4 章（掃描見第 8 章），本 Skill 不重複；資安掃描對最終要上架的每個 workflow JSON 執行（Stage 10 之前若又改過 JSON，對最終版重掃）。語言依 §1.5 的語言鎖定規則，與使用者發起時的語言一致。
 
 ---
 
@@ -554,6 +561,7 @@ examples/<repo-name>-n8n/
 - [ ] SECURITY-REVIEW.md 13+ SEC-### 結構化 finding（不少於 5 個）
 - [ ] Stage 10 ACTIVATION-LOG 含所有 workflow id + tag
 - [ ] COMPLETION-REPORT 無禁用詞彙、claim ↔ evidence 對齊
+- [ ] 每個產出的 workflow 的 Layer 3 便條含「參考來源」「建議事項」「資安掃描結果」，COMPLETION-REPORT 與收尾訊息只放摘要並指向註解（依 `spec/references-disclosure.md`）
 - [ ] REVIEW-SIGN-OFF 含 critic agent 識別與時間戳
 
 任一未過 → critic 不簽 → pipeline 未完成。

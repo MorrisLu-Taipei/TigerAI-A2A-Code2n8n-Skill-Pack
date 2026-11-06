@@ -80,6 +80,8 @@ User: Done
   >   How would you like to split?"
 - User insists on single workflow → AI complies but Layer 3 must note "expected node count > 25, hard to maintain"
 
+**Native-first (design-stage reminder)**: when planning and rephrasing steps, first think of whether an n8n native node can do it (Summarize for totals, Sort plus Limit for top-N, Merge for joining two datasets) instead of defaulting to "write code for this step". This is an internal planning principle: **do not** raise terms like Code node or native node with the user; if a described step seems to need custom code, ask in plain language what result they actually want. The basis and decision order are in [`spec/native-first.en.md`](../../../spec/native-first.en.md); the gate and the disclosure are run by `sticky-note-to-workflow` after the handoff.
+
 ---
 
 ### Stage 4: Output (max 2 questions)
@@ -127,6 +129,14 @@ On failure: [ignore / notify / retry]
 ```
 
 After confirmation, calls `sticky-note-to-workflow` Skill to produce the workflow. The latter internally translates the natural language to strict format (DSL), but **the user never sees DSL throughout**.
+
+### After completion: references, recommendations and scan result
+
+This Skill does not generate workflows itself, so this part has two halves:
+
+- **Where this happens**: during the interview, if any material was consulted to offer choices or suggestions (for example explaining with a cookbook example, or looking up an n8n.io template with the user's consent), record it in the "reference log"; if nothing was consulted, record nothing and do not fill in. When the draft is confirmed and handed to `sticky-note-to-workflow`, pass the reference log along.
+- Writing the references, recommendations and scan result into the Layer 3 note and the relevant node notes, with only a summary in the conversation, is done by Step 8 of `sticky-note-to-workflow`; this Skill does not scan again. Order, format and honesty rules follow Chapter 4 of [`spec/references-disclosure.en.md`](../../../spec/references-disclosure.en.md).
+- If the user leaves midway (for example "I'll write it myself") and no workflow is produced, none of this is needed. Any summary shown to the user is in plain language, without technical terms (keep the principle in Section 1).
 
 > ⚠️ **All AI-shown drafts to users use plain language**. Technical formats (@trigger / @step etc.) are passed only between Skills internally — **never displayed to the user**.
 
