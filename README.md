@@ -45,7 +45,7 @@ We're also contributing an upstream-issue draft back: [`docs/upstream-issues/pai
 
 Receipts for the ✅ column: [`docs/responsibility-matrix.md`](docs/responsibility-matrix.md) (status per claim) and [`tests/REPORT-v0.24.1-evidence.md`](tests/REPORT-v0.24.1-evidence.md) (fresh dated evidence).
 
-> 📊 **The whole pack in one picture**: Natural-language intent *or* an existing program system → Code2n8n Skill Pack (Cookbook + digested statistics of 13,947 official public n8n.io templates *referenced, never copied; the repo ships no template files* + DSL v1.2 + **15 skills** + 4 enterprise patterns) → decides what logic stays as code vs lifts into an n8n node → emits a reviewable, hand-off-able, cross-system n8n workflow.
+> 📊 **The whole pack in one picture**: Natural-language intent *or* an existing program system → Code2n8n Skill Pack (Cookbook + digested statistics of 13,947 official public n8n.io templates *referenced, never copied; the repo ships no template files* + DSL v1.2 + **31 skills** + 4 enterprise patterns) → decides what logic stays as code vs lifts into an n8n node → emits a reviewable, hand-off-able, cross-system n8n workflow.
 > *by n8n Taipei Ambassador Morris Lu*
 
 ---
@@ -72,7 +72,7 @@ Code2n8n **does not transliterate every line of Python or JavaScript into nodes*
 
 ### 🧪 Case study evidence — samples of the methodology applied, not the deliverable
 
-> The deliverable is the **methodology + 15 SKILLs + templates + V&V gate (§10 two-layer + A2A 11-language + §1.6 lexical) + main/critic architecture** above. Case studies below are **evidence of methodology applied to real codebases**, kept in `examples/` as reference. More will be added as new GitHub repos go through the [`code2n8n-pipeline`](skills/tigerai/code2n8n-pipeline/SKILL.md) SKILL. Each case maintains its own `SECURITY-REVIEW.md` and (where the case surfaced new methodology gaps) `REFLECTION.md`.
+> The deliverable is the **methodology + 31 SKILLs + templates + V&V gate (§10 two-layer + A2A 11-language + §1.6 lexical) + main/critic architecture** above. Case studies below are **evidence of methodology applied to real codebases**, kept in `examples/` as reference. More will be added as new GitHub repos go through the [`code2n8n-pipeline`](skills/tigerai/code2n8n-pipeline/SKILL.md) SKILL. Each case maintains its own `SECURITY-REVIEW.md` and (where the case surfaced new methodology gaps) `REFLECTION.md`.
 
 | Case | Upstream → n8n | Methodology status |
 |---|---|---|
@@ -106,12 +106,19 @@ This Skill Pack is itself a working demo of **Agentic Engineering**:
 
 ### Agentic footprints in this repo
 
-- **`skills/`** — `plugin.json` registers **15 Claude Code / Antigravity skills** (incl. v0.30.0 `code2n8n-pipeline` auto-pilot); each `SKILL.md` is co-authored by humans and AI
+- **`skills/`** — `plugin.json` registers **31 Claude Code / Antigravity skills** (21 vendored + 10 TigerAI, incl. v0.30.0 `code2n8n-pipeline` auto-pilot); each `SKILL.md` is co-authored by humans and AI
 - **`.agent/workflows/`** — Antigravity-native agentic workflows (e.g. `/install-n8n-pack` one-shot installer)
 - **`cookbook/`** — 8 natural-language → workflow examples showing how to "talk to" the AI
 - **`spec/sticky-note-three-layer.md`** — Three-layer structure spec that forces reviewable AI output
-- **`research/patterns.md`** — 7 canonical skeletons + anti-patterns digested from statistics over 13,947 official public n8n.io templates (digested locally; the repo ships no template files)
+- **`research/patterns.md`** — 14 skeletons plus anti-patterns and a decision flow (§2, §3, §5), digested from statistics over 13,947 official public n8n.io templates (digested locally; the repo ships no template files)
 - **Official n8n.io templates (live lookup)** — when finding examples, the AI first asks whether you want it to search n8n.io; it only looks if you agree, only references the approach, names the template ID, and never copies or imports it
+
+### How this Pack relates to n8n's official skills
+
+- **Positioning**: n8n's official skills (`skills/_vendor/*-official`, from [n8n-io/skills](https://github.com/n8n-io/skills)) provide the methodology and best practices. This Pack additionally provides statistics and skeleton patterns digested from 13,947 public n8n.io templates (`research/`); when it finishes a task, it tells you which of that material it consulted.
+- **Where this Pack differs**: it formalises annotation as a three-layer sticky note (user requirement, AI implementation notes, reference sources). You can describe a requirement in a sticky note, the AI reads the note to produce the workflow, and every finished workflow ends with its reference sources attached.
+- **MCP versus REST**: the official skills are written for the n8n MCP tools. This Pack is REST-only. When an official skill asks for an MCP tool, see [`docs/mcp-to-rest-map.md`](docs/mcp-to-rest-map.md) for the REST equivalent, or for the capabilities that have none in REST-only mode.
+- **Unmodified**: the 15 official skill folders are included exactly as upstream published them (pinned in [`skills/_vendor/SOURCE.md`](skills/_vendor/SOURCE.md)); we only add a copy of the Apache-2.0 `LICENSE` to each folder.
 
 ### Who should study this project
 
@@ -214,9 +221,9 @@ TigerAI-Code2n8n-Skill-Pack/
 ├── cookbook/                  ← 8 copy-paste recipes (each has plain-language + DSL fold)
 │   └── 00-INDEX.md/.en.md
 │
-├── skills/                    ← 15 skills (plugin.json manifest matches on-disk)
-│   ├── _vendor/                  6 vendor n8n-skills (MIT)
-│   └── tigerai/                  8 TigerAI execution skills
+├── skills/                    ← 31 skills (plugin.json manifest matches on-disk)
+│   ├── _vendor/                  21 vendored skills: 6 czlonkowski/n8n-skills (MIT) + 15 n8n-io/skills (Apache-2.0, unmodified)
+│   └── tigerai/                  10 TigerAI skills
 │       ├── code-to-workflow/        ← Marquee: existing code / system → n8n
 │       ├── n8n-security-governance/ ← Security + version control + CI/CD + rollback gate
 │       └── n8n-code-to-native/      ← Code node → native n8n nodes
@@ -262,7 +269,7 @@ TigerAI-Code2n8n-Skill-Pack/
 3. Security, version control, CI/CD, and rollback gate: `skills/tigerai/n8n-security-governance/SKILL.md`
 4. Building from scratch intent: `skills/tigerai/sticky-note-to-workflow/SKILL.md`
 5. `skills/tigerai/n8n-api-bridge/SKILL.md`: n8n REST API SOP
-6. `research/patterns.md`: 7 standard skeletons + anti-patterns
+6. `research/patterns.md`: 14 skeletons, anti-patterns and the decision flow
 
 ### I have existing code I want to move into n8n
 1. Read [`CODE2N8N.md`](CODE2N8N.md) first to understand the "keep in code / lift to flow" split
@@ -306,7 +313,7 @@ TigerAI-Code2n8n-Skill-Pack/
 |---|---|
 | AI-written workflows are inconsistent, hard to review | Enforce three-layer structure |
 | Users don't know how to describe what they want | Plain-language stickies + 8 cookbooks + Q&A mode |
-| AI doesn't know n8n well enough | 6 vendor official Skills + digested statistics of 13,947 official n8n.io templates |
+| AI doesn't know n8n well enough | 21 vendored Skills (6 community MIT + 15 from n8n's official `n8n-io/skills`) + digested statistics of 13,947 official n8n.io templates |
 | Don't know what existing code to keep vs move into n8n | `code-to-workflow` 7-step methodology + 3 empirical case studies |
 | AI-written code demos fine but auth / SQL / secret management may not ship | Mandatory **Step 1.5 security audit**; unresolved findings disclosed via `SECURITY-CAVEATS.md` |
 | No enterprise-grade patterns | 4 pillars: Atomic Orchestration / Universal Worker / SDD / Security |
@@ -403,15 +410,20 @@ Current version: see [`VERSION`](VERSION). All changes: [`CHANGELOG.md`](CHANGEL
 
 ## 📜 License
 
-**The whole pack is now MIT-licensed.** See the root [`LICENSE`](LICENSE) file.
+This repository contains content under three licenses. We do not relicense anyone's work; each part keeps the license its author chose.
 
-- `skills/_vendor/`: MIT — from [czlonkowski/n8n-skills](https://github.com/czlonkowski/n8n-skills), see `skills/_vendor/LICENSE`
-- Template data: the repo ships no n8n.io template files; `research/` keeps only statistics and a few representative template IDs. The community workflow corpus included in earlier versions has been removed - see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
-- `examples/line-ai-customer-service-onprem/`: derived from MIT-licensed `scorpioliu0953/ai_customer_service`, attribution chain in the example's `CREDITS.md`.
-- `examples/einvoice-n8n/`: derived from MIT-licensed [`paid-tw/einvoice`](https://github.com/paid-tw/einvoice) TypeScript SDK (5 providers, MIG 4.0). The Pack's `svc/` Hono wrapper + 14 n8n workflows + SECURITY-REVIEW + Amego sandbox runtime test runner are MIT-authored by TigerAI on top of the upstream SDK. SDK adapter source code is consumed via `npm install @paid-tw/einvoice*` with exact-pin (per [SEC-017](examples/einvoice-n8n/SECURITY-REVIEW.md)); no SDK source is vendored into this repo.
-- The rest (TigerAI-authored skills, cookbook, specs, docs, install scripts, manifesto, marquee `code-to-workflow` skill): **MIT** (Copyright (c) 2026 Morris Lu / TigerAI).
+| Part | License |
+|---|---|
+| This Pack's own content (`skills/tigerai/`, `cookbook/`, `spec/`, `docs/`, scripts, and so on) | MIT, Copyright (c) 2026 Morris Lu / TigerAI (root [`LICENSE`](LICENSE)) |
+| 6 community skills in `skills/_vendor/` (from [czlonkowski/n8n-skills](https://github.com/czlonkowski/n8n-skills), pinned v1.37.1) | MIT, Copyright (c) 2025 Romuald Członkowski |
+| 15 official skills in `skills/_vendor/*-official` (from [n8n-io/skills](https://github.com/n8n-io/skills), included unmodified) | Apache-2.0, Copyright 2026 n8n GmbH |
 
-Full third-party notices: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+Every skill folder carries its own `LICENSE`, so the license text travels with the folder when the installer copies it. The `examples/` folders derived from MIT-licensed projects, the removed community corpus, and the n8n.io templates (statistics only, no template files shipped) are listed in the central index.
+
+- Central license index: [`LICENSES.md`](LICENSES.md)
+- Full third-party notices: [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
+
+**Trademark notice**: TigerAI is not affiliated with, partnered with, or endorsed by n8n GmbH. "n8n" is a trademark of n8n GmbH; this project uses the name only descriptively.
 
 ---
 

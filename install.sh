@@ -17,6 +17,21 @@ VENDOR_SKILLS=(
   n8n-node-configuration
   n8n-code-javascript
   n8n-code-python
+  n8n-agents-official
+  n8n-ai-nodes-official
+  n8n-binary-and-data-official
+  n8n-code-nodes-official
+  n8n-credentials-and-security-official
+  n8n-data-tables-official
+  n8n-debugging-official
+  n8n-error-handling-official
+  n8n-expressions-official
+  n8n-extending-mcp-official
+  n8n-loops-official
+  n8n-node-configuration-official
+  n8n-subworkflows-official
+  n8n-workflow-lifecycle-official
+  using-n8n-skills-official
 )
 TIGERAI_SKILLS=(
   sticky-note-to-workflow
@@ -28,7 +43,7 @@ TIGERAI_SKILLS=(
   n8n-security-governance
   n8n-code-to-native
 )
-EXPECTED_COUNT=$(( ${#VENDOR_SKILLS[@]} + ${#TIGERAI_SKILLS[@]} ))   # 14
+EXPECTED_COUNT=$(( ${#VENDOR_SKILLS[@]} + ${#TIGERAI_SKILLS[@]} ))   # 29 (21 vendor + 8 TigerAI)
 
 usage() {
   cat <<EOF
@@ -49,7 +64,7 @@ Behaviour:
   * If neither parent dir exists, falls back to Claude.
   * "--target claude" or "--target antigravity" forces a single target.
   * Re-running is safe: existing skill folders are removed and recopied.
-  * Post-install verifies $EXPECTED_COUNT/14 skill folders landed in each target.
+  * Post-install verifies all $EXPECTED_COUNT skill folders landed in each target.
 EOF
 }
 

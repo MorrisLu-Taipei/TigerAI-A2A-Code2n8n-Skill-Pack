@@ -45,7 +45,7 @@ MIT 授權讓本 Pack 能把 SDK 包成 svc + n8n 治理層對外發布 — 是 
 
 ✅ 欄位的證據放這裡：[`docs/responsibility-matrix.md`](docs/responsibility-matrix.md)（逐項狀態）、[`tests/REPORT-v0.24.1-evidence.md`](tests/REPORT-v0.24.1-evidence.md)（最新驗收紀錄）。
 
-> 📊 **一張圖看懂**：自然語言需求或既有程式系統 → Code2n8n Skill Pack（Cookbook + n8n.io 13,947 個官方公開範本的消化統計 *範本只被參考、不被複製，repo 不含範本檔* + DSL v1.2 + 15 個 Skill + 4 大企業模式）→ 分析哪些邏輯留在程式、哪些上升為 n8n 節點 → 產出可檢查、可交接、可跨系統編排的 workflow。
+> 📊 **一張圖看懂**：自然語言需求或既有程式系統 → Code2n8n Skill Pack（Cookbook + n8n.io 13,947 個官方公開範本的消化統計 *範本只被參考、不被複製，repo 不含範本檔* + DSL v1.2 + 31 個 Skill + 4 大企業模式）→ 分析哪些邏輯留在程式、哪些上升為 n8n 節點 → 產出可檢查、可交接、可跨系統編排的 workflow。
 > *by n8n Taipei Ambassador Morris Lu*
 
 ---
@@ -72,7 +72,7 @@ Code2n8n **不是逐行把 Python 或 JavaScript 翻成節點**。它做的是�
 
 ### 🧪 案例見證 — 方法論被套用後的樣本，不是 Pack 的賣點
 
-> Pack 的賣點是上方的**方法論 + 15 個 SKILLs + templates + V&V gate（§10 兩層 + A2A 11 語 + §1.6 lexical）+ main/critic 雙 agent 架構**。下面這些案例是**方法論被套到真實程式碼後的樣本**，放在 `examples/` 當參考。每個案例獨立負責自己的 `SECURITY-REVIEW.md`（必要時還有 `REFLECTION.md`）。未來會有更多 GitHub repo 透過 [`code2n8n-pipeline`](skills/tigerai/code2n8n-pipeline/SKILL.md) SKILL 自動加入。
+> Pack 的賣點是上方的**方法論 + 31 個 SKILLs + templates + V&V gate（§10 兩層 + A2A 11 語 + §1.6 lexical）+ main/critic 雙 agent 架構**。下面這些案例是**方法論被套到真實程式碼後的樣本**，放在 `examples/` 當參考。每個案例獨立負責自己的 `SECURITY-REVIEW.md`（必要時還有 `REFLECTION.md`）。未來會有更多 GitHub repo 透過 [`code2n8n-pipeline`](skills/tigerai/code2n8n-pipeline/SKILL.md) SKILL 自動加入。
 
 | 案例 | 上游 → n8n | 方法論套用紀錄 |
 |---|---|---|
@@ -106,12 +106,19 @@ Code2n8n **不是逐行把 Python 或 JavaScript 翻成節點**。它做的是�
 
 ### 你會在這個 repo 看到的 Agentic 痕跡
 
-- **`skills/`** — `plugin.json` 登錄 15 個 Claude Code / Antigravity Skill（含 v0.30.0 新增 `code2n8n-pipeline` 自動駕駛 SKILL），每個 SKILL.md 都是 AI 與人共筆
+- **`skills/`** — `plugin.json` 登錄 31 個 Claude Code / Antigravity Skill（21 個收錄 + 10 個 TigerAI，含 v0.30.0 新增 `code2n8n-pipeline` 自動駕駛 SKILL），每個 SKILL.md 都是 AI 與人共筆
 - **`.agent/workflows/`** — Antigravity 專屬的 agentic workflow（如 `/install-n8n-pack` 一鍵安裝）
 - **`cookbook/`** — 8 個自然語言 → workflow 的對照範例，示範如何「對 AI 講話」
 - **`spec/sticky-note-three-layer.md`** — 三層結構規範，強制 AI 產出可 review 的 workflow
-- **`research/patterns.md`** — AI 從 n8n.io 13,947 個官方公開範本的統計歸納出 7 大骨架 + 反模式（本機消化，repo 不含範本檔）
+- **`research/patterns.md`** — AI 從 n8n.io 13,947 個官方公開範本的統計歸納出 14 個骨架，加上反模式與決策流程（§2、§3、§5；本機消化，repo 不含範本檔）
 - **n8n.io 官方範本（即時查詢）** — 找範例時 AI 會先問你要不要去 n8n.io 查詢；你同意才查，只參考做法並註明範本編號，不複製、不匯入
+
+### 本 Pack 與 n8n 官方 Skill 的關係
+
+- **定位**：n8n 官方 Skill（`skills/_vendor/*-official`，來自 [n8n-io/skills](https://github.com/n8n-io/skills)）提供方法論與最佳實務；本 Pack 另外提供從 13,947 個 n8n.io 公開範本消化出的統計與骨架模式（`research/`），完成工作後會告訴你參考了哪些資料。
+- **本 Pack 的差異**：把註解規格化為三層便條（使用者需求、AI 實作說明、參考來源）；使用者可用便條描述需求，AI 讀便條產生 workflow；完成後固定附上參考來源。
+- **MCP 與 REST**：官方 Skill 是為 n8n MCP 工具設計的，本 Pack 為 REST-only。官方 Skill 要你呼叫 MCP 工具時，請查 [`docs/mcp-to-rest-map.md`](docs/mcp-to-rest-map.md)，看有沒有對應的 REST 呼叫，或哪些能力在 REST-only 模式下沒有對應。
+- **未修改**：15 個官方 Skill 資料夾與上游發布的內容完全相同（釘選資訊見 [`skills/_vendor/SOURCE.md`](skills/_vendor/SOURCE.md)），我們只在每個資料夾新增一份 Apache-2.0 的 `LICENSE`。
 
 ### 適合誰參考這個專案
 
@@ -214,9 +221,9 @@ TigerAI-Code2n8n-Skill-Pack/
 ├── cookbook/                  ← 8 個照抄範例（每個有自然語言版 + DSL 折疊）
 │   └── 00-INDEX.md
 │
-├── skills/                    ← 15 個 Skill（plugin.json manifest 與磁碟一致）
-│   ├── _vendor/                  6 個 vendor n8n-skills（MIT）
-│   └── tigerai/                  8 個 TigerAI 執行 Skill
+├── skills/                    ← 31 個 Skill（plugin.json manifest 與磁碟一致）
+│   ├── _vendor/                  21 個收錄 Skill：6 個 czlonkowski/n8n-skills（MIT）+ 15 個 n8n-io/skills（Apache-2.0，未修改）
+│   └── tigerai/                  10 個 TigerAI Skill
 │       ├── code-to-workflow/        ← 旗艦：既有程式 / 系統 → n8n
 │       ├── n8n-security-governance/ ← 安全、版本控制、CI/CD、回滾閘門
 │       └── n8n-code-to-native/      ← Code node → 原生 n8n node
@@ -261,7 +268,7 @@ TigerAI-Code2n8n-Skill-Pack/
 3. 安全、版本控制、CI/CD 與回滾閘門：`skills/tigerai/n8n-security-governance/SKILL.md`
 4. 從零需求產 workflow：`skills/tigerai/sticky-note-to-workflow/SKILL.md`
 5. `skills/tigerai/n8n-api-bridge/SKILL.md`：n8n REST API SOP
-6. `research/patterns.md`：7 大標準骨架 + 反模式
+6. `research/patterns.md`：14 個骨架、反模式與決策流程
 
 ### 我有既有程式，想搬到 n8n
 1. 先讀 [`CODE2N8N.md`](CODE2N8N.md) 理解「保留程式 + 上升流程」的分工
@@ -303,7 +310,7 @@ TigerAI-Code2n8n-Skill-Pack/
 |---|---|
 | AI 寫的 workflow 不一致、難 review | 強制三層結構 |
 | 使用者不會寫需求給 AI | 自然語言便利貼 + 8 個 cookbook + 問答模式 |
-| AI 不夠懂 n8n | 沿用 6 個官方 Skill + n8n.io 13,947 個官方公開範本的消化統計 |
+| AI 不夠懂 n8n | 收錄 21 個 Skill（6 個社群 MIT + 15 個 n8n 官方 `n8n-io/skills`）+ n8n.io 13,947 個官方公開範本的消化統計 |
 | 不知道既有程式哪些該留、哪些該移到 n8n | `code-to-workflow` 7 步驟移植方法論 + 三個實證案例 |
 | AI 寫的程式能 demo，但認證、SQL 與秘密管理可能不能上線 | 強制 Step 1.5 security audit；未修補的缺陷必須用 `SECURITY-CAVEATS.md` 公開揭露 |
 | 沒有企業級模式 | 4 大支柱：原子化 / Universal Worker / SDD / 安全 |
@@ -350,15 +357,20 @@ TigerAI-Code2n8n-Skill-Pack/
 
 ## 📜 授權
 
-**整套 pack 現已採 MIT 授權。** 見根目錄 [`LICENSE`](LICENSE)。
+本 repo 的內容分屬三種授權。我們不替任何人的作品改授權，各部分維持原作者選定的授權。
 
-- `skills/_vendor/`：MIT — 來自 [czlonkowski/n8n-skills](https://github.com/czlonkowski/n8n-skills)，見 `skills/_vendor/LICENSE`
-- 範本資料：repo 不含任何 n8n.io 範本檔；`research/` 只保留統計與少量代表範本編號。早期曾收錄的社群 workflow 語料已移除，詳見 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
-- `examples/line-ai-customer-service-onprem/`：MIT 授權衍生自 `scorpioliu0953/ai_customer_service`，出處鏈見該範例的 `CREDITS.md`
-- `examples/einvoice-n8n/`：MIT 授權衍生自 [`paid-tw/einvoice`](https://github.com/paid-tw/einvoice) TypeScript SDK（5 家供應商、MIG 4.0）。Pack 的 `svc/` Hono wrapper + 14 個 n8n workflow + SECURITY-REVIEW + Amego sandbox runtime 測試 runner 為 TigerAI MIT 自製。SDK adapter 透過 `npm install @paid-tw/einvoice*` exact-pin 引用（依 [SEC-017](examples/einvoice-n8n/SECURITY-REVIEW.md)）；本 repo **不** vendoring SDK source。
-- 其餘（TigerAI 自製 skills、cookbook、spec、docs、安裝腳本、Code2n8n 宣言、marquee `code-to-workflow` skill 等）：**MIT**（Copyright (c) 2026 Morris Lu / TigerAI）
+| 部分 | 授權 |
+|---|---|
+| 本 Pack 自有內容（`skills/tigerai/`、`cookbook/`、`spec/`、`docs/`、腳本等） | MIT，Copyright (c) 2026 Morris Lu / TigerAI（根目錄 [`LICENSE`](LICENSE)） |
+| `skills/_vendor/` 內 6 個社群 Skill（來自 [czlonkowski/n8n-skills](https://github.com/czlonkowski/n8n-skills)，釘選 v1.37.1） | MIT，Copyright (c) 2025 Romuald Członkowski |
+| `skills/_vendor/*-official` 15 個官方 Skill（來自 [n8n-io/skills](https://github.com/n8n-io/skills)，原樣收錄） | Apache-2.0，Copyright 2026 n8n GmbH |
 
-完整第三方授權聲明見 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+每個 Skill 資料夾都自帶一份 `LICENSE`，安裝腳本複製資料夾時授權檔會一起走。`examples/` 內衍生自 MIT 專案的案例、已移除的社群語料、n8n.io 範本（只留統計，不散布範本檔）等，請看集中清單。
+
+- 集中授權清單：[`LICENSES.md`](LICENSES.md)
+- 完整第三方授權聲明：[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
+
+**商標聲明**：TigerAI 與 n8n GmbH 沒有隸屬、合作或背書關係；「n8n」為 n8n GmbH 的商標，本專案僅以描述性方式使用該名稱。
 
 ---
 

@@ -58,11 +58,11 @@ await check('n8n-io/skills (plugin.json)', async () => {
   const file = await getJson('https://api.github.com/repos/n8n-io/skills/contents/.claude-plugin/plugin.json', ghHeaders);
   const latest = JSON.parse(Buffer.from(file.content, 'base64').toString('utf8')).version;
   const repo = await getJson('https://api.github.com/repos/n8n-io/skills', ghHeaders);
-  const seen = off.observed?.plugin_version ?? null;
-  const behind = seen ? cmp(latest, seen) > 0 : false;
+  const pinnedVer = off.pinned.plugin_version;
+  const behind = cmp(latest, pinnedVer) > 0;
   const pushed = repo.pushed_at ? repo.pushed_at.slice(0, 10) : '?';
-  return { pinned: off.pinned ? String(off.pinned) : `未收錄 (記錄時為 ${seen ?? '?'})`, latest,
-    behind, note: `最近推送 ${pushed}（記錄時 ${off.observed?.last_push ?? '?'}）${behind ? '；' + gap(seen, latest) : ''}` };
+  return { pinned: pinnedVer, latest, behind,
+    note: `最近推送 ${pushed}（釘選 commit ${off.pinned.commit}，${off.pinned.date}）${behind ? '；' + gap(pinnedVer, latest) : ''}` };
 });
 
 await check('n8n (npm latest)', async () => {

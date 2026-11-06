@@ -43,16 +43,43 @@
     "n8n-io/skills": {
       "repo": "https://github.com/n8n-io/skills",
       "license": "Apache-2.0",
-      "vendored": false,
+      "copyright": "Copyright 2026 n8n GmbH",
+      "vendored": true,
       "plugin_manifest": ".claude-plugin/plugin.json",
-      "observed": {
+      "pinned": {
+        "commit": "27b6b9f",
         "plugin_version": "1.3.0",
-        "last_push": "2026-10-30",
-        "skills": 15,
-        "skill_naming": "*-official"
+        "date": "2026-10-17"
       },
-      "pinned": null,
-      "status": "Not vendored. Apache-2.0 would need an extra NOTICE entry, and the skills pair with instance-level MCP. Awaiting the user's decision."
+      "notice_file": null,
+      "notice_note": "Upstream has no NOTICE file at the pinned commit. Re-check on every sync.",
+      "modifications": "None. Upstream files are included unchanged; only a LICENSE copy is added to each skill folder, plus skills/_vendor/LICENSE-n8n-io-skills-APACHE-2.0.",
+      "included_skills": [
+        "n8n-agents-official",
+        "n8n-ai-nodes-official",
+        "n8n-binary-and-data-official",
+        "n8n-code-nodes-official",
+        "n8n-credentials-and-security-official",
+        "n8n-data-tables-official",
+        "n8n-debugging-official",
+        "n8n-error-handling-official",
+        "n8n-expressions-official",
+        "n8n-extending-mcp-official",
+        "n8n-loops-official",
+        "n8n-node-configuration-official",
+        "n8n-subworkflows-official",
+        "n8n-workflow-lifecycle-official",
+        "using-n8n-skills-official"
+      ],
+      "excluded": [
+        { "path": "hooks/", "reason": "Reminder hooks for the n8n MCP; not knowledge content" },
+        { "path": "opencode/", "reason": "Platform plugin mechanism for OpenCode" },
+        { "path": ".claude-plugin/", "reason": "Platform plugin manifest; the Pack has its own plugin.json and installers" },
+        { "path": ".codex-plugin/", "reason": "Platform plugin manifest; the Pack has its own plugin.json and installers" },
+        { "path": ".agents/", "reason": "Platform plugin mechanism" },
+        { "path": "package.json", "reason": "Upstream repo tooling; not skill content" }
+      ],
+      "mcp_note": "These skills are written for the n8n MCP tools; the Pack is REST-only. See docs/mcp-to-rest-map.md."
     }
   },
   "n8n": {

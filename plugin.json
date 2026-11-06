@@ -3,7 +3,45 @@
   "version": "1.0.9",
   "description": "TigerAI A2A Code2n8n Skill Pack v1.0 — Production-Grade Methodology for building enterprise-grade n8n workflows. Natural-language sticky notes or existing code (Apps Script / Netlify Functions / Express / Docker stack / TypeScript SDK) → governable workflows. A2A directives (V&V two-layer + external-dependency security; Chinese + English machine-readable specs). 4-Tier external-dependency security CI-enforced (scanner with 9 malicious jsCode patterns, npm audit fail-gate, container hardening, Skill rules → real CI gates). Path B real-vendor-sandbox runtime evidence: Taiwan e-invoice case CLEARED with Amego 10/10 SDK capability verified against real Amego public sandbox (11 invoice traces). 4 case studies (Google Workspace admin / cloud LINE customer service / on-prem LINE customer service / Taiwan e-invoice). Pure REST API, no MCP dependency.",
   "author": "TigerAI",
-  "license": "MIT",
+  "license": "MIT AND Apache-2.0",
+  "license_index": "LICENSES.md",
+  "licenses": [
+    {
+      "id": "MIT",
+      "scope": "Pack own content (also the Pack-authored layer of examples/einvoice-n8n/)",
+      "copyright": "Copyright (c) 2026 Morris Lu / TigerAI",
+      "paths": ["skills/tigerai/", "cookbook/", "spec/", "docs/", "scripts/", "tests/", "research/", "examples/templates/"],
+      "license_file": "LICENSE"
+    },
+    {
+      "id": "MIT",
+      "scope": "Community skills (czlonkowski/n8n-skills v1.37.1)",
+      "copyright": "Copyright (c) 2025 Romuald Członkowski",
+      "paths": [
+        "skills/_vendor/n8n-expression-syntax",
+        "skills/_vendor/n8n-workflow-patterns",
+        "skills/_vendor/n8n-validation-expert",
+        "skills/_vendor/n8n-node-configuration",
+        "skills/_vendor/n8n-code-javascript",
+        "skills/_vendor/n8n-code-python"
+      ],
+      "license_file": "<path>/LICENSE"
+    },
+    {
+      "id": "Apache-2.0",
+      "scope": "n8n official skills (n8n-io/skills, commit 27b6b9f)",
+      "copyright": "Copyright 2026 n8n GmbH",
+      "paths": ["skills/_vendor/*-official"],
+      "license_file": "<path>/LICENSE"
+    },
+    {
+      "id": "MIT",
+      "scope": "On-prem LINE customer-service example (scorpioliu0953/ai_customer_service)",
+      "copyright": "Copyright (c) 2026 scorpioliu0953",
+      "paths": ["examples/line-ai-customer-service-onprem/"],
+      "license_file": "examples/line-ai-customer-service-onprem/LICENSE"
+    }
+  ],
   "skills": [
     { "path": "skills/_vendor/n8n-expression-syntax", "source": "vendor" },
     { "path": "skills/_vendor/n8n-workflow-patterns", "source": "vendor" },
@@ -11,6 +49,21 @@
     { "path": "skills/_vendor/n8n-node-configuration", "source": "vendor" },
     { "path": "skills/_vendor/n8n-code-javascript", "source": "vendor" },
     { "path": "skills/_vendor/n8n-code-python", "source": "vendor" },
+    { "path": "skills/_vendor/n8n-agents-official", "source": "vendor-official" },
+    { "path": "skills/_vendor/n8n-ai-nodes-official", "source": "vendor-official" },
+    { "path": "skills/_vendor/n8n-binary-and-data-official", "source": "vendor-official" },
+    { "path": "skills/_vendor/n8n-code-nodes-official", "source": "vendor-official" },
+    { "path": "skills/_vendor/n8n-credentials-and-security-official", "source": "vendor-official" },
+    { "path": "skills/_vendor/n8n-data-tables-official", "source": "vendor-official" },
+    { "path": "skills/_vendor/n8n-debugging-official", "source": "vendor-official" },
+    { "path": "skills/_vendor/n8n-error-handling-official", "source": "vendor-official" },
+    { "path": "skills/_vendor/n8n-expressions-official", "source": "vendor-official" },
+    { "path": "skills/_vendor/n8n-extending-mcp-official", "source": "vendor-official" },
+    { "path": "skills/_vendor/n8n-loops-official", "source": "vendor-official" },
+    { "path": "skills/_vendor/n8n-node-configuration-official", "source": "vendor-official" },
+    { "path": "skills/_vendor/n8n-subworkflows-official", "source": "vendor-official" },
+    { "path": "skills/_vendor/n8n-workflow-lifecycle-official", "source": "vendor-official" },
+    { "path": "skills/_vendor/using-n8n-skills-official", "source": "vendor-official" },
     { "path": "skills/tigerai/sticky-note-to-workflow", "source": "tigerai", "role": "core-executor" },
     { "path": "skills/tigerai/n8n-api-bridge", "source": "tigerai", "role": "io" },
     { "path": "skills/tigerai/tigerai-enterprise-patterns", "source": "tigerai", "role": "enterprise" },

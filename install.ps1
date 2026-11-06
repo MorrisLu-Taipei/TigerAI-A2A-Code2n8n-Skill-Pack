@@ -19,7 +19,22 @@ $VendorSkills = @(
   'n8n-validation-expert',
   'n8n-node-configuration',
   'n8n-code-javascript',
-  'n8n-code-python'
+  'n8n-code-python',
+  'n8n-agents-official',
+  'n8n-ai-nodes-official',
+  'n8n-binary-and-data-official',
+  'n8n-code-nodes-official',
+  'n8n-credentials-and-security-official',
+  'n8n-data-tables-official',
+  'n8n-debugging-official',
+  'n8n-error-handling-official',
+  'n8n-expressions-official',
+  'n8n-extending-mcp-official',
+  'n8n-loops-official',
+  'n8n-node-configuration-official',
+  'n8n-subworkflows-official',
+  'n8n-workflow-lifecycle-official',
+  'using-n8n-skills-official'
 )
 $TigerAISkills = @(
   'sticky-note-to-workflow',
@@ -31,7 +46,7 @@ $TigerAISkills = @(
   'n8n-security-governance',
   'n8n-code-to-native'
 )
-$ExpectedCount = $VendorSkills.Count + $TigerAISkills.Count   # 14
+$ExpectedCount = $VendorSkills.Count + $TigerAISkills.Count   # 29 (21 vendor + 8 TigerAI)
 
 function Show-Usage {
   Write-Host @"
@@ -52,7 +67,7 @@ Behaviour:
   * If neither parent dir exists, falls back to Claude.
   * "-Target claude" or "-Target antigravity" forces a single target.
   * Re-running is safe: existing skill folders are removed and recopied.
-  * Post-install verifies $ExpectedCount/14 skill folders landed in each target.
+  * Post-install verifies all $ExpectedCount skill folders landed in each target.
 "@
 }
 
