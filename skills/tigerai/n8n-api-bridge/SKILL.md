@@ -49,8 +49,7 @@ curl -H "X-N8N-API-KEY: $N8N_API_KEY" "$N8N_API_URL/api/v1/workflows?limit=1"
 | 列 workflow | `GET /api/v1/workflows` |
 | 讀 workflow | `GET /api/v1/workflows/{id}` |
 | 建 workflow | `POST /api/v1/workflows` |
-| 改 workflow（局部）| `PATCH /api/v1/workflows/{id}` |
-| 全量替換 | `PUT /api/v1/workflows/{id}` |
+| 改 workflow | `PUT /api/v1/workflows/{id}`（body 必須含 `name`、`nodes`、`connections`、`settings`；**公開 API 不支援 `PATCH`，回 405**，2.37.3 / 2.44.6 / 2.46.6 實測） |
 | 啟用 | `POST /api/v1/workflows/{id}/activate` |
 | 停用 | `POST /api/v1/workflows/{id}/deactivate` |
 | 刪 | `DELETE /api/v1/workflows/{id}` |
@@ -110,8 +109,9 @@ await updateFull(id, merged);
 | 401 | API key 失效 | 提示使用者重新產 key |
 | 403 | 權限不足 | 提示需要 owner/admin role |
 | 404 | workflow 不存在 | 提示確認 ID |
-| 409 | 衝突（並發修改） | 重讀 + 重 merge + 重寫 |
-| 422 | JSON schema 不合 | 回報具體欄位，由 AI 依錯誤訊息修正後重 PUT |
+| 400 | JSON schema 不合、節點設定缺漏、缺憑證、節點類型已棄用 | 回報具體欄位，由 AI 依錯誤訊息修正後重 PUT（實測不合格的 PUT 回 400，不是 422） |
+| 405 | 呼叫了不支援的方法（例如 `PATCH`） | 改用 `PUT` 全量替換 |
+| 409 | 衝突（並發修改，或 webhook 路徑已被其他啟用中的 workflow 使用） | 重讀 + 重 merge + 重寫；webhook 衝突則改 `path` |
 | 5xx | n8n 端錯誤 | 指數退避 retry 3 次（1s/2s/4s） |
 | timeout | 大 workflow | 增 timeout 至 60s 重試 |
 
