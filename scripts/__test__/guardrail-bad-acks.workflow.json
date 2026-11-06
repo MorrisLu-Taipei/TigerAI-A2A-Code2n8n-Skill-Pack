@@ -1,0 +1,86 @@
+{
+  "name": "test-fixture: invalid acks (must be ignored)",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const r = eval('1 + 1');\nreturn [{ json: { r } }];"
+      },
+      "id": "bad-01",
+      "name": "Code Eval",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        200
+      ],
+      "notes": "Reviewed by owner.\nguardrail-ack: jscode:dynamic-eval -- detection rule, ack must not apply",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/items",
+        "options": {}
+      },
+      "id": "bad-02",
+      "name": "HTTP Plain",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        400
+      ],
+      "notes": "Reviewed by owner.\nguardrail-ack: tls:allow-unauthorized-certs -- no such finding on this node",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "resource": "command",
+        "operation": "execute",
+        "command": "uptime",
+        "cwd": "/"
+      },
+      "id": "bad-03",
+      "name": "Remote Command",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        660,
+        0
+      ],
+      "notes": "Reviewed by owner.\nguardrail-ack: exec:ssh-typo -- wrong rule id",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "command": "echo hello"
+      },
+      "id": "bad-04",
+      "name": "Run Shell",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        880,
+        200
+      ],
+      "notes": "Reviewed by owner.\nguardrail-ack: exec:execute-command -- fine, acknowledged",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Code Eval": {
+      "main": [
+        [
+          {
+            "node": "HTTP Plain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "name": "test-fixture: RegExp.exec must not trigger process-spawn",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const m = /(\\d+)/.exec($input.first().json.text);\nreturn [{ json: { n: m ? m[1] : null } }];"
+      },
+      "id": "rx-1",
+      "name": "Literal Regex",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const regex = /a+/g;\nconst pattern = new RegExp('b+', 'g');\nlet hit;\nconst out = [];\nwhile ((hit = regex.exec($input.first().json.text)) !== null) out.push(hit[0]);\nconst line = pattern.exec('bbb');\nreturn [{ json: { out, line } }];"
+      },
+      "id": "rx-2",
+      "name": "Variable Regex",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    }
+  ],
+  "connections": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -139,6 +139,10 @@ jobs:
           node scripts/security-scan.mjs --glob "examples/templates/*.workflow.json"
       - name: Scan on-prem brain JSON
         run: node scripts/security-scan.mjs examples/line-ai-customer-service-onprem/n8n_workflow_export.json --format markdown
+      - name: Scanner guardrail regression tests
+        run: node scripts/__test__/run-security-scan-tests.mjs
+      - name: Native-first check regression tests (advisory tool, exit 0 by design)
+        run: node scripts/__test__/run-native-first-tests.mjs
 
   dependency-cve:
     name: case-study npm audit (HIGH+ is a gate, not advisory — SEC-017)

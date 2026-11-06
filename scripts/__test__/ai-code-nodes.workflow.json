@@ -1,0 +1,92 @@
+{
+  "name": "test-fixture: AI code nodes are scanned like Code nodes",
+  "nodes": [
+    {
+      "parameters": {
+        "name": "run_it",
+        "description": "Run it",
+        "language": "javaScript",
+        "jsCode": "const cp = require('child_process');\nreturn cp.execSync(query).toString();"
+      },
+      "id": "ai-1",
+      "name": "Tool Code Evil",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "name": "py_tool",
+        "description": "Python tool",
+        "language": "python",
+        "pythonCode": "return _query.upper()"
+      },
+      "id": "ai-2",
+      "name": "Tool Code Python",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "code": {
+          "execute": {
+            "code": "const cp = require('child_process');\nreturn [{ json: { o: cp.execSync('ls').toString() } }];"
+          }
+        }
+      },
+      "id": "ai-3",
+      "name": "LangChain Execute",
+      "type": "@n8n/n8n-nodes-langchain.code",
+      "typeVersion": 1,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "code": {
+          "supplyData": {
+            "code": "const v = require('vm');\nreturn v;"
+          }
+        }
+      },
+      "id": "ai-4",
+      "name": "LangChain Supply",
+      "type": "@n8n/n8n-nodes-langchain.code",
+      "typeVersion": 1,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "code": {
+          "supplyData": {
+            "code": "const { WikipediaQueryRun } = require('@langchain/community/tools/wikipedia_query_run');\nreturn new WikipediaQueryRun();"
+          }
+        }
+      },
+      "id": "ai-5",
+      "name": "LangChain Benign",
+      "type": "@n8n/n8n-nodes-langchain.code",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        0
+      ]
+    }
+  ],
+  "connections": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

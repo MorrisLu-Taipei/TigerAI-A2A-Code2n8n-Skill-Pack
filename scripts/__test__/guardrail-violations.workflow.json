@@ -1,0 +1,282 @@
+{
+  "name": "test-fixture: guardrail violations (every new rule fires at least once)",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "guard-01",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "formTitle": "Contact",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Message",
+              "fieldType": "textarea"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "guard-02",
+      "name": "Public Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "guard-03",
+      "name": "Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "id": "guard-04",
+      "name": "Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "name": "calc",
+        "description": "Evaluate an expression",
+        "language": "javaScript",
+        "jsCode": "return query;"
+      },
+      "id": "guard-05",
+      "name": "Code Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/items",
+        "options": {
+          "allowUnauthorizedCerts": true
+        }
+      },
+      "id": "guard-06",
+      "name": "HTTP Insecure TLS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/items",
+        "options": {},
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer not-a-real-token-abcdef123456"
+            }
+          ]
+        }
+      },
+      "id": "guard-07",
+      "name": "HTTP Hardcoded Auth",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "command": "echo hello"
+      },
+      "id": "guard-08",
+      "name": "Run Shell",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "command",
+        "operation": "execute",
+        "command": "uptime",
+        "cwd": "/"
+      },
+      "id": "guard-09",
+      "name": "Remote Command",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "/tmp/example.txt",
+        "options": {}
+      },
+      "id": "guard-10",
+      "name": "Read File",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "guardrail-demo",
+        "options": {}
+      },
+      "id": "guard-11",
+      "name": "Open Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        400
+      ],
+      "webhookId": "00000000-0000-4000-8000-000000000001"
+    }
+  ],
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Public Form": {
+      "main": [
+        [
+          {
+            "node": "HTTP Insecure TLS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Insecure TLS": {
+      "main": [
+        [
+          {
+            "node": "HTTP Hardcoded Auth",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Hardcoded Auth": {
+      "main": [
+        [
+          {
+            "node": "Run Shell",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Shell": {
+      "main": [
+        [
+          {
+            "node": "Remote Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remote Command": {
+      "main": [
+        [
+          {
+            "node": "Read File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

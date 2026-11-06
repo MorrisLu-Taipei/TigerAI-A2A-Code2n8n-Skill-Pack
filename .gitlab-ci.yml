@@ -97,6 +97,16 @@ workflow-security-scan:
     - node scripts/security-scan.mjs --glob "examples/templates/*.workflow.json"
     - node scripts/security-scan.mjs examples/line-ai-customer-service-onprem/n8n_workflow_export.json --format markdown
 
+workflow-security-scan-tests:
+  stage: scan
+  script:
+    - node scripts/__test__/run-security-scan-tests.mjs
+
+native-first-check-tests:
+  stage: scan
+  script:
+    - node scripts/__test__/run-native-first-tests.mjs
+
 dependency-cve:
   stage: scan
   allow_failure: true
