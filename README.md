@@ -41,11 +41,11 @@ We're also contributing an upstream-issue draft back: [`docs/upstream-issues/pai
 | Security Review **gate** — SOPs, skill, positive + negative examples, deterministic scanner | A full SAST / DAST / fuzzer / static-analyser for arbitrary code |
 | Validation SOP + first-line CI gate (lint, secret scan, manifest, installer, scanner, optional live round-trip) | A complete workflow-deployment pipeline (no staging promote / blue-green / automatic rollback yet) |
 | Case-study evidence (3 real ports + 16 reviewable workflow JSONs) | A universal "code → workflow" compiler — Partition is a design decision, not auto-translation |
-| Reference corpus (2,061 community workflows, MIT, secrets scrubbed) for design lookup | Validated production templates — the corpus is **lookup material**, not certified workflows |
+| Statistics and skeleton knowledge digested locally from 13,947 official public n8n.io templates (the repo ships no template files); live n8n.io lookup only with your consent | A template warehouse or importable templates — templates are only read and digested, and output is always rebuilt with current node versions |
 
 Receipts for the ✅ column: [`docs/responsibility-matrix.md`](docs/responsibility-matrix.md) (status per claim) and [`tests/REPORT-v0.24.1-evidence.md`](tests/REPORT-v0.24.1-evidence.md) (fresh dated evidence).
 
-> 📊 **The whole pack in one picture**: Natural-language intent *or* an existing program system → Code2n8n Skill Pack (Cookbook + 2,061 reference workflows *as a design-lookup corpus, not validated templates* + DSL v1.2 + **15 skills** + 4 enterprise patterns) → decides what logic stays as code vs lifts into an n8n node → emits a reviewable, hand-off-able, cross-system n8n workflow.
+> 📊 **The whole pack in one picture**: Natural-language intent *or* an existing program system → Code2n8n Skill Pack (Cookbook + digested statistics of 13,947 official public n8n.io templates *referenced, never copied; the repo ships no template files* + DSL v1.2 + **15 skills** + 4 enterprise patterns) → decides what logic stays as code vs lifts into an n8n node → emits a reviewable, hand-off-able, cross-system n8n workflow.
 > *by n8n Taipei Ambassador Morris Lu*
 
 ---
@@ -110,8 +110,8 @@ This Skill Pack is itself a working demo of **Agentic Engineering**:
 - **`.agent/workflows/`** — Antigravity-native agentic workflows (e.g. `/install-n8n-pack` one-shot installer)
 - **`cookbook/`** — 8 natural-language → workflow examples showing how to "talk to" the AI
 - **`spec/sticky-note-three-layer.md`** — Three-layer structure spec that forces reviewable AI output
-- **`research/patterns.md`** — 7 canonical skeletons + anti-patterns mined by AI from 2,061 real workflows
-- **`reference-workflows/`** — AI training corpus ([Zie619/n8n-workflows](https://github.com/Zie619/n8n-workflows), MIT, secrets scrubbed)
+- **`research/patterns.md`** — 7 canonical skeletons + anti-patterns digested from statistics over 13,947 official public n8n.io templates (digested locally; the repo ships no template files)
+- **Official n8n.io templates (live lookup)** — when finding examples, the AI first asks whether you want it to search n8n.io; it only looks if you agree, only references the approach, names the template ID, and never copies or imports it
 
 ### Who should study this project
 
@@ -229,7 +229,6 @@ TigerAI-Code2n8n-Skill-Pack/
 ├── examples/line-ai-customer-service/           ← Cloud LINE CS → n8n + admin UI
 ├── examples/line-ai-customer-service-onprem/    ← On-prem Docker + Qdrant RAG (NOT deployable as-is)
 ├── examples/tigerai-flagship/ ← 3 enterprise-grade examples (with SDD)
-├── reference-workflows/       ← 2,061 public workflows (AI corpus)
 ├── research/                  ← Research artifacts
 ├── tests/                     ← Three rounds of acceptance reports
 │
@@ -307,7 +306,7 @@ TigerAI-Code2n8n-Skill-Pack/
 |---|---|
 | AI-written workflows are inconsistent, hard to review | Enforce three-layer structure |
 | Users don't know how to describe what they want | Plain-language stickies + 8 cookbooks + Q&A mode |
-| AI doesn't know n8n well enough | 6 vendor official Skills + 2,061 workflow corpus |
+| AI doesn't know n8n well enough | 6 vendor official Skills + digested statistics of 13,947 official n8n.io templates |
 | Don't know what existing code to keep vs move into n8n | `code-to-workflow` 7-step methodology + 3 empirical case studies |
 | AI-written code demos fine but auth / SQL / secret management may not ship | Mandatory **Step 1.5 security audit**; unresolved findings disclosed via `SECURITY-CAVEATS.md` |
 | No enterprise-grade patterns | 4 pillars: Atomic Orchestration / Universal Worker / SDD / Security |
@@ -407,7 +406,7 @@ Current version: see [`VERSION`](VERSION). All changes: [`CHANGELOG.md`](CHANGEL
 **The whole pack is now MIT-licensed.** See the root [`LICENSE`](LICENSE) file.
 
 - `skills/_vendor/`: MIT — from [czlonkowski/n8n-skills](https://github.com/czlonkowski/n8n-skills), see `skills/_vendor/LICENSE`
-- `reference-workflows/`: MIT — from [Zie619/n8n-workflows](https://github.com/Zie619/n8n-workflows). API tokens, bearer tokens, and other secrets present in the original files have been replaced with placeholders (e.g. `YOUR_API_TOKEN_HERE`) before redistribution.
+- Template data: the repo ships no n8n.io template files; `research/` keeps only statistics and a few representative template IDs. The community workflow corpus included in earlier versions has been removed - see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 - `examples/line-ai-customer-service-onprem/`: derived from MIT-licensed `scorpioliu0953/ai_customer_service`, attribution chain in the example's `CREDITS.md`.
 - `examples/einvoice-n8n/`: derived from MIT-licensed [`paid-tw/einvoice`](https://github.com/paid-tw/einvoice) TypeScript SDK (5 providers, MIG 4.0). The Pack's `svc/` Hono wrapper + 14 n8n workflows + SECURITY-REVIEW + Amego sandbox runtime test runner are MIT-authored by TigerAI on top of the upstream SDK. SDK adapter source code is consumed via `npm install @paid-tw/einvoice*` with exact-pin (per [SEC-017](examples/einvoice-n8n/SECURITY-REVIEW.md)); no SDK source is vendored into this repo.
 - The rest (TigerAI-authored skills, cookbook, specs, docs, install scripts, manifesto, marquee `code-to-workflow` skill): **MIT** (Copyright (c) 2026 Morris Lu / TigerAI).

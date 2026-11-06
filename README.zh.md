@@ -41,11 +41,11 @@ MIT 授權讓本 Pack 能把 SDK 包成 svc + n8n 治理層對外發布 — 是 
 | Security Review **關卡**：SOP、Skill、正反例範本、確定性掃描器 | 萬用程式 SAST / DAST / fuzzer / 靜態分析器 |
 | 驗證 SOP + 第一線 CI gate（lint、secret scan、manifest、installer、scanner、optional live round-trip） | 完整 workflow deployment pipeline（尚未做 staging promote / blue-green / 自動 rollback） |
 | 三個真實案例移植 + 16 個可審 workflow JSON | 萬用「程式碼 → workflow」compiler — Partition 是設計決策，不是自動翻譯 |
-| 2,061 社群 workflow 參考語料（MIT、密鑰已 scrub）供設計查找 | 已驗證的 production 模板 — 是**查詢素材**，不是已驗收 workflow |
+| n8n.io 13,947 個官方公開範本的統計與骨架知識（本機消化，repo 不含範本檔）；經你同意才即時查詢 n8n.io 當參考 | 範本倉庫或可直接匯入的模板 — 範本只被閱讀與消化，產出一律以目前版本的節點重新建構 |
 
 ✅ 欄位的證據放這裡：[`docs/responsibility-matrix.md`](docs/responsibility-matrix.md)（逐項狀態）、[`tests/REPORT-v0.24.1-evidence.md`](tests/REPORT-v0.24.1-evidence.md)（最新驗收紀錄）。
 
-> 📊 **一張圖看懂**：自然語言需求或既有程式系統 → Code2n8n Skill Pack（Cookbook + 2,061 參考 workflow *為設計查找語料，非已驗證模板* + DSL v1.2 + 15 個 Skill + 4 大企業模式）→ 分析哪些邏輯留在程式、哪些上升為 n8n 節點 → 產出可檢查、可交接、可跨系統編排的 workflow。
+> 📊 **一張圖看懂**：自然語言需求或既有程式系統 → Code2n8n Skill Pack（Cookbook + n8n.io 13,947 個官方公開範本的消化統計 *範本只被參考、不被複製，repo 不含範本檔* + DSL v1.2 + 15 個 Skill + 4 大企業模式）→ 分析哪些邏輯留在程式、哪些上升為 n8n 節點 → 產出可檢查、可交接、可跨系統編排的 workflow。
 > *by n8n Taipei Ambassador Morris Lu*
 
 ---
@@ -110,8 +110,8 @@ Code2n8n **不是逐行把 Python 或 JavaScript 翻成節點**。它做的是�
 - **`.agent/workflows/`** — Antigravity 專屬的 agentic workflow（如 `/install-n8n-pack` 一鍵安裝）
 - **`cookbook/`** — 8 個自然語言 → workflow 的對照範例，示範如何「對 AI 講話」
 - **`spec/sticky-note-three-layer.md`** — 三層結構規範，強制 AI 產出可 review 的 workflow
-- **`research/patterns.md`** — AI 從 2,061 個真實 workflow 歸納出 7 大骨架 + 反模式
-- **`reference-workflows/`** — AI 對照語料（[Zie619/n8n-workflows](https://github.com/Zie619/n8n-workflows) MIT，已 scrub 密鑰）
+- **`research/patterns.md`** — AI 從 n8n.io 13,947 個官方公開範本的統計歸納出 7 大骨架 + 反模式（本機消化，repo 不含範本檔）
+- **n8n.io 官方範本（即時查詢）** — 找範例時 AI 會先問你要不要去 n8n.io 查詢；你同意才查，只參考做法並註明範本編號，不複製、不匯入
 
 ### 適合誰參考這個專案
 
@@ -229,7 +229,6 @@ TigerAI-Code2n8n-Skill-Pack/
 ├── examples/line-ai-customer-service/           ← 雲端 LINE 客服 → n8n + 後台
 ├── examples/line-ai-customer-service-onprem/    ← 地端 Docker + Qdrant RAG（不可直接上線）
 ├── examples/tigerai-flagship/ ← 3 個企業級範例（含 SDD）
-├── reference-workflows/       ← 2,061 個公開 workflow（AI 對照語料）
 ├── research/                  ← 研究與統計（給工程師）
 ├── tests/                     ← 三輪驗收紀錄
 │
@@ -304,7 +303,7 @@ TigerAI-Code2n8n-Skill-Pack/
 |---|---|
 | AI 寫的 workflow 不一致、難 review | 強制三層結構 |
 | 使用者不會寫需求給 AI | 自然語言便利貼 + 8 個 cookbook + 問答模式 |
-| AI 不夠懂 n8n | 沿用 6 個官方 Skill + 2,061 個 workflow 語料 |
+| AI 不夠懂 n8n | 沿用 6 個官方 Skill + n8n.io 13,947 個官方公開範本的消化統計 |
 | 不知道既有程式哪些該留、哪些該移到 n8n | `code-to-workflow` 7 步驟移植方法論 + 三個實證案例 |
 | AI 寫的程式能 demo，但認證、SQL 與秘密管理可能不能上線 | 強制 Step 1.5 security audit；未修補的缺陷必須用 `SECURITY-CAVEATS.md` 公開揭露 |
 | 沒有企業級模式 | 4 大支柱：原子化 / Universal Worker / SDD / 安全 |
@@ -354,7 +353,7 @@ TigerAI-Code2n8n-Skill-Pack/
 **整套 pack 現已採 MIT 授權。** 見根目錄 [`LICENSE`](LICENSE)。
 
 - `skills/_vendor/`：MIT — 來自 [czlonkowski/n8n-skills](https://github.com/czlonkowski/n8n-skills)，見 `skills/_vendor/LICENSE`
-- `reference-workflows/`：MIT — 來自 [Zie619/n8n-workflows](https://github.com/Zie619/n8n-workflows)。原始檔內的 API token / bearer token 等密鑰，於收錄前已替換為佔位符（如 `YOUR_API_TOKEN_HERE`）
+- 範本資料：repo 不含任何 n8n.io 範本檔；`research/` 只保留統計與少量代表範本編號。早期曾收錄的社群 workflow 語料已移除，詳見 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
 - `examples/line-ai-customer-service-onprem/`：MIT 授權衍生自 `scorpioliu0953/ai_customer_service`，出處鏈見該範例的 `CREDITS.md`
 - `examples/einvoice-n8n/`：MIT 授權衍生自 [`paid-tw/einvoice`](https://github.com/paid-tw/einvoice) TypeScript SDK（5 家供應商、MIG 4.0）。Pack 的 `svc/` Hono wrapper + 14 個 n8n workflow + SECURITY-REVIEW + Amego sandbox runtime 測試 runner 為 TigerAI MIT 自製。SDK adapter 透過 `npm install @paid-tw/einvoice*` exact-pin 引用（依 [SEC-017](examples/einvoice-n8n/SECURITY-REVIEW.md)）；本 repo **不** vendoring SDK source。
 - 其餘（TigerAI 自製 skills、cookbook、spec、docs、安裝腳本、Code2n8n 宣言、marquee `code-to-workflow` skill 等）：**MIT**（Copyright (c) 2026 Morris Lu / TigerAI）

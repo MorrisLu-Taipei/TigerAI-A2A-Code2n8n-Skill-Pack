@@ -5,17 +5,18 @@ Their original licenses are reproduced below.
 
 ---
 
-## 1. `reference-workflows/` — Zie619/n8n-workflows
+## 1. `reference-workflows/` — Zie619/n8n-workflows (removed)
 
-The 2,061 reference workflow JSON files under `reference-workflows/` are
-derived from the public collection:
+The 2,061 reference workflow JSON files that used to live under
+`reference-workflows/` were derived from the public collection:
 
 - **Source**: https://github.com/Zie619/n8n-workflows
 - **License**: MIT License
-- **Use in this repo**: Used as language reference / training corpus for
-  AI assistants. API tokens, bearer tokens, and other secrets that were
-  present in the original files have been replaced with placeholders
-  (e.g. `YOUR_API_TOKEN_HERE`) before redistribution.
+- **Use in this repo**: **Removed.** Since 2026-11-06 this directory is no
+  longer distributed with the repo. Earlier versions in the git history still
+  contain those files, so the MIT license text and copyright notice below are
+  kept here to satisfy the license for that history. Reference templates are now
+  looked up live from n8n.io only with the user's consent (see section 5).
 
 ### MIT License (Zie619/n8n-workflows)
 
@@ -47,10 +48,11 @@ SOFTWARE.
 
 ## 2. `skills/_vendor/` — czlonkowski/n8n-skills
 
-The seven official n8n skills bundled under `skills/_vendor/` are from:
+`skills/_vendor/` currently bundles 6 official n8n skills from:
 
 - **Source**: https://github.com/czlonkowski/n8n-skills
-- **License**: MIT License (see `skills/_vendor/LICENSE` if present)
+- **Pinned version**: v1.37.1 (commit `e037563`, 2026-10-24)
+- **License**: MIT License (see `skills/_vendor/LICENSE`)
 
 ---
 
