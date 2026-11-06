@@ -40,7 +40,9 @@
 
 2.46.6 啟用時會檢查 workflow 引用的憑證是否存在，訊息為 `Credential "..." no longer exists`。
 
-## 3. cookbook 與 examples 的 37 支 workflow
+## 3. cookbook 與 examples 的 37 支 workflow（修正前）
+
+> 本節是三支範本還使用 `Function` 節點時的結果，保留作為版本差異的證據。修正後的重跑見 3.1。
 
 | 項目 | 2.37.3 | 2.44.6 | 2.46.6 |
 |---|---|---|---|
@@ -64,6 +66,43 @@
 | 佔位符 | `REPLACE_WITH_*_WORKFLOW_ID`，需要先發布被呼叫的 workflow |
 | 空的必填參數 | `path`、`folderId` 由使用者填寫 |
 | 無觸發節點 | `_starter-blank.json`、`_starter-template.json` 設計上就是空白範本 |
+
+## 3.1 修正後複測（2026-11-06）
+
+三支範本已把 `Function` 節點改為 `Code`，並修掉複測時發現的節點設定錯誤（細節與逐項對照見 [`docs/n8n-version-compat.md`](../docs/n8n-version-compat.md) 的「修正後複測」）。同一組實例、同一份流程重跑 37 支，並對三支範本另做執行路徑測試。
+
+### 37 支重跑
+
+| 項目 | 2.37.3 | 2.44.6 | 2.46.6 |
+|---|---|---|---|
+| 匯入成功 | 37 / 37 | 37 / 37 | 37 / 37 |
+| 啟用成功 | 12 / 37 | 12 / 37 | 12 / 37 |
+| webhook 回 500 | 0 | 3 | 3 |
+
+與第 3 節相比，只有 `examples/templates/` 三支的結果改變；其餘 34 支的匯入、啟用、webhook 回應碼逐支比對沒有差異。`handover-trace` 匯入後啟用被拒（400），因為它只有 Manual Trigger，屬於範本設計；`retry-with-backoff` 與 `human-approval-gate` 含 `Wait` 節點，可以啟用。
+
+### 三支範本的執行路徑
+
+在暫存副本把 `Trigger` 換成 Webhook，再以 `curl` 觸發；repo 內的檔案沒有被改動。三個版本的結果相同。
+
+| 範本 | 情境 | 結果 |
+|---|---|---|
+| `retry-with-backoff` | 回 2xx | 走到 `Mark success` |
+| | 第一次回 500、第二次回 2xx | 等 2 秒後重試，走到 `Mark success` |
+| | 一直回 500 | 呼叫 4 次，等待 2/4/8 秒，進 `Dead-letter sink`，`finalAttempt` 為 4 |
+| | 網址無法連線 | 同上，進 `Dead-letter sink` |
+| `human-approval-gate` | 核准 | `Wait` 恢復後走 `Apply destructive action` |
+| | 拒絕（帶 `approver`） | 走 `Audit reject`，`approver` 取到傳入值 |
+| | 沒帶 `decision` | 走 `Audit reject` |
+| | 等待逾時（副本改為 1 分鐘） | 走 `Audit reject` |
+| `handover-trace` | 一般觸發 | 7 個節點成功，`Merge handovers` 輸出 2 筆，`downstreamIds` 含 A、B 兩個 ID |
+
+### 限制
+
+- 2xx 與 500 來自同一實例上的測試用 webhook；沒有對真實 API 試過 429 或逾時。
+- `human-approval-gate` 的 24 小時等待沒有等完；逾時分支只用 1 分鐘的副本走過。通知節點仍是 `Code` 佔位，沒有接真實通道。
+- 範本的 `Trigger` 是 Manual Trigger，使用者必須自行接上真實觸發器。
+- 只涵蓋這三個 2.x 版本。
 
 ## 4. `n8n-api-bridge` 端點
 
@@ -98,7 +137,8 @@
 觀察到的事實：
 
 1. 同一批範本在 2.44.6 與 2.46.6 的結果幾乎相同；與 2.37.3 的差異集中在三處：已棄用的 `Function` 節點、webhook 失敗回應碼、2.46.6 的憑證檢查。
-2. Pack 有 3 支範本在 2.44.6 以上無法匯入，尚未修正。
+2. 修正前，Pack 有 3 支範本在 2.44.6 以上無法匯入（第 3 節）。**已修正**：改用 `Code` 節點並修掉節點設定錯誤，複測三個版本都能匯入，執行路徑見 3.1。
+   **仍未修正**：webhook 失敗回應碼與憑證檢查是 n8n 版本行為；三支範本都需要使用者自行接上真實觸發器。
 3. `n8n-api-bridge` 文件有兩處與實際行為不符，已更正。
 4. 備份還原的路徑可行（SQLite）。
 

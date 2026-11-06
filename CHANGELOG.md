@@ -7,6 +7,18 @@
 - 修三支範本（`handover-trace`、`human-approval-gate`、`retry-with-backoff`）的棄用節點：`n8n-nodes-base.function` 改為 `n8n-nodes-base.code`（typeVersion 2）。n8n 2.44.6 以上會拒絕匯入 Function 節點。
 - `plugin.json`：n8n 版本資訊改為 2.37.3 / 2.44.6 / 2.46.6，對應報告改為 `tests/REPORT-4.md`，新增 `upstream` 欄位。
 - `reference-workflows/` 已移除（改為統計與即時查詢），`plugin.json` 的 `shared_resources` 同步拿掉該項。
+- 收錄 n8n 官方 Skill（[n8n-io/skills](https://github.com/n8n-io/skills)，Apache-2.0，Copyright 2026 n8n GmbH）15 個 `*-official` Skill 到 `skills/_vendor/`，釘選 commit 27b6b9f（plugin 1.3.0，2026-10-17）。上游檔案原樣收錄、未修改；只收 `skills/`，不收 hooks、opencode 與各平台外掛檔。
+- 授權：每個官方 Skill 資料夾新增一份 `LICENSE`（Apache-2.0 全文與版權聲明複本），`skills/_vendor/` 另放 `LICENSE-n8n-io-skills-APACHE-2.0`；`THIRD_PARTY_NOTICES.md` 新增第 6 節（含 §4 義務對照與商標聲明），README 加上定位說明與商標聲明。
+- 新增 `docs/mcp-to-rest-map.md`：官方 Skill 提到的 58 個 MCP 工具對照 REST 呼叫（17 個有對應、10 個部分對應、31 個沒有對應），含給 AI 的使用規則。
+- `plugin.json`、`install.sh`、`install.ps1`、`uninstall.sh`、`uninstall.ps1` 加入 15 個新 Skill（vendor 21 個）；`upstream-pins.json`、`SOURCE.md` 登錄 n8n-io/skills，`scripts/check-upstream.mjs` 改讀釘選的 1.3.0。
+- **參考來源與建議寫進註解**：新增 `spec/references-disclosure.md`（中英），統一收尾區塊：參考來源、建議事項、資安掃描結果，以 Layer 3 說明便條為正式紀錄，針對特定節點的建議寫在該節點 `notes`，對話只放摘要。`sticky-note-three-layer`、`sticky-note-to-workflow`、`tigerai-qa-mode`、`code-to-workflow`、`code2n8n-pipeline`、`tigerai-enterprise-patterns`、`n8n-code-to-native`、`n8n-security-governance`、`tigerai-example-finder` 同步接上。節點 `notes` 改為只在非顯而易見處寫並說明原因，與 n8n 官方建議對齊。
+- **資安護欄（建議式）**：新增 `spec/security-guardrails.md`（中英）與 13 條規則編號；護欄只是建議，不強制。`scripts/security-scan.mjs` 新增 `form:no-auth`、`tls:allow-unauthorized-certs`、`exec:*`、`file:rw-access`、`header:hardcoded-authorization`、`ai:agent-no-guardrails`、`ai:agent-code-tool`、`error:no-handling` 等規則（護欄類一律 warning），節點 notes 可寫 `guardrail-ack: <規則編號>` 表示已知悉，`--strict` 為選用；修正 `jscode:process-spawn` 對正規表達式 `.exec(` 的誤報，補掃 toolCode 與 LangChain Code 節點，pinData 納入機密掃描，機密樣式輸出遮蔽。新增測試夾具與 `run-security-scan-tests.mjs`，並接上 CI。
+- **原生節點優先**：新增 `spec/native-first.md`（中英）與 `scripts/native-first-check.mjs`（建議式，只要檔案可讀退出碼就是 0，不印程式碼內容），產生 Code 節點 N／M 與「可能可改用原生節點」的建議；新增測試與 CI。
+- **節點版本查表**：新增 `scripts/dump-node-versions.mjs` 與 `docs/node-versions/`（2.37.3、2.44.6、2.46.6 的節點目錄、README、版本差異），規格中的 typeVersion 改以查表為準。盤點後修正 DSL 把 `@trigger: discord` 對應到不存在的 `discordTrigger`（改為 Webhook）等文件中的節點引用。
+- **研究文件**：以 13,947 個 n8n.io 公開範本重寫 `research/node-frequency.md`、`patterns.md`，新增 `n8n-templates-method.md`、`n8n-templates-security.md`、`n8n-templates-code-vs-native.md`（中英）。repo 只放彙整統計與少量代表範本編號，不含範本檔。
+- **授權統一**：新增 `LICENSES.md` 集中清單；每個 Skill 資料夾（社群 6、官方 15、TigerAI 10）都附授權檔；`plugin.json` 的 `license` 改為 `MIT AND Apache-2.0`。
+- **範例修正**：`examples/templates/` 三支範本修正實際錯誤（IF `between`、迴圈狀態、核准連結簽章、Merge 覆蓋、Wait 逾時）；`examples/einvoice-n8n/workflows/einvoice-void-with-approval.workflow.json` 修正核准連結的簽章接法（`?` 改 `&`）、IF v1 的無效運算 `equals` 改 `equal`，並把通知文字中字面的 `\n` 改成真正換行。
+- **實測紀錄**：新增 `tests/REPORT-4.md`、`docs/n8n-version-compat.md`、`docs/n8n-upgrade-rollback-sop.md`；`n8n-api-bridge` 更正 `PATCH` 為 405、不合格 `PUT` 為 400。
 
 ---
 

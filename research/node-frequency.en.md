@@ -25,7 +25,7 @@
 | Templates created in 2025-2026 | 12,789 (91.7%); the sample skews recent, see §11 |
 
 ### Key observations
-- Nearly all public templates carry stickyNote annotations (93.1%), and multi-block annotation is the norm, so allowing several stickies in Layer 1 / Layer 3 matches convention. This also reflects that public templates are written for other readers; internal workflows will not necessarily show the same rate.
+- Nearly all public templates carry stickyNote annotations (93.1%), and multi-block annotation is the norm, so allowing several stickies in Layer 1 / Layer 3 matches convention. This also reflects that public templates are written for other readers; internal workflows will not necessarily show the same rate. Also, while sticky notes are common, node-level `notes` that explain why a node is configured a certain way appear in only 10.1% of templates (§9.6).
 - Only 24.8% of templates have any form of error handling. That is the gap AI should fill proactively, and the Layer 3 "known limits" section must flag it.
 - Templates are fairly large: median 19 nodes, P90 39. Template size must not be taken directly as AI's default size cap (see §2).
 
@@ -311,6 +311,7 @@ These are signals of whether a template does something at all, not a score of ho
 - With stickyNote: 12,978 / 13,947 (93.1%).
 - Without stickyNote: 969 (6.9%).
 - Median stickyNote count per template: 5.
+- These are sticky notes only; node-level `notes` and comments inside code are in §9.6, together with the overlap of sticky notes and node `notes`.
 
 ### 9.2 Error handling
 
@@ -353,6 +354,47 @@ A template counts as "having error handling" if any of the following holds: it c
 | `stopAndError` | 325 | 2.3% |
 
 > **Design implication**: `respondToWebhook` appears in only 1,357 templates, while 2,775 contain `webhook` (48.9% have a response node). No `respondToWebhook` does not mean no response (the Webhook node has its own response modes), but when designing a webhook flow, decide explicitly who responds, when, and what to return on failure.
+
+### 9.6 Annotations and explanations
+
+n8n has two places for explanatory text: sticky-note nodes (`stickyNote`) on the canvas, and the `notes` field on any ordinary node (with `notesInFlow` set to show that text under the node on the canvas). The tables below count them separately, then together.
+
+| Metric | Count | Share |
+|---|---|---|
+| Templates with sticky notes (`stickyNote`) | 12,978 / 13,947 | 93.1% |
+| Total sticky notes | 81,106 | median 5 per template, P90 10 |
+| Sticky note content length (71,961 notes with content) | median 187 characters | — |
+| Templates with at least one node-level `notes` | 1,404 / 13,947 | 10.1% |
+| Nodes with `notes` | 10,368 / 310,179 | 3.3% (excluding sticky nodes from the denominator: 10,196 / 229,073, about 4.5%) |
+| Nodes with `notesInFlow` true | 4,648 nodes across 722 templates | 5.2% of all templates |
+
+**Overlap of the two carriers**
+
+| Combination | Templates | Share of all |
+|---|---|---|
+| Both sticky notes and node `notes` | 1,342 | 9.6% |
+| Sticky notes only | 11,636 | 83.4% |
+| Node `notes` only | 62 | 0.4% |
+| Neither | 907 | 6.5% |
+
+**Adoption by size** (bucket definitions in §2)
+
+| Size | Templates | With sticky notes | With node `notes` |
+|---|---|---|---|
+| tiny | 315 | 13 (4.1%) | 8 (2.5%) |
+| small | 897 | 523 (58.3%) | 67 (7.5%) |
+| medium | 3,842 | 3,636 (94.6%) | 306 (8.0%) |
+| large | 6,233 | 6,156 (98.8%) | 629 (10.1%) |
+| xlarge | 2,660 | 2,650 (99.6%) | 394 (14.8%) |
+
+**Comments inside Code nodes**: there are 27,074 `code` nodes (those with `jsCode` or `pythonCode`), and 15,996 of them (59.1%) contain a comment. A comment is a whole line starting with `//` (JavaScript) or `#` (Python), or a `/* */` block comment; trailing comments and `//` inside strings (such as URLs) are not counted, to avoid overstating. This is descriptive only and says nothing about whether the comments are useful.
+
+**Reading the numbers**
+- Sticky notes are everywhere: over 90% of templates have them and nearly every large template does. But they are canvas-level overviews, typically a flow summary and setup steps, with a median under 200 characters each.
+- Node-level `notes` that explain why a node is configured a certain way are rare: about one template in ten uses them, and only about 39% (4,053) of the nodes that have `notes` set `notesInFlow` to show them on the canvas. Templates with node `notes` but no sticky notes are only 0.4%, so node `notes` almost always supplement sticky notes rather than replace them.
+- Comments inside code (59.1%) are far more common than node `notes` (3.3%): explanation tends to live in the code rather than on the canvas.
+- These are descriptive statistics. Having a comment does not make the content correct or consistent with the actual settings, and lacking one does not make a template poor. This section only describes the habits of public templates.
+- The Pack does not follow these proportions. The AI always adds the three-layer sticky notes (user request, AI implementation notes, references) and node-level `notes`, and discloses which sources it consulted; the rules are in [`../spec/references-disclosure.md`](../spec/references-disclosure.md).
 
 ---
 

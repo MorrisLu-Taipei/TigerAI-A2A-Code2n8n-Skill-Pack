@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "content": "## Pattern: Human approval gate\n\n**When to use**: workflow with a destructive or financially material step. Pauses on a `Wait → Resume on webhook` node; approver clicks the approve / reject link in the notification.\n\n**Nodes that implement it**:\n- `Trigger`\n- `Notify approver` — replace with Slack / email / Teams. Body MUST embed `{{$resumeUrl}}/approve` and `{{$resumeUrl}}/reject`.\n- `Wait for approval` — `resumeOn=webhook`, timeout configurable\n- `Approved?` IF — branches the workflow\n- `Apply destructive action` — your real action; only runs after approve\n- `Audit reject` — logs who rejected (Code node placeholder — replace with audit log writer)\n\n**Customise before activating**:\n1. Wire `Notify approver` to your real channel.\n2. Set the timeout on `Wait for approval` to match SLA (default 24 h).\n3. Replace `Apply destructive action` with the real call.\n4. Replace `Audit reject` with a write to your audit log.\n\n**Satisfies n8n-security-governance rules**: §3 destructive actions require explicit human approval · §6 audit trail must record approver identity + decision · §9 timeouts must be bounded.",
+        "content": "## Pattern: Human approval gate\n\n**When to use**: workflow with a destructive or financially material step. Pauses on a `Wait → Resume on webhook` node; approver clicks the approve / reject link in the notification.\n\n**Nodes that implement it**:\n- `Trigger` — manual only; replace with your real trigger\n- `Notify approver` — replace with Slack / email / Teams. Body MUST embed the two links built in that node (`approveUrl` / `rejectUrl` = `$execution.resumeUrl` + `&decision=approve|reject`; the URL already has `?signature=`). They are GET links.\n- `Wait for approval` — `resume=webhook`, wait limit 24 h (expires to the reject branch)\n- `Approved?` IF — `decision` = `approve` goes to the action, anything else (or timeout) to the reject branch\n- `Apply destructive action` — your real action; only runs after approve\n- `Audit reject` — logs who rejected (Code node placeholder — replace with audit log writer)\n\n**Customise before activating**:\n1. This is a pattern template, not a standalone flow: `Trigger` is a Manual Trigger, so nothing can start it once active. Connect a real trigger (Webhook / Schedule / app trigger) before activating. 這是模式範本，需自行接上真實觸發器後才能啟用。\n2. Wire `Notify approver` to your real channel.\n3. Set the wait limit on `Wait for approval` to match SLA (default 24 h).\n4. Replace `Apply destructive action` with the real call.\n5. Replace `Audit reject` with a write to your audit log.\n\n**Satisfies n8n-security-governance rules**: §3 destructive actions require explicit human approval · §6 audit trail must record approver identity + decision · §9 timeouts must be bounded.",
         "height": 460,
         "width": 540
       },
@@ -33,7 +33,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// REPLACE THIS with a real Slack / email / Teams send node.\n// The body MUST contain $resumeUrl/approve and $resumeUrl/reject so the\n// Wait node can pick up the decision.\nconst current = $input.first().json;\nreturn [{ json: { ...current, notified: true } }];"
+        "jsCode": "// REPLACE THIS with a real Slack / email / Teams send node.\n// The message MUST contain approveUrl and rejectUrl so the Wait node can\n// pick up the decision (both resume the same execution, decision= tells which).\n// $execution.resumeUrl already carries ?signature=..., so append with & not ?.\nconst current = $input.first().json;\nconst base = $execution.resumeUrl;\nconst sep = base.includes('?') ? '&' : '?';\nreturn [{ json: { ...current, notified: true, approveUrl: `${base}${sep}decision=approve`, rejectUrl: `${base}${sep}decision=reject` } }];"
       },
       "id": "notify-1",
       "name": "Notify approver",
@@ -44,38 +44,43 @@
     {
       "parameters": {
         "resume": "webhook",
-        "options": {
-          "webhookSuffix": "approve",
-          "responseTimeout": "24h"
-        }
+        "limitWaitTime": true,
+        "limitType": "afterTimeInterval",
+        "resumeAmount": 24,
+        "resumeUnit": "hours",
+        "options": {}
       },
       "id": "wait-1",
       "name": "Wait for approval",
       "type": "n8n-nodes-base.wait",
-      "typeVersion": 1,
+      "typeVersion": 1.1,
       "position": [600, -40]
     },
     {
       "parameters": {
         "conditions": {
-          "string": [
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3 },
+          "conditions": [
             {
-              "value1": "={{ $json.body?.decision ?? $json.query?.decision ?? 'reject' }}",
-              "operation": "equals",
-              "value2": "approve"
+              "id": "cond-decision",
+              "leftValue": "={{ $json.body?.decision ?? $json.query?.decision ?? 'reject' }}",
+              "rightValue": "approve",
+              "operator": { "type": "string", "operation": "equals" }
             }
-          ]
-        }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
       "id": "if-1",
       "name": "Approved?",
       "type": "n8n-nodes-base.if",
-      "typeVersion": 1,
+      "typeVersion": 2.3,
       "position": [840, -40]
     },
     {
       "parameters": {
-        "jsCode": "// REPLACE WITH YOUR REAL DESTRUCTIVE ACTION (delete user, transfer funds, etc).\n// This node only runs after explicit approve.\nconst current = $input.first().json;\nreturn [{ json: { ok: true, action: 'applied', correlationId: current.correlationId } }];"
+        "jsCode": "// REPLACE WITH YOUR REAL DESTRUCTIVE ACTION (delete user, transfer funds, etc).\n// This node only runs after explicit approve.\n// After Wait resumes, the input is the approver's request, not the earlier\n// items, so read correlationId from 'Stamp correlation'.\nconst correlationId = $('Stamp correlation').first().json.correlationId;\nreturn [{ json: { ok: true, action: 'applied', correlationId } }];"
       },
       "id": "apply-1",
       "name": "Apply destructive action",
@@ -85,7 +90,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// REPLACE with a real audit log writer.\nconst current = $input.first().json;\nreturn [{ json: { audit: 'rejected', approver: current.body?.approver ?? 'unknown', correlationId: current.correlationId } }];"
+        "jsCode": "// REPLACE with a real audit log writer.\n// Input is the approver's request (or empty on wait timeout); correlationId\n// lives in 'Stamp correlation'.\nconst req = $input.first().json;\nconst correlationId = $('Stamp correlation').first().json.correlationId;\nreturn [{ json: { audit: 'rejected', approver: req.query?.approver ?? req.body?.approver ?? 'unknown', correlationId } }];"
       },
       "id": "reject-1",
       "name": "Audit reject",

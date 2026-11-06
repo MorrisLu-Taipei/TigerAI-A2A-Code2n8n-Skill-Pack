@@ -50,7 +50,7 @@
     {
       "parameters": {
         "channel": "__REPLACE_ME__SLACK_CHANNEL__",
-        "text": "=🛑 *VOID approval required*\\nInvoice: `{{ $json.input?.invoiceNumber }}` (provider: {{ $json.provider }})\\nRequested by: {{ $json.requestedBy }}\\nReason: {{ $json.reason }}\\nCorrelation: `{{ $json.correlationId }}`\\n\\nApprove: {{ $execution.resumeUrl }}?decision=approve\\nReject: {{ $execution.resumeUrl }}?decision=reject\\n\\n⚠ Void is irreversible. The approver field in the audit row is taken from this resume URL caller — in production, front it with HMAC verification."
+        "text": "=🛑 *VOID approval required*\nInvoice: `{{ $json.input?.invoiceNumber }}` (provider: {{ $json.provider }})\nRequested by: {{ $json.requestedBy }}\nReason: {{ $json.reason }}\nCorrelation: `{{ $json.correlationId }}`\n\nApprove: {{ $execution.resumeUrl }}&decision=approve\nReject: {{ $execution.resumeUrl }}&decision=reject\n\n⚠ Void is irreversible. The approver field in the audit row is taken from this resume URL caller — in production, front it with HMAC verification."
       },
       "id": "slack-1",
       "name": "Notify approver",
@@ -98,7 +98,7 @@
           "string": [
             {
               "value1": "={{ $json.decision }}",
-              "operation": "equals",
+              "operation": "equal",
               "value2": "approve"
             }
           ]
