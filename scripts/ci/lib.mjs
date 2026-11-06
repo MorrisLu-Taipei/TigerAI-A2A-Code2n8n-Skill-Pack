@@ -109,12 +109,15 @@ const cleanItem = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, 
 export function finalizeReport(r) {
   const blocking = dedupe((r.blocking ?? []).map(cleanItem), b => `${b.code}|${b.file ?? ''}|${b.node ?? ''}|${b.message ?? ''}`);
   const advisories = dedupe((r.advisories ?? []).map(cleanItem), a => `${a.source}|${a.rule}|${a.file ?? ''}|${a.node ?? ''}|${a.message ?? ''}`);
+  const incomplete = dedupe((r.incomplete ?? []).map(cleanItem), x => `${x.reason}|${x.file ?? ''}`);
   const byCode = {};
   for (const b of blocking) byCode[b.code] = (byCode[b.code] ?? 0) + 1;
+  // 三態：有阻擋項 = fail；沒有阻擋項但檢查沒跑完（逾時、無法歸類的啟用失敗）= incomplete；否則 pass
   return {
     ...r,
+    incomplete,
     ...(Array.isArray(r.dynamic) ? { dynamic: r.dynamic.map(d => ({ ...cleanItem(d), executions: (d.executions ?? []).map(x => clip(x, 40)) })) } : {}),
-    status: blocking.length > 0 ? 'fail' : 'pass',
+    status: blocking.length > 0 ? 'fail' : incomplete.length > 0 ? 'incomplete' : 'pass',
     blocking,
     advisories,
     counts: {
@@ -122,6 +125,7 @@ export function finalizeReport(r) {
       filesWithBlocking: new Set(blocking.map(b => b.file).filter(Boolean)).size,
       blocking: blocking.length,
       advisories: advisories.length,
+      incomplete: incomplete.length,
       blockingByCode: byCode,
     },
   };
@@ -151,6 +155,7 @@ const SOURCE_TITLES = {
   'node-catalog': '舊節點（建議）',
   'workflow-refs': 'workflow 引用（建議）',
   activation: '觸發節點（建議）',
+  matrix: '多版本對照（建議）',
   'n8n-run': '動態檢查提示',
   ci: '其他提示',
 };
@@ -159,11 +164,20 @@ export function renderComment(r) {
   const L = [];
   L.push('> 建議項不會讓 CI 失敗；只有阻擋項會使檢查失敗。', '');
   L.push('## n8n workflow CI 報告', '');
-  L.push(`**結果：${r.status === 'pass' ? '通過（無阻擋項）' : '未通過'}**　目標版本：${idCell(r.target)}　檢查檔案：${r.counts.files} 個　阻擋項：${r.counts.blocking}　建議項：${r.counts.advisories}`, '');
+  const verdict = r.status === 'pass' ? '通過（無阻擋項）'
+    : r.status === 'incomplete' ? '未完成（沒有阻擋項，但檢查沒有跑完，需重跑或人工複核，不能視為通過）'
+    : '失敗';
+  L.push(`**結果：${verdict}**　目標版本：${idCell(r.target)}　檢查檔案：${r.counts.files} 個　阻擋項：${r.counts.blocking}　建議項：${r.counts.advisories}`, '');
 
   if (r.blocking.length > 0) {
     L.push(`### 阻擋項（${r.blocking.length}）`, '', '必須修正後才能合併。', '');
     table(L, ['代碼', '檔案', '節點', '說明'], r.blocking.map(b => [idCell(b.code), txt(b.file), txt(b.node), txt(b.message)]), r.blocking.length);
+  }
+
+  const inc = Array.isArray(r.incomplete) ? r.incomplete : [];
+  if (inc.length > 0) {
+    L.push(`### 未完成項（${inc.length}）`, '', '以下檢查沒有跑完，結果不完整；請重跑或人工複核。', '');
+    table(L, ['原因', '檔案'], inc.map(x => [idCell(x.reason), txt(x.file)]), inc.length);
   }
 
   if (Array.isArray(r.dynamic) && r.dynamic.length > 0) {

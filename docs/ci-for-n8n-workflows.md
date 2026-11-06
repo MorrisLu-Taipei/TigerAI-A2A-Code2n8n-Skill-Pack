@@ -42,7 +42,8 @@ PR 開啟或更新
 | `node-catalog` | 規則 `node:hidden-legacy`：目錄標示 `hidden: true` 但未 `deprecated` 的舊節點。訊息為「此節點在節點面板中已隱藏，屬舊節點，建議評估新版替代」；本 Pack 在 2.44.6、2.46.6 實測這類節點仍可匯入，是否阻擋以實測為準，不以 hidden 旗標為準 |
 | `workflow-refs` | 規則 `workflow:unknown-subworkflow-reference`：Execute Workflow 節點的 `workflowId` 在同一批檔案與 `--existing-workflow-ids` 清單中都找不到。可能指向目標環境既有的 workflow，所以只提醒 |
 | `activation` | 規則 `trigger:external-registration`：workflow 含需要向外部服務註冊的觸發節點（Telegram、GitHub、Slack、IMAP 等）。訊息：此 workflow 的觸發節點需要對外註冊，無法在無網路測試環境驗證啟用，建議在 staging 實測 |
-| `n8n-run` | 動態檢查的提示：`NO_TRIGGER`（沒有觸發節點，屬於模式範本）、`activate:unverified-external`（啟用失敗但屬外部註冊或網路造成）、`activate:unverified-unknown`（啟用失敗但無法歸類，**需人工複核**）、`workflow:timeout`（單一 workflow 逾時，屬基礎設施問題，請重跑）、執行狀態為 error（假憑證下預期會發生）、假憑證建立失敗 |
+| `matrix` | 規則 `matrix:version-difference`：`matrix.sh` 的跨版本差異（同一個檔案在不同 n8n 版本的匯入或啟用結果不同） |
+| `n8n-run` | 動態檢查的提示：`NO_TRIGGER`（沒有觸發節點，屬於模式範本）、`activate:unverified-external`（啟用失敗但屬外部註冊或網路造成）、`activate:unverified-unknown`（啟用失敗但無法歸類，**需人工複核**，整體狀態為 `incomplete`）、`workflow:timeout`（單一 workflow 逾時，屬基礎設施問題，請重跑；整體狀態為 `incomplete`）、執行狀態為 error（假憑證下預期會發生）、假憑證建立失敗 |
 | `ci` | 沒有提供憑證允許清單而略過檢查、webhook path 是運算式而無法靜態比對 |
 
 ## 腳本與用法
@@ -71,7 +72,7 @@ node scripts/ci/check-workflows.mjs \
 ```bash
 N8N_URL=<拋棄式實例網址> N8N_API_KEY=<金鑰> \
   node scripts/ci/run-on-n8n.mjs --dir <workflows目錄> \
-  [--target-version <版本>] [--workflow-timeout <秒>] [--out <檔>] [--merge-into ci-report.json] [--comment <檔>]
+  [--target-version <版本>] [--workflow-timeout <秒>] [--disposable] [--hold-active] [--out <檔>] [--merge-into ci-report.json] [--comment <檔>]
 
 # 對「全新空實例」自動建立擁有者與 API 金鑰（密碼與金鑰只放記憶體）
 N8N_URL=<拋棄式實例網址> node scripts/ci/run-on-n8n.mjs --bootstrap --dir <workflows目錄>
@@ -86,26 +87,30 @@ N8N_URL=<拋棄式實例網址> node scripts/ci/run-on-n8n.mjs --bootstrap --dir
 - `--merge-into` 把結果合併進靜態檢查的報告（阻擋項與建議項相加、重算狀態與數量），並用合併後的內容重寫 `--comment`；`--out` 則寫出只含動態結果的報告。
 - 輸出與報告不含 API 金鑰、密碼或 cookie。`--bootstrap` 結束時會嘗試刪除自己建立的 API 金鑰；擁有者帳號留在實例內，所以實例必須是丟棄式的。
 - 其他選項：`--settle-seconds`（觸發 webhook 後等執行紀錄，預設 3）、`--wait-seconds`（等實例就緒，預設 30）。
-- `--workflow-timeout <秒>`（預設 60）：單一 workflow 從建立假憑證到讀完執行紀錄的總時限。逾時**不算 workflow 的錯**：中止該檔、照常清理，只列建議項 `workflow:timeout`，請重跑一次；持續發生再調高時限或檢查實例資源。
+- `--workflow-timeout <秒>`（預設 60）：單一 workflow 從建立假憑證到讀完執行紀錄的總時限。逾時**不算 workflow 的錯**：中止該檔、照常清理，列建議項 `workflow:timeout`，整體狀態為 `incomplete`（見上），請重跑一次；持續發生再調高時限或檢查實例資源。
+- `--disposable`：目標是用完即銷毀的實例（`matrix.sh` 起的容器就是）。結束時每個 workflow 只嘗試刪除一次，遇到「還在取消註冊」的 409 就放棄、不等待，數量記在 `cleanup.workflowsAbandoned`（`workflowsCreated = workflowsDeleted + workflowsAbandoned`）。**預設（沒加這個選項）維持原行為**：遇到 409 最長等約 4 分鐘，確保把自己建立的東西刪乾淨，適合會長期存在的測試實例。不要對需要保留的實例使用 `--disposable`。
+- `--hold-active`（預設關閉）：先匯入並啟用整批，最後才統一停用與清理，讓同批的 webhook 路徑衝突在啟用時出現 409（`WEBHOOK_PATH_CONFLICT`）。預設的逐檔流程是「啟用、呼叫、停用、刪除」，前一個檔案已刪除，所以幾乎看不到同批衝突。適用情境：想在動態階段再確認一次同批路徑衝突、或需要觀察多個 workflow 同時啟用的行為。代價：整批同時啟用（占用較多記憶體與連線）、含外部註冊型觸發的檔案會把取消註冊的等待集中到最後、單一檔案出問題時影響範圍較大。**同批與既有路徑衝突的主要防線仍是靜態檢查**（`check-workflows.mjs` 比對同批與 `--existing-webhook-paths`），`--hold-active` 只是補充，且只能偵測「同一批」的衝突，看不到目標環境既有 workflow 的路徑。
 
 ### `scripts/ci/matrix.sh`（多版本對照）
 
 ```bash
 bash scripts/ci/matrix.sh --dir <workflows目錄> \
   [--versions "2.37.3 2.44.6 2.46.6"] [--out-dir <目錄>] [--image docker.n8n.io/n8nio/n8n] \
-  [--offline] [--workflow-timeout <秒>]
+  [--offline] [--workflow-timeout <秒>] [--hold-active] [--no-disposable]
 ```
 
 每個版本各起一個全新容器：`docker run -d --rm`、只綁 `127.0.0.1` 的隨機 port、`--cpus 1 --memory 1g`、空資料目錄（`mktemp -d`，結束刪除）、隨機的 `N8N_ENCRYPTION_KEY`、`N8N_DIAGNOSTICS_ENABLED=false`、`N8N_SECURE_COOKIE=false`；等實例就緒後跑 `run-on-n8n.mjs --bootstrap`，最後 `docker stop`（`--rm` 會自動移除容器）。`--offline`：容器改用 `--network none`（不綁 port、不連外），腳本以 `docker cp` 放進容器，在容器內用 `docker exec` 跑 `run-on-n8n.mjs`。沒有 `--offline` 時，容器走預設網路，n8n 為了啟用 Telegram、GitHub 這類觸發節點，會拿假憑證向外部服務發出請求；不希望如此就加 `--offline`（或在 runner 層擋掉對外連線）。**找不到映像時直接報錯，不會自動拉取。**
 
-產出（在 `--out-dir`）：`ci-report-<版本>.json`、`matrix-report.json`、`matrix-report.md`（對照表）。退出碼：0 各版本都沒有阻擋項；1 有版本出現阻擋項；2 使用錯誤、找不到映像或實例起不來。
+`matrix.sh` 起的容器都是拋棄式的，所以**預設對 `run-on-n8n.mjs` 加 `--disposable`**（`--no-disposable` 可改回預設清理，一般用不到）；`--hold-active` 會轉交給 `run-on-n8n.mjs`。
+
+產出（在 `--out-dir`）：`ci-report-<版本>.json`、`matrix-report.json`、`matrix-report.md`（對照表）。`matrix-report.json` 另有 `advisories`（來源 `matrix`，規則 `matrix:version-difference`）：同一個檔案在不同版本的匯入或啟用結果不同時各列一則，只是提醒。退出碼：0 各版本都沒有阻擋項；1 有版本出現阻擋項；2 使用錯誤、找不到映像或實例起不來。
 
 ### 退出碼總表
 
 | 腳本 | 0 | 1 | 2 |
 |---|---|---|---|
 | `check-workflows.mjs` | 無阻擋項 | 有阻擋項 | 使用錯誤、缺少版本目錄、內部工具失敗 |
-| `run-on-n8n.mjs` | 無阻擋項 | 有阻擋項 | 使用錯誤、連不上實例、`--bootstrap` 失敗 |
+| `run-on-n8n.mjs` | 無阻擋項（含 `incomplete`） | 有阻擋項 | 使用錯誤、連不上實例、`--bootstrap` 失敗 |
 | `matrix.sh` | 各版本無阻擋項 | 有版本出現阻擋項 | 使用錯誤、映像不存在、實例起不來 |
 
 ## 啟用失敗的分類（依實測）
@@ -118,7 +123,7 @@ bash scripts/ci/matrix.sh --dir <workflows目錄> \
 | 2 | 結構性 | `configuration issues`、`Missing or invalid required parameters`、`Unrecognized node type`、`not available in version`、`Cannot use a "…" node`（棄用）、`Cycle detected` | 阻擋 `ACTIVATE_FAILED` |
 | 3 | 外部或網路 | `ENOTFOUND`、`ECONNREFUSED`、`ECONNRESET`、`EAI_AGAIN`、`ETIMEDOUT`、`getaddrinfo`、`timeout`、`socket hang up`、`fetch failed`、`The DNS server returned an error`、`The resource you are requesting could not be found`、`The Webhook can not work on "localhost"`、`custom domain`、`401`、`403`、`unauthorized`、`forbidden`、`Bad credentials`、`invalid_auth` | 該 workflow 含外部註冊型觸發節點：建議 `activate:unverified-external`；否則視為無法歸類 |
 | 4 | 較寬鬆的結構性 | `Cannot publish workflow`、`invalid workflow`（前面都沒命中時） | 阻擋 `ACTIVATE_FAILED` |
-| 5 | 無法歸類 | 其餘（含 HTTP 5xx、連不上實例） | 建議 `activate:unverified-unknown`，**需人工複核** |
+| 5 | 無法歸類 | 其餘（含 HTTP 5xx、連不上實例） | 建議 `activate:unverified-unknown`，**需人工複核**，整體狀態為 `incomplete` |
 
 另外：HTTP 409 一律是 `WEBHOOK_PATH_CONFLICT`；沒有觸發節點的 400 是提示 `NO_TRIGGER`。**分類不確定時一律歸為建議而非阻擋。**
 
@@ -149,7 +154,7 @@ bash scripts/ci/matrix.sh --dir <workflows目錄> \
 
 ```json
 {
-  "status": "pass | fail",
+  "status": "pass | incomplete | fail",
   "target": "2.44.6",
   "blocking":   [{ "code": "NODE_DEPRECATED", "file": "a.json", "node": "Old Function", "message": "…" }],
   "advisories": [{ "source": "security-scan", "rule": "webhook:no-auth", "file": "a.json", "node": "Webhook", "message": "…" }],
@@ -157,10 +162,15 @@ bash scripts/ci/matrix.sh --dir <workflows目錄> \
 }
 ```
 
-- `status` 只由 `blocking` 決定：有任何一項就是 `fail`。
+- `status` 有三態：
+  - `fail`：`blocking` 有任何一項。
+  - `incomplete`：沒有阻擋項，但檢查沒有跑完（`incomplete` 陣列非空）。原因有兩種：`workflow-timeout`（單一 workflow 逾時）、`activate-unverified-unknown`（啟用失敗但無法歸類）。PR 註解會顯示「未完成（需重跑或人工複核）」，**不會顯示通過**。
+  - `pass`：沒有阻擋項，也沒有未完成項。
+- 退出碼與狀態的關係：只有 `fail` 使腳本以 1 結束；`incomplete` 仍是 0（依「只有阻擋類使 CI 失敗」的決策）。想把未完成也當成失敗的流程，請自行讀 `ci-report.json` 的 `status`，例如 `node -e "process.exit(JSON.parse(require('fs').readFileSync('ci-report.json','utf8')).status==='pass'?0:1)"`。
+- `incomplete`（陣列）：`[{ "reason": "workflow-timeout", "file": "a.json" }]`；`counts.incomplete` 為其數量。
 - `message` 只寫規則名稱、檔名、節點名與固定說明，不會放疑似機密的原文。
 - 來自使用者 workflow 的字串（檔名、節點名稱、訊息片段）在報告中會去掉換行與控制字元，並限制每欄最長 200 字元（超過以 `…` 結尾）。
-- 動態檢查與合併後的報告另有 `dynamic`（每個檔案的 `import`、`activate`、`webhook`、`executions`）與 `cleanup`。`activate` 的值為 `ok`、`failed`、`conflict`、`no-trigger`、`skipped`。
+- 動態檢查與合併後的報告另有 `dynamic`（每個檔案的 `import`、`activate`、`webhook`、`executions`）與 `cleanup`。`activate` 的值為 `ok`（成功）、`failed`（結構性失敗，阻擋）、`conflict`（409，阻擋）、`no-trigger`（沒有觸發節點）、`unverified`（啟用失敗但屬外部註冊或無法歸類，只列建議）、`skipped`（匯入失敗等原因沒有嘗試）；逾時的檔案另有 `timeout: true`。
 
 ## PR 註解的防注入
 
@@ -247,4 +257,4 @@ node scripts/__test__/run-ci-tests.mjs                 # 靜態部分，不需�
 node scripts/__test__/run-ci-tests.mjs --with-n8n      # 另用 matrix.sh 在本機容器上跑動態部分
 ```
 
-夾具放在 `scripts/__test__/ci-fixtures/`（`pass-*`、`advisory-*`、`fail-*`），檔名與預期結果寫在 `scripts/__test__/expected.json`。測試會斷言：每個 `fail-*` 恰好得到預期的阻擋碼、每個 `pass-*` 與 `advisory-*` 退出碼為 0、建議項不會使狀態變成 `fail`、輸出不含疑似機密。`fail-secret` 夾具內只放佔位符，測試時才在暫存目錄展開成假金鑰。
+報告與註解的三態另有 `scripts/__test__/ci-report-fixtures/`（通過、失敗、逾時未完成、啟用無法歸類、失敗且未完成各一份）。夾具放在 `scripts/__test__/ci-fixtures/`（`pass-*`、`advisory-*`、`fail-*`），檔名與預期結果寫在 `scripts/__test__/expected.json`。測試會斷言：每個 `fail-*` 恰好得到預期的阻擋碼、每個 `pass-*` 與 `advisory-*` 退出碼為 0、建議項不會使狀態變成 `fail`、輸出不含疑似機密。`fail-secret` 夾具內只放佔位符，測試時才在暫存目錄展開成假金鑰。

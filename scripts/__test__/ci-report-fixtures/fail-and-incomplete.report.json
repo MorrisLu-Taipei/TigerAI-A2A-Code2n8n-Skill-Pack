@@ -1,0 +1,21 @@
+{
+  "target": "2.44.6",
+  "counts": {
+    "files": 2
+  },
+  "blocking": [
+    {
+      "code": "IMPORT_FAILED",
+      "file": "b.workflow.json",
+      "node": null,
+      "message": "匯入失敗"
+    }
+  ],
+  "advisories": [],
+  "incomplete": [
+    {
+      "reason": "workflow-timeout",
+      "file": "a.workflow.json"
+    }
+  ]
+}

@@ -195,6 +195,27 @@ try {
   expect(/\\\[b\\\]\\\(c\\\) \\<d\\> \\`e\\`/.test(lib.mdText('[b](c) <d> `e`')), 'mdText：方括號、圓括號、角括號與反引號應被反斜線跳脫');
   expect(!lib.mdText('@admin').includes('@admin') && lib.mdText('x'.repeat(500)).length <= 201, 'mdText：@mention 要被拆開、長度要被限制');
 
+  // ---- 三態結果（通過／未完成／失敗）與註解 ---------------------------------------------------------------
+  const rf = n => lib.finalizeReport(JSON.parse(readFileSync(join(here, 'ci-report-fixtures', n), 'utf8')));
+  const rp = rf('pass.report.json'), rfail = rf('fail.report.json'), rinc = rf('incomplete-timeout.report.json');
+  const runk = rf('incomplete-unknown.report.json'), rboth = rf('fail-and-incomplete.report.json');
+  expect(rp.status === 'pass' && rfail.status === 'fail' && rinc.status === 'incomplete' && runk.status === 'incomplete', '三態：finalizeReport 的 status 不對');
+  expect(rboth.status === 'fail', '三態：有阻擋項時即使未完成也應為 fail');
+  expect(rinc.counts.incomplete === 1 && rinc.counts.blocking === 0 && rp.counts.incomplete === 0, '三態：counts.incomplete 不對');
+  const cPass = lib.renderComment(rp), cFail = lib.renderComment(rfail), cInc = lib.renderComment(rinc), cUnk = lib.renderComment(runk), cBoth = lib.renderComment(rboth);
+  expect(cPass.includes('結果：通過') && !cPass.includes('未完成') && !cPass.includes('結果：失敗'), '三態：pass 的註解應顯示通過');
+  expect(cFail.includes('結果：失敗') && !cFail.includes('結果：通過'), '三態：fail 的註解應顯示失敗');
+  expect(cInc.includes('結果：未完成') && cInc.includes('需重跑或人工複核') && !cInc.includes('結果：通過') && !cInc.includes('結果：失敗'), '三態：incomplete 的註解應顯示未完成，不得顯示通過');
+  expect(cInc.includes('### 未完成項') && cInc.includes('workflow-timeout') && cInc.includes('### 建議項'), '三態：未完成的註解應列出未完成項與建議項');
+  expect(cUnk.includes('結果：未完成') && cUnk.includes('activate-unverified-unknown'), '三態：啟用失敗無法歸類也應顯示未完成');
+  expect(cBoth.includes('結果：失敗') && cBoth.includes('### 未完成項') && cBoth.indexOf('### 阻擋項') < cBoth.indexOf('### 未完成項'), '三態：失敗且未完成時，結果為失敗並仍列出未完成項');
+  for (const c of [cPass, cFail, cInc, cUnk, cBoth]) expect(c.split('\n')[0].includes('建議項不會讓 CI 失敗'), '三態：註解第一行都應有建議項說明');
+  expect(cInc.includes('多版本對照（建議）') && !cInc.includes('#### matrix'), 'matrix 來源的建議項應顯示中文標題，不是原始鍵值');
+  for (const src of ['security-scan', 'native-first', 'node-catalog', 'workflow-refs', 'activation', 'matrix', 'n8n-run', 'ci']) {
+    const c = lib.renderComment(lib.finalizeReport({ target: '2.44.6', blocking: [], advisories: [{ source: src, rule: 'x:y', file: 'f.json', node: null, message: 'm' }], counts: { files: 1 } }));
+    expect(!c.includes(`#### ${src}`), `來源 ${src}：註解的標題不應是原始鍵值`);
+  }
+
   // ---- 報告格式與註解 ------------------------------------------------------------------
   const rep = all.report;
   expect(['status', 'target', 'blocking', 'advisories', 'counts'].every(k => k in rep), '報告缺少必要欄位');
@@ -258,7 +279,9 @@ try {
       const raw = readFileSync(f, 'utf8');
       expect(!/eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\./.test(raw), `${v}：報告含有疑似 token`);
       const rep2 = JSON.parse(raw);
-      expect(rep2.cleanup.workflowsCreated === rep2.cleanup.workflowsDeleted && rep2.cleanup.credentialsCreated === rep2.cleanup.credentialsDeleted, `${v}：建立與刪除的數量不一致`);
+      expect(rep2.cleanup.workflowsCreated === rep2.cleanup.workflowsDeleted + rep2.cleanup.workflowsAbandoned && rep2.cleanup.credentialsCreated === rep2.cleanup.credentialsDeleted, `${v}：建立數量應等於刪除加放棄的數量`);
+      expect(rep2.cleanup.disposable === true && rep2.cleanup.holdActive === false, `${v}：matrix.sh 預設應使用 --disposable，且不使用 --hold-active`);
+      expect(rep2.status === 'pass' || rep2.status === 'fail', `${v}：整批夾具不應是 incomplete（實際 ${rep2.status}）`);
       expect(rep2.cleanup.workflowsCreated > 0, `${v}：沒有建立任何 workflow`);
       for (const [file, exp0] of Object.entries(dyn)) {
         const exp = { ...exp0, ...(exp0.overrides?.[v] ?? {}) };
@@ -283,12 +306,58 @@ try {
     expect(existsSync(tf), '逾時測試：沒有產生報告');
     if (existsSync(tf)) {
       const tr = JSON.parse(readFileSync(tf, 'utf8'));
-      expect(tr.status === 'pass' && tr.blocking.length === 0, '逾時測試：逾時不應產生阻擋項');
+      expect(tr.status === 'incomplete' && tr.blocking.length === 0 && tr.counts.incomplete === 2, `逾時測試：逾時不應產生阻擋項，狀態應為 incomplete（實際 ${tr.status}）`);
+      expect(tr.incomplete.every(x => x.reason === 'workflow-timeout'), '逾時測試：未完成原因應為 workflow-timeout');
+      const tc = lib.renderComment(tr);
+      expect(tc.includes('結果：未完成') && !tc.includes('結果：通過'), '逾時測試：註解不得顯示通過');
       expect(tr.advisories.filter(a => a.rule === 'workflow:timeout').length === 2, '逾時測試：每個逾時的 workflow 應有一則 workflow:timeout 建議項');
-      expect(tr.cleanup.workflowsCreated === tr.cleanup.workflowsDeleted && tr.cleanup.credentialsCreated === tr.cleanup.credentialsDeleted, '逾時測試：逾時後建立與刪除的數量應一致');
+      expect(tr.cleanup.workflowsCreated === tr.cleanup.workflowsDeleted + tr.cleanup.workflowsAbandoned && tr.cleanup.credentialsCreated === tr.cleanup.credentialsDeleted, '逾時測試：逾時後建立數量應等於刪除加放棄的數量');
       expect(tr.dynamic.every(d => d.timeout === true), '逾時測試：dynamic 項目應標示 timeout');
     }
+    if (existsSync(join(outDir, 'matrix-report.json'))) {
+      const mr = JSON.parse(readFileSync(join(outDir, 'matrix-report.json'), 'utf8'));
+      expect(Array.isArray(mr.advisories) && mr.advisories.every(a => a.source === 'matrix'), 'matrix-report.json：advisories 的來源應為 matrix');
+      expect(mr.advisories.some(a => a.rule === 'matrix:version-difference' && a.file === 'pass-webhook-branch.workflow.json'), 'matrix-report.json：pass-webhook-branch 在 2.37.3 的結果不同，應有跨版本差異建議');
+      expect(readFileSync(join(outDir, 'matrix-report.md'), 'utf8').includes('跨版本差異'), 'matrix-report.md：應列出跨版本差異');
+    }
     expect(existsSync(join(outDir, 'matrix-report.json')) && existsSync(join(outDir, 'matrix-report.md')), '沒有產生 matrix-report.json 或 matrix-report.md');
+    // --hold-active：同批路徑衝突要在啟用時出現 409；預設（逐檔清理）則不會
+    const hv = n8nVersions.includes('2.44.6') ? '2.44.6' : n8nVersions[0];
+    const dupFiles = ['fail-webhook-dup-a.workflow.json', 'fail-webhook-dup-b.workflow.json'];
+    const runDup = flags => {
+      const od = mkdir();
+      const r = spawnSync('bash', [join(root, 'scripts', 'ci', 'matrix.sh'), '--dir', stage(dupFiles), '--versions', hv, '--out-dir', od, '--offline', ...flags],
+        { cwd: root, encoding: 'utf8', timeout: 10 * 60 * 1000, maxBuffer: 64 * 1024 * 1024 });
+      const f = join(od, `ci-report-${hv}.json`);
+      return { status: r.status, rep: existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : null, text: (r.stdout ?? '') + (r.stderr ?? '') };
+    };
+    const hold = runDup(['--hold-active']);
+    expect(hold.status === 1 && hold.rep?.blocking.some(b => b.code === 'WEBHOOK_PATH_CONFLICT'), `--hold-active：同批路徑重複應在動態階段出現 WEBHOOK_PATH_CONFLICT（退出碼 ${hold.status}）\n${hold.text.slice(-600)}`);
+    expect(hold.rep?.cleanup.holdActive === true && hold.rep.cleanup.workflowsCreated === hold.rep.cleanup.workflowsDeleted + hold.rep.cleanup.workflowsAbandoned, '--hold-active：整批結束後應全部清理');
+    const nohold = runDup([]);
+    expect(nohold.status === 0 && !nohold.rep?.blocking.some(b => b.code === 'WEBHOOK_PATH_CONFLICT'), `預設逐檔清理：動態階段不應看到同批路徑衝突（退出碼 ${nohold.status}）`);
+
+    // 預設（非拋棄式）清理：外部註冊型觸發要等取消註冊完成，不放棄任何 workflow
+    const nd = mkdir();
+    const ndr = spawnSync('bash', [join(root, 'scripts', 'ci', 'matrix.sh'), '--dir', stage(['advisory-external-trigger.workflow.json']), '--versions', hv, '--out-dir', nd, '--offline', '--no-disposable'],
+      { cwd: root, encoding: 'utf8', timeout: 10 * 60 * 1000, maxBuffer: 64 * 1024 * 1024 });
+    const ndf = join(nd, `ci-report-${hv}.json`);
+    expect(ndr.status === 0 && existsSync(ndf), `非拋棄式：應正常完成（退出碼 ${ndr.status}）`);
+    if (existsSync(ndf)) {
+      const c = JSON.parse(readFileSync(ndf, 'utf8')).cleanup;
+      expect(c.disposable === false && c.workflowsAbandoned === 0 && c.workflowsCreated === c.workflowsDeleted, '非拋棄式：應等到全部刪除，不放棄任何 workflow');
+    }
+    const dd = mkdir();
+    const t0 = Date.now();
+    const dsp = spawnSync('bash', [join(root, 'scripts', 'ci', 'matrix.sh'), '--dir', stage(['advisory-external-trigger.workflow.json']), '--versions', hv, '--out-dir', dd, '--offline'],
+      { cwd: root, encoding: 'utf8', timeout: 10 * 60 * 1000, maxBuffer: 64 * 1024 * 1024 });
+    const dspSec = (Date.now() - t0) / 1000;
+    expect(dsp.status === 0, `拋棄式：應正常完成（退出碼 ${dsp.status}）`);
+    if (existsSync(join(dd, `ci-report-${hv}.json`))) {
+      const c = JSON.parse(readFileSync(join(dd, `ci-report-${hv}.json`), 'utf8')).cleanup;
+      expect(c.disposable === true && c.workflowsCreated === c.workflowsDeleted + c.workflowsAbandoned, '拋棄式：建立數量應等於刪除加放棄的數量');
+    }
+    if (process.env.CI_TESTS_SHOW_MATRIX) console.log(`外部觸發夾具清理耗時：拋棄式約 ${Math.round(dspSec)} 秒（含起停容器）`);
     expect(sameSet(dockerPs(), before), `測試後有殘留容器：${dockerPs().filter(n => !before.includes(n)).join('、')}`);
     if (process.env.CI_TESTS_SHOW_MATRIX) console.log(readFileSync(join(outDir, 'matrix-report.md'), 'utf8'));
   }

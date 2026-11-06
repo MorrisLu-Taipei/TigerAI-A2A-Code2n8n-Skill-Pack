@@ -1,0 +1,39 @@
+{
+  "target": "2.44.6",
+  "counts": {
+    "files": 2
+  },
+  "blocking": [],
+  "advisories": [
+    {
+      "source": "n8n-run",
+      "rule": "workflow:timeout",
+      "file": "a.workflow.json",
+      "node": null,
+      "message": "超過 60 秒仍未完成"
+    },
+    {
+      "source": "matrix",
+      "rule": "matrix:version-difference",
+      "file": "a.workflow.json",
+      "node": null,
+      "message": "不同版本結果不同"
+    }
+  ],
+  "incomplete": [
+    {
+      "reason": "workflow-timeout",
+      "file": "a.workflow.json"
+    }
+  ],
+  "dynamic": [
+    {
+      "file": "a.workflow.json",
+      "import": "ok",
+      "activate": "skipped",
+      "webhook": null,
+      "executions": [],
+      "timeout": true
+    }
+  ]
+}

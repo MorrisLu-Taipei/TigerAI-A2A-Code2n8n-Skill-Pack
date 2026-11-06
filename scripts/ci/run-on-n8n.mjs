@@ -8,9 +8,15 @@
 //        --bootstrap：對「全新空實例」用隨機密碼建立擁有者與 API 金鑰（只放記憶體，結束時嘗試刪除金鑰）。
 //   其他選項：--settle-seconds <秒，預設 3>（觸發 webhook 後等執行紀錄）、--wait-seconds <秒，預設 30>（等 /healthz）、
 //   --workflow-timeout <秒，預設 60>（單一 workflow 的總時限；逾時只列建議項 workflow:timeout，請重跑）。
+//   --disposable：目標是用完即銷毀的實例（例如 matrix.sh 起的容器）。結束時每個 workflow 只嘗試刪除一次，
+//     遇到「還在取消註冊」的 409 不等待、直接放棄（報告的 cleanup.workflowsAbandoned）；預設（非拋棄式）最長等約 4 分鐘。
+//   --hold-active：先匯入並啟用整批，最後才統一停用與清理，讓同批的 webhook 路徑衝突在啟用時出現 409。
+//     代價：整批同時啟用（吃資源）、清理集中在最後（外部註冊型觸發的取消註冊會集中等待）。預設關閉（逐檔跑完就清）。
 //
 // 阻擋項：IMPORT_FAILED；ACTIVATE_FAILED（結構性：節點設定缺漏或無效、節點類型不存在或已棄用、版本不支援等）；
 //   CREDENTIAL_MISSING（啟用時回報憑證不存在或缺少）；WEBHOOK_PATH_CONFLICT（啟用時回 409）。
+// 狀態三態：fail（有阻擋項）、incomplete（沒有阻擋項但檢查沒跑完：workflow 逾時、啟用失敗無法歸類）、pass。
+//   incomplete 的退出碼仍是 0（只有阻擋項使 CI 失敗），但報告與 PR 註解會明確標示『未完成』，不會顯示為通過。
 // 提示（不使 CI 失敗）：NO_TRIGGER（沒有觸發節點）、activate:unverified-external（觸發節點需對外註冊，無網路或假憑證下必然失敗）、
 //   activate:unverified-unknown（啟用失敗但無法歸類，需人工複核）、workflow:timeout、執行失敗、假憑證建立失敗。
 // 只刪自己建立的 workflow 與憑證；無論成功失敗都會清理。退出碼：0 無阻擋項、1 有阻擋項、2 使用錯誤或連不上。
@@ -20,12 +26,12 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { classifyActivation, finalizeReport, listJsonFiles, parseArgs, renderComment, scrub, writeJson } from './lib.mjs';
 
-const USAGE = 'N8N_URL=… N8N_API_KEY=… node scripts/ci/run-on-n8n.mjs --dir <目錄> [--bootstrap] [--target-version <版本>] [--workflow-timeout <秒>] [--out <檔>] [--merge-into <檔>] [--comment <檔>]';
+const USAGE = 'N8N_URL=… N8N_API_KEY=… node scripts/ci/run-on-n8n.mjs --dir <目錄> [--bootstrap] [--target-version <版本>] [--workflow-timeout <秒>] [--disposable] [--hold-active] [--out <檔>] [--merge-into <檔>] [--comment <檔>]';
 const die = msg => { console.error(`錯誤：${msg}`); console.error(`用法：${USAGE}`); process.exit(2); };
 
 const { opts, errors } = parseArgs(process.argv.slice(2), {
   dir: 'string', out: 'string', 'merge-into': 'string', comment: 'string', 'target-version': 'string',
-  bootstrap: 'boolean', 'settle-seconds': 'string', 'wait-seconds': 'string', 'workflow-timeout': 'string', help: 'boolean',
+  bootstrap: 'boolean', disposable: 'boolean', 'hold-active': 'boolean', 'settle-seconds': 'string', 'wait-seconds': 'string', 'workflow-timeout': 'string', help: 'boolean',
 });
 if (opts.help) { console.log(`用法：${USAGE}`); process.exit(0); }
 if (errors.length) die(errors.join('；'));
@@ -127,7 +133,8 @@ async function bootstrap() {
 // ---- 假憑證 -------------------------------------------------------------------
 
 const created = { workflows: new Map(), credentials: new Map() };   // id -> 描述
-const stats = { workflowsCreated: 0, workflowsDeleted: 0, credentialsCreated: 0, credentialsDeleted: 0 };
+const stats = { workflowsCreated: 0, workflowsDeleted: 0, workflowsAbandoned: 0, credentialsCreated: 0, credentialsDeleted: 0, disposable: Boolean(opts.disposable), holdActive: Boolean(opts['hold-active']) };
+const incomplete = [];
 const credCache = new Map();   // `${type} ${name}` -> { id, name } | null
 const advisories = [];
 const blocking = [];
@@ -211,6 +218,7 @@ async function cleanupWorkflow(id, activated, { defer = false } = {}) {
     r = await http('DELETE', `/api/v1/workflows/${id}`, { noDeadline: true });
     if (r.status === 200 || r.status === 404) break;
     if (r.status === 409 && defer) return 'deferred';
+    if (r.status === 409 && opts.disposable) break;   // 拋棄式實例：不等取消註冊
     await sleep(500);
   }
   if (r.status === 200) { created.workflows.delete(id); stats.workflowsDeleted++; }
@@ -225,6 +233,7 @@ async function runOneGuarded(f) {
   } catch (e) {
     if (!(e instanceof WorkflowTimeout)) throw e;
     entry.timeout = true;
+    incomplete.push({ reason: 'workflow-timeout', file: f.rel });
     advise('workflow:timeout', f.rel, null, `超過 ${timeoutSeconds} 秒仍未完成，已中止並清理；逾時屬基礎設施問題，不算 workflow 的錯，請重跑一次（持續發生再調高 --workflow-timeout）`);
     return entry;
   } finally {
@@ -286,6 +295,7 @@ async function runOne(f, entry) {
         advise('activate:unverified-external', f.rel, null, `此 workflow 的觸發節點需要對外註冊，無法在無網路測試環境驗證啟用，建議在 staging 實測（HTTP ${act.status}：${msgOf(act)}）`);
       } else {
         entry.activate = 'unverified';
+        incomplete.push({ reason: 'activate-unverified-unknown', file: f.rel });
         advise('activate:unverified-unknown', f.rel, null, `啟用失敗但原因無法歸類，已列為建議而非阻擋，需人工複核（HTTP ${act.status}：${msgOf(act)}）`);
       }
     }
@@ -309,9 +319,12 @@ async function runOne(f, entry) {
       if (bad.length > 0) advise('execution-status', f.rel, null, `執行狀態：${bad.join('、')}（使用假憑證時外部呼叫失敗屬預期，只回報不影響結果）`);
     }
   } finally {
-    const why = await cleanupWorkflow(id, activated, { defer: true });
-    if (why && why !== 'deferred') {
-      advise('cleanup-failed', f.rel, null, `無法刪除本次建立的 workflow：${why}`);
+    // --hold-active：整批跑完才由 cleanupAll 統一停用與刪除
+    if (!opts['hold-active']) {
+      const why = await cleanupWorkflow(id, activated, { defer: true });
+      if (why && why !== 'deferred') {
+        advise('cleanup-failed', f.rel, null, `無法刪除本次建立的 workflow：${why}`);
+      }
     }
   }
   return entry;
@@ -323,11 +336,17 @@ let cleaned = false;
 async function cleanupAll() {
   if (cleaned) return;
   cleaned = true;
+  const ids = [...created.workflows.keys()];
+  // 先全部停用（外部取消註冊可以同時進行），再逐一刪除
+  for (const id of ids) await http('POST', `/api/v1/workflows/${id}/deactivate`, { noDeadline: true });
   const until = Date.now() + 240000;
-  for (const id of [...created.workflows.keys()]) {
+  for (const id of ids) {
     for (;;) {
-      const why = await cleanupWorkflow(id, true);
-      if (!why || Date.now() >= until || !/HTTP 409/.test(why)) break;
+      const why = await cleanupWorkflow(id, false);
+      if (!why) break;
+      if (!/HTTP 409/.test(why)) break;
+      if (opts.disposable) { created.workflows.delete(id); stats.workflowsAbandoned++; break; }   // 實例會整個銷毀，不必等
+      if (Date.now() >= until) break;
       await sleep(1500);
     }
   }
@@ -365,14 +384,14 @@ try {
   await cleanupAll();
 }
 
-if (stats.workflowsCreated !== stats.workflowsDeleted || stats.credentialsCreated !== stats.credentialsDeleted) {
+if (stats.workflowsCreated !== stats.workflowsDeleted + stats.workflowsAbandoned || stats.credentialsCreated !== stats.credentialsDeleted) {
   console.error('警告：有本次建立的 workflow 或憑證沒有清掉，請檢查實例');
-  advise('cleanup-incomplete', null, null, `建立 ${stats.workflowsCreated} 個 workflow／${stats.credentialsCreated} 個憑證，刪除 ${stats.workflowsDeleted}／${stats.credentialsDeleted}`);
+  advise('cleanup-incomplete', null, null, `建立 ${stats.workflowsCreated} 個 workflow／${stats.credentialsCreated} 個憑證，刪除 ${stats.workflowsDeleted}／${stats.credentialsDeleted}，放棄 ${stats.workflowsAbandoned}`);
 }
 
 let report = {
   status: 'pass', target: opts['target-version'] ?? n8nVersion ?? 'unknown', n8nVersion,
-  blocking, advisories, counts: { files: files.length }, dynamic, cleanup: stats,
+  blocking, advisories, incomplete, counts: { files: files.length }, dynamic, cleanup: stats,
 };
 if (opts['merge-into']) {
   let base;
@@ -381,6 +400,7 @@ if (opts['merge-into']) {
     ...base, ...(n8nVersion ? { n8nVersion } : {}),
     blocking: [...(base.blocking ?? []), ...blocking],
     advisories: [...(base.advisories ?? []), ...advisories],
+    incomplete: [...(base.incomplete ?? []), ...incomplete],
     counts: { files: base.counts?.files ?? files.length },
     dynamic, cleanup: stats,
   };
@@ -392,9 +412,9 @@ for (const d of dynamic) {
 }
 for (const b of blocking) console.log(`BLOCK   ${b.file ?? '-'}  [${b.code}]  ${b.message}`);
 console.log('---');
-console.log(`Summary: ${dynamic.length} file(s) · n8n ${n8nVersion ?? '?'} · ${blocking.length} 阻擋 · ${advisories.length} 提示 · 清理 workflow ${stats.workflowsDeleted}/${stats.workflowsCreated}、憑證 ${stats.credentialsDeleted}/${stats.credentialsCreated} · ${report.status.toUpperCase()}`);
+console.log(`Summary: ${dynamic.length} file(s) · n8n ${n8nVersion ?? '?'} · ${blocking.length} 阻擋 · ${advisories.length} 提示 · 清理 workflow ${stats.workflowsDeleted}/${stats.workflowsCreated}${stats.workflowsAbandoned ? `（放棄 ${stats.workflowsAbandoned}）` : ''}、憑證 ${stats.credentialsDeleted}/${stats.credentialsCreated} · ${report.status.toUpperCase()}`);
 
 if (opts['merge-into']) writeJson(opts['merge-into'], report);
-if (opts.out) writeJson(opts.out, opts['merge-into'] ? finalizeReport({ status: 'pass', target: report.target, n8nVersion, blocking, advisories, counts: { files: files.length }, dynamic, cleanup: stats }) : report);
+if (opts.out) writeJson(opts.out, opts['merge-into'] ? finalizeReport({ status: 'pass', target: report.target, n8nVersion, blocking, advisories, incomplete, counts: { files: files.length }, dynamic, cleanup: stats }) : report);
 if (opts.comment) writeFileSync(opts.comment, renderComment(report));
 process.exit(report.status === 'fail' ? 1 : 0);

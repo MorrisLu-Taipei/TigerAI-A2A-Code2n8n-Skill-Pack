@@ -1,0 +1,15 @@
+{
+  "target": "2.44.6",
+  "counts": {
+    "files": 2
+  },
+  "blocking": [
+    {
+      "code": "NODE_NOT_FOUND",
+      "file": "b.workflow.json",
+      "node": "Discord Trigger",
+      "message": "節點類型不在目錄中"
+    }
+  ],
+  "advisories": []
+}

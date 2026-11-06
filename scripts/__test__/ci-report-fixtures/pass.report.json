@@ -1,0 +1,16 @@
+{
+  "target": "2.44.6",
+  "counts": {
+    "files": 2
+  },
+  "blocking": [],
+  "advisories": [
+    {
+      "source": "security-scan",
+      "rule": "webhook:no-auth",
+      "file": "a.workflow.json",
+      "node": "Webhook",
+      "message": "Webhook 沒有設定認證"
+    }
+  ]
+}

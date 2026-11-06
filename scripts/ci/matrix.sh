@@ -3,12 +3,15 @@
 #
 # 用法：
 #   bash scripts/ci/matrix.sh --dir <workflows目錄> [--versions "2.37.3 2.44.6 2.46.6"] [--out-dir <目錄>] [--image <映像名稱，預設 docker.n8n.io/n8nio/n8n>]
-#                              [--offline] [--workflow-timeout <秒>]
+#                              [--offline] [--workflow-timeout <秒>] [--hold-active] [--no-disposable]
 # 產出（在 --out-dir，預設目前目錄）：ci-report-<版本>.json、matrix-report.json、matrix-report.md
 # 退出碼：0 各版本都沒有阻擋項；1 有版本出現阻擋項；2 使用錯誤、找不到映像或實例起不來。
 # 容器用 docker run --rm 起、只綁 127.0.0.1 隨機 port；結束（含中斷）時 docker stop，--rm 會自動移除。
 # --offline：容器用 --network none（不綁 port、不連外），腳本以 docker cp 放進容器，在容器內用 docker exec 跑 run-on-n8n.mjs；
 #   適合不想讓假憑證對外部服務（Telegram、Slack 等）發出請求的環境。
+# 容器都是拋棄式的，所以一律對 run-on-n8n.mjs 加 --disposable（結束時不等 workflow 取消註冊）。
+# --no-disposable：不加 --disposable，沿用 run-on-n8n.mjs 的預設清理（會等取消註冊完成）；一般不需要，用於確認預設行為。
+# --hold-active：轉交給 run-on-n8n.mjs，先啟用整批、最後才統一清理，讓同批 webhook 路徑衝突在啟用時出現 409。
 # 找不到映像時直接報錯，不自動拉取。資料目錄是 mktemp -d 的空目錄，結束時刪除。
 
 set -euo pipefail
@@ -20,6 +23,8 @@ OUT_DIR="."
 IMAGE="docker.n8n.io/n8nio/n8n"
 OFFLINE=0
 WF_TIMEOUT=""
+HOLD=0
+DISPOSABLE=1
 
 die() { echo "錯誤：$*" >&2; exit 2; }
 
@@ -30,6 +35,8 @@ while [ $# -gt 0 ]; do
     --out-dir) OUT_DIR="${2:-}"; shift 2 ;;
     --image) IMAGE="${2:-}"; shift 2 ;;
     --offline) OFFLINE=1; shift ;;
+    --hold-active) HOLD=1; shift ;;
+    --no-disposable) DISPOSABLE=0; shift ;;
     --workflow-timeout) WF_TIMEOUT="${2:-}"; shift 2 ;;
     -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
     *) die "不認得的參數：$1" ;;
@@ -116,7 +123,9 @@ for v in $VERSIONS; do
   fi
 
   extra=()
-  [ -n "$WF_TIMEOUT" ] && extra=(--workflow-timeout "$WF_TIMEOUT")
+  [ "$DISPOSABLE" = 1 ] && extra+=(--disposable)
+  [ -n "$WF_TIMEOUT" ] && extra+=(--workflow-timeout "$WF_TIMEOUT")
+  [ "$HOLD" = 1 ] && extra+=(--hold-active)
   rc=0
   if [ "$OFFLINE" = 1 ]; then
     docker cp "$HERE" "$name:/tmp/ci-scripts" >/dev/null || die "docker cp 腳本失敗"
