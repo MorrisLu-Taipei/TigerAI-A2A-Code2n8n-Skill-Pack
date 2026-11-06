@@ -1,3 +1,5 @@
+> 歷史紀錄：文中的 `reference-workflows/` 已於 2026-11-06 自 repo 移除，見 `research/n8n-templates-method.md`
+
 # Baseline 對齊基準（Phase 0）
 
 > 🌐 [English](baseline.en.md) | **繁體中文**
