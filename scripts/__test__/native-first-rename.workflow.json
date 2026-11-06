@@ -1,0 +1,69 @@
+{
+  "name": "test-fixture: native-first, rename-only Code node",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "nf-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => ({ json: { customerName: item.json.name, customerEmail: item.json.email, total: item.json.amount } }));"
+      },
+      "id": "nf-rename",
+      "name": "Rename Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "label",
+              "value": "demo",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "nf-set",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "fixture note",
+        "height": 80,
+        "width": 200
+      },
+      "id": "nf-sticky",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -200
+      ]
+    }
+  ],
+  "connections": {},
+  "settings": {}
+}
