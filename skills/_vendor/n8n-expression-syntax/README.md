@@ -19,7 +19,7 @@ Teaches correct n8n expression syntax ({{ }} patterns) and fixes common mistakes
 
 ## File Count
 
-4 files, ~450 lines total
+4 files
 
 ## Dependencies
 
@@ -39,6 +39,8 @@ Teaches correct n8n expression syntax ({{ }} patterns) and fixes common mistakes
 - Core variables ($json, $node, $now, $env)
 - **Webhook data structure** ($json.body.*)
 - When NOT to use expressions (Code nodes)
+- `$jmespath(object, query)` — querying nested JSON in one expression, with the quoting rules that fail silently
+- Runtime errors inside `{{ }}` resolve to `null` (node still succeeds) — how to surface them
 
 ### Common Patterns
 - Accessing nested fields
@@ -48,17 +50,19 @@ Teaches correct n8n expression syntax ({{ }} patterns) and fixes common mistakes
 - String manipulation
 
 ### Error Prevention
-- 15 common mistakes with fixes
+- 17 common mistakes with fixes (incl. JMESPath quoting and the silent-null runtime error)
 - Quick reference table
 - Debugging process
 
 ## Evaluations
 
-4 scenarios (100% coverage expected):
+6 scenarios (100% coverage expected):
 1. **eval-001**: Missing curly braces
 2. **eval-002**: Webhook body data access (critical!)
 3. **eval-003**: Code node vs expression confusion
 4. **eval-004**: Node reference syntax
+5. **eval-005**: `$jmespath` quoting (double-quoted string, bare number)
+6. **eval-006**: Filter drops everything on a green run (silent null)
 
 ## Key Features
 
@@ -70,9 +74,9 @@ Teaches correct n8n expression syntax ({{ }} patterns) and fixes common mistakes
 
 ## Files
 
-- **SKILL.md** (285 lines) - Main content with all essential knowledge
-- **COMMON_MISTAKES.md** (380 lines) - Complete error catalog with 15 common mistakes
-- **EXAMPLES.md** (450 lines) - 10 real working examples
+- **SKILL.md** - Main content with all essential knowledge
+- **COMMON_MISTAKES.md** - Complete error catalog with 15 common mistakes
+- **EXAMPLES.md** - 10 real working examples
 - **README.md** (this file) - Skill metadata
 
 ## Success Metrics
@@ -90,4 +94,4 @@ Teaches correct n8n expression syntax ({{ }} patterns) and fixes common mistakes
 ---
 
 **Part of**: n8n-skills repository
-**Conceived by**: Romuald Członkowski - [www.aiadvisors.pl/en](https://www.aiadvisors.pl/en)
+**Conceived by**: Romuald Członkowski - [aiadvisors.pl/en](https://aiadvisors.pl/en)

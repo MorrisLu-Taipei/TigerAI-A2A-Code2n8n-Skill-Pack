@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "note": "Machine-readable upstream pins. Read by scripts/check-upstream.mjs. Update together with skills/_vendor/SOURCE.md.",
+  "upstreams": {
+    "czlonkowski/n8n-skills": {
+      "repo": "https://github.com/czlonkowski/n8n-skills",
+      "license": "MIT",
+      "vendored": true,
+      "pinned": {
+        "tag": "v1.37.1",
+        "commit": "e037563e101749e630e6688d121d04529fe6ee7b",
+        "date": "2026-10-24"
+      },
+      "previous": {
+        "tag": "v1.9.0",
+        "commit": "27e9d0a",
+        "date": "2026-05-06"
+      },
+      "included_skills": [
+        "n8n-expression-syntax",
+        "n8n-workflow-patterns",
+        "n8n-validation-expert",
+        "n8n-node-configuration",
+        "n8n-code-javascript",
+        "n8n-code-python"
+      ],
+      "excluded": [
+        { "path": "skills/n8n-mcp-tools-expert", "reason": "Tied to n8n-mcp MCP tools; conflicts with the Pack's REST-only stance" },
+        { "path": "skills/using-n8n-mcp-skills", "reason": "Entry skill that routes to MCP-based skills; conflicts with the Pack's REST-only stance" },
+        { "path": "hooks/", "reason": "Hook enforcement layer that assumes n8n-mcp tools; conflicts with the Pack's REST-only stance" }
+      ],
+      "pending_decision": [
+        "n8n-agents",
+        "n8n-binary-and-data",
+        "n8n-code-tool",
+        "n8n-error-handling",
+        "n8n-multi-instance",
+        "n8n-self-hosting",
+        "n8n-subworkflows"
+      ],
+      "pending_decision_note": "Exist upstream at the pinned tag, not vendored. Most reference n8n-mcp MCP tools. Awaiting the user's decision."
+    },
+    "n8n-io/skills": {
+      "repo": "https://github.com/n8n-io/skills",
+      "license": "Apache-2.0",
+      "vendored": false,
+      "plugin_manifest": ".claude-plugin/plugin.json",
+      "observed": {
+        "plugin_version": "1.3.0",
+        "last_push": "2026-10-30",
+        "skills": 15,
+        "skill_naming": "*-official"
+      },
+      "pinned": null,
+      "status": "Not vendored. Apache-2.0 would need an extra NOTICE entry, and the skills pair with instance-level MCP. Awaiting the user's decision."
+    }
+  },
+  "n8n": {
+    "package": "n8n",
+    "registry": "https://registry.npmjs.org/n8n/latest",
+    "exercised_versions": ["2.37.3", "2.44.6", "2.46.6"],
+    "report": "tests/REPORT-4.md",
+    "compat_table": "docs/n8n-version-compat.md",
+    "note": "Versions the Pack has run import/activate/webhook checks against. 1.x and 2.0-2.36 were not exercised."
+  }
+}

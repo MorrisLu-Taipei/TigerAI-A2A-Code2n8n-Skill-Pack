@@ -23,42 +23,42 @@
     },
     {
       "parameters": {
-        "functionCode": "const id = `tpl-handover-${Date.now()}-${Math.floor(Math.random()*1e6)}`;\nconst spanId = `span-${Math.floor(Math.random()*1e9).toString(16)}`;\nreturn [{ json: { ...($input.first()?.json ?? {}), correlationId: id, originSpanId: spanId, startedAt: new Date().toISOString() } }];"
+        "jsCode": "const id = `tpl-handover-${Date.now()}-${Math.floor(Math.random()*1e6)}`;\nconst spanId = `span-${Math.floor(Math.random()*1e9).toString(16)}`;\nreturn [{ json: { ...($input.first()?.json ?? {}), correlationId: id, originSpanId: spanId, startedAt: new Date().toISOString() } }];"
       },
       "id": "mint-1",
       "name": "Mint correlation",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [120, -40]
     },
     {
       "parameters": {
-        "functionCode": "// REPLACE with real audit log writer (DB / Loki / S3).\nreturn [{ json: { ...$json, auditEvent: 'origin', persisted: true } }];"
+        "jsCode": "// REPLACE with real audit log writer (DB / Loki / S3).\nconst current = $input.first().json;\nreturn [{ json: { ...current, auditEvent: 'origin', persisted: true } }];"
       },
       "id": "persist-origin-1",
       "name": "Persist origin event",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [360, -40]
     },
     {
       "parameters": {
-        "functionCode": "// REPLACE with real downstream-A call.\n// Keep the correlation ID in headers AND body so the receiver can log it.\nreturn [{ json: { downstream: 'A', acceptedId: `A-${Math.floor(Math.random()*1e9)}`, correlationId: $json.correlationId } }];"
+        "jsCode": "// REPLACE with real downstream-A call.\n// Keep the correlation ID in headers AND body so the receiver can log it.\nconst current = $input.first().json;\nreturn [{ json: { downstream: 'A', acceptedId: `A-${Math.floor(Math.random()*1e9)}`, correlationId: current.correlationId } }];"
       },
       "id": "handoff-a-1",
       "name": "Hand off to system A",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [620, -160]
     },
     {
       "parameters": {
-        "functionCode": "// REPLACE with real downstream-B call.\nreturn [{ json: { downstream: 'B', acceptedId: `B-${Math.floor(Math.random()*1e9)}`, correlationId: $json.correlationId } }];"
+        "jsCode": "// REPLACE with real downstream-B call.\nconst current = $input.first().json;\nreturn [{ json: { downstream: 'B', acceptedId: `B-${Math.floor(Math.random()*1e9)}`, correlationId: current.correlationId } }];"
       },
       "id": "handoff-b-1",
       "name": "Hand off to system B",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [620, 80]
     },
     {
@@ -74,12 +74,12 @@
     },
     {
       "parameters": {
-        "functionCode": "// REPLACE with real audit writer. Persist correlation ID + both downstream IDs.\nconst items = $input.all().map(i => i.json);\nreturn [{ json: { auditEvent: 'handover-complete', correlationId: items[0]?.correlationId, downstreamIds: items.map(i => i.acceptedId), completedAt: new Date().toISOString() } }];"
+        "jsCode": "// REPLACE with real audit writer. Persist correlation ID + both downstream IDs.\nconst items = $input.all().map(i => i.json);\nreturn [{ json: { auditEvent: 'handover-complete', correlationId: items[0]?.correlationId, downstreamIds: items.map(i => i.acceptedId), completedAt: new Date().toISOString() } }];"
       },
       "id": "persist-final-1",
       "name": "Persist handover result",
-      "type": "n8n-nodes-base.function",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [1120, -40]
     }
   ],

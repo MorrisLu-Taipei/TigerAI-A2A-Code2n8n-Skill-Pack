@@ -1,5 +1,15 @@
 # Changelog
 
+## 未發布
+
+- `skills/_vendor/` 的 6 個 Skill 從上游 n8n-skills v1.9.0 同步到 v1.37.1（commit e037563，2026-10-24）。覆蓋前確認舊檔與 v1.9.0 逐位元組相同，沒有本地修改。
+- 新增 `skills/_vendor/upstream-pins.json`（記錄上游版本、收錄與排除名單、實測過的 n8n 版本）與 `scripts/check-upstream.mjs`（對照釘選版與上游最新版，不在 CI 內執行）；重寫 `skills/_vendor/SOURCE.md` 與同步步驟。
+- 修三支範本（`handover-trace`、`human-approval-gate`、`retry-with-backoff`）的棄用節點：`n8n-nodes-base.function` 改為 `n8n-nodes-base.code`（typeVersion 2）。n8n 2.44.6 以上會拒絕匯入 Function 節點。
+- `plugin.json`：n8n 版本資訊改為 2.37.3 / 2.44.6 / 2.46.6，對應報告改為 `tests/REPORT-4.md`，新增 `upstream` 欄位。
+- `reference-workflows/` 已移除（改為統計與即時查詢），`plugin.json` 的 `shared_resources` 同步拿掉該項。
+
+---
+
 ## v1.0.9 — v1.0 release banner 完全移除；"What's new + Thanks" 留作唯一 v1.0 說明
 
 User directive：「這裡就好阿 其他都不要有說明了」（"What's new" 那段就夠，其他 v1.0 解釋都不要）。

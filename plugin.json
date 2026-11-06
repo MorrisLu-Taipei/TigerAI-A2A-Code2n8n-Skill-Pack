@@ -26,7 +26,6 @@
     "spec": "spec/",
     "cookbook": "cookbook/",
     "research": "research/",
-    "reference_workflows": "reference-workflows/",
     "usage_modes_guide": "02-USAGE-MODES.md",
     "first_workflow_tutorial": "03-FIRST-WORKFLOW.md",
     "faq": "04-FAQ.md"
@@ -34,7 +33,7 @@
   "requires": {
     "claude_code": ">=1.0.0",
     "antigravity": ">=1.0.0",
-    "n8n_instance": ">=1.0.0 (REST API enabled)"
+    "n8n_instance": ">=2.37.3 (REST API enabled); 2.37.3 / 2.44.6 / 2.46.6 have run records, see docs/n8n-version-compat.md; 1.x and 2.0-2.36 not exercised"
   },
   "env_vars": {
     "N8N_API_URL": { "required": true, "description": "n8n REST API base URL (no trailing slash)" },
@@ -57,9 +56,9 @@
     }
   },
   "verified_against": {
-    "n8n_version": "2.10.3",
-    "tested_workflows": 8,
-    "test_pass_rate": "8/8 JSON, 8/8 import, 7/8 activate, 4/4 webhook routing",
-    "report": "tests/REPORT-3.md"
-  }
+    "n8n_version": ["2.37.3", "2.44.6", "2.46.6"],
+    "tested_workflows": { "tests": 8, "cookbook_and_examples": 37 },
+    "report": "tests/REPORT-4.md"
+  },
+  "upstream": "skills/_vendor/upstream-pins.json"
 }
