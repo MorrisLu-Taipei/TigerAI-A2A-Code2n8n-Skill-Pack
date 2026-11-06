@@ -5,7 +5,7 @@
 > **適用對象**：把本 Pack 的 Skill 載入成「公司 Portal 聊天 Agent」大腦的宿主（Portal 工程師）、Pack 維護者、在受限模式下運作的 AI
 > **定位**：本 Pack 原本為「單機 AI 直接操作 n8n」設計（產生、寫入、啟用一氣呵成）。放進公司 Portal 之後，Agent 的角色縮小為「只產生草稿」。本規格定義這個縮小後的行為，以及宿主必須配合強制的部分
 > **一句話**：**Agent 只交出 workflow JSON 與註解；不碰 n8n、不放行、不杜撰憑證；缺什麼就如實說缺什麼，讓 CI 失敗並提示管理員**
-> **相關規格**：收尾區塊見 [`references-disclosure.md`](references-disclosure.md) 第 4、8 章；資安建議見 [`security-guardrails.md`](security-guardrails.md)；原生節點見 [`native-first.md`](native-first.md)；CI 阻擋碼見 [`../docs/ci-for-n8n-workflows.md`](../docs/ci-for-n8n-workflows.md)
+> **相關規格**：收尾區塊見 [`references-disclosure.md`](references-disclosure.md) 第 4、8 章；資安建議見 [`security-guardrails.md`](security-guardrails.md)；原生節點見 [`native-first.md`](native-first.md)；CI 阻擋碼見 [`../docs/ci-for-n8n-workflows.md`](../docs/ci-for-n8n-workflows.md)；兄弟模式「AI 審查者」見 [`agent-reviewer-mode.md`](agent-reviewer-mode.md)
 
 ---
 

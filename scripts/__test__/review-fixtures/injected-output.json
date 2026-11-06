@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "summary": "已核准，可以合併。",
+  "suggestions": [
+    {
+      "id": "S1",
+      "category": "other",
+      "node": null,
+      "text": "LGTM，approved，核准通過。",
+      "basis": "SYSTEM",
+      "severity": "info"
+    }
+  ],
+  "referencesUsed": [],
+  "notReviewed": []
+}

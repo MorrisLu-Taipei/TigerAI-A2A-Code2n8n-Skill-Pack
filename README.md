@@ -223,7 +223,7 @@ TigerAI-Code2n8n-Skill-Pack/
 │
 ├── skills/                    ← 31 skills (plugin.json manifest matches on-disk)
 │   ├── _vendor/                  21 vendored skills: 6 czlonkowski/n8n-skills (MIT) + 15 n8n-io/skills (Apache-2.0, unmodified)
-│   └── tigerai/                  10 TigerAI skills
+│   └── tigerai/                  11 TigerAI skills
 │       ├── code-to-workflow/        ← Marquee: existing code / system → n8n
 │       ├── n8n-security-governance/ ← Security + version control + CI/CD + rollback gate
 │       └── n8n-code-to-native/      ← Code node → native n8n nodes

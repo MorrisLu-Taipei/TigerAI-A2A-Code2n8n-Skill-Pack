@@ -117,6 +117,11 @@ portal-bundle-tests:
   script:
     - node scripts/__test__/run-portal-bundle-tests.mjs
 
+ai-review-tests:
+  stage: scan
+  script:
+    - node scripts/__test__/run-review-tests.mjs
+
 dependency-cve:
   stage: scan
   allow_failure: true

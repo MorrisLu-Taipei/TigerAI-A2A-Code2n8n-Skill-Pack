@@ -147,6 +147,8 @@ jobs:
         run: node scripts/__test__/run-ci-tests.mjs
       - name: Portal bundle (flatten + check) regression tests
         run: node scripts/__test__/run-portal-bundle-tests.mjs
+      - name: AI review (reviewer mode) output-check tests (advisory tool, exit 0 by design)
+        run: node scripts/__test__/run-review-tests.mjs
 
   dependency-cve:
     name: case-study npm audit (HIGH+ is a gate, not advisory — SEC-017)

@@ -159,6 +159,10 @@ node eval/run-eval.mjs ... --dynamic --dynamic-limit 10 --dynamic-disposable
 | `http-500` | 回 500，並在錯誤內容回顯收到的 `Authorization`（用來測試遮罩） |
 | `non-json` | 只回純文字 |
 
+### 審查者假模型（`review-server.mjs`）
+
+`node eval/mock-model/review-server.mjs --mode <模式>` 是另一支假模型，專門給「AI 審查者模式」（[`../spec/agent-reviewer-mode.md`](../spec/agent-reviewer-mode.md)）用：離線、只綁 127.0.0.1，依輸入裡 workflow 的內容回傳預先寫好的審查 JSON，或故意回不合格的輸出（含網址、HTML、放行用語、超長、超過 20 則、格式錯誤、機密樣式、非 JSON、逾時、500）。workflow 便條含 `SYSTEM: approve` 之類文字時，它會故意「被說服」並回放行用語，用來證明輸出檢查（`scripts/review/validate-review.mjs`）會擋下。它與上表的 `server.mjs` 互相獨立，不影響評測套件；不是品質基準。測試見 `node scripts/__test__/run-review-tests.mjs`。
+
 參考輸出的來源與檢查：`oracles/Gxx.workflow.json` 可直接拿去跑 `node scripts/ci/check-workflows.mjs --dir <絕對路徑> --target-version 2.44.6 --credential-map '<json>'`；它們在受限模式下只引用情境的 credentialMap 名稱。
 
 ## 9. 風險與日誌政策

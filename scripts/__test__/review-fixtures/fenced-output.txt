@@ -1,0 +1,9 @@
+```json
+{
+  "version": 1,
+  "summary": "沒有提出建議；這不代表沒有問題，仍需人工審核。",
+  "suggestions": [],
+  "referencesUsed": [],
+  "notReviewed": []
+}
+```

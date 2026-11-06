@@ -180,7 +180,7 @@ Usage rules:
 5. The date is the day of the change; if unsure of today's date, ask the user instead of inventing one.
 6. **This is a recommendation only**: a missing "Change log" section, or the heading with no row of data, only draws a scanner reminder (`notes:missing-change-log`, severity `info`, see [`security-guardrails.en.md`](security-guardrails.en.md) 2.15); it never blocks and never fails a check. If the user does not want it, follow the user's decision; a `guardrail-ack: notes:missing-change-log` line in node notes records that they know.
 7. **How the scanner recognizes it**: a heading of "修改記錄" (or "修改紀錄"), `Change log` or `Changelog`, with at least one row under it containing a `YYYY-MM-DD` date. With no Layer 3 note at all, this rule does not repeat the reminder.
-8. **Whether the log matches the real change** cannot be judged inside the Pack (it needs a comparison with the previous version); the pipeline compares at pull-request level (later work). So the AI writes the log honestly and does not add a row that does not match the real change just to quiet the reminder.
+8. **Whether the log matches the real change** cannot be judged inside the Pack (it needs a comparison with the previous version); the pipeline compares at pull-request level (the AI reviewer raises suggestions, criterion C7 of [`agent-reviewer-mode.en.md`](agent-reviewer-mode.en.md), still a reminder only). So the AI writes the log honestly and does not add a row that does not match the real change just to quiet the reminder.
 
 ---
 

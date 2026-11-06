@@ -14,6 +14,8 @@ PR 開啟或更新
         ↓ 產出 ci-report.json 與 ci-comment.md，貼回 PR
 ```
 
+AI 審查（只給建議、不阻擋）排在這些檢查之後，另外貼一則註解，做法見 [`ai-review-in-pr.md`](ai-review-in-pr.md)。
+
 ## 阻擋類與建議類
 
 使用者的決策：**資安護欄與原生節點提醒都只是建議，不可讓 CI 失敗，只輸出成 PR 註解。** 只有下列「阻擋類」會讓 CI 失敗（退出碼 1）。**不使用** `scripts/security-scan.mjs` 的 `--strict`。

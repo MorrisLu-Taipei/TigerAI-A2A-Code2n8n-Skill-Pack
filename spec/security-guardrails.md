@@ -266,7 +266,7 @@ n8n 本身已提供原生的 Guardrails 節點（type：`@n8n/n8n-nodes-langchai
 - **建議做法**：依 [`sticky-note-three-layer.md`](sticky-note-three-layer.md) §4.4，在 Layer 3 便條加上「修改記錄」段：每列有日期（YYYY-MM-DD）、變更摘要、提出者（使用者或 AI）、原因；新建的 workflow 第一列為「建立」；修改既有 workflow 就新增一列；不寫入機密。
 - **辨識方式**：標題為「修改記錄」（或「修改紀錄」）、`Change log`、`Changelog`，且該段落內至少有一列（表格列或清單項目）含 `YYYY-MM-DD` 格式的日期。有多張 Layer 3 便條時，任一張符合即可。
 - **完全沒有 Layer 3 便條時**：本規則**不重複提醒**，沿用既有的便條相關提醒（Skill 流程要求每個 workflow 附 Layer 3 便條）。
-- **掃描器看不到的部分**：修改記錄寫的內容與實際變更是否相符，需要與前一版比對，Pack 內無法判斷；之後由管線在 PR 層級比對，不在本規則範圍。
+- **掃描器看不到的部分**：修改記錄寫的內容與實際變更是否相符，需要與前一版比對，Pack 內無法判斷；由管線在 PR 層級比對（AI 審查者提出建議，見 [`agent-reviewer-mode.md`](agent-reviewer-mode.md)），不在本規則範圍。
 - **為什麼**：workflow 匯出後會與 Git 分離，正式環境的人只看得到 workflow 本身；便條上的歷程讓核准人與日後維護者不必另外找紀錄。
 - **使用者不採用時**：照使用者的決定處理；在任一節點的 notes（建議在觸發節點）寫 `guardrail-ack: notes:missing-change-log -- 說明`。
 - **掃描規則**：`notes:missing-change-log`（提醒，workflow 層級）。

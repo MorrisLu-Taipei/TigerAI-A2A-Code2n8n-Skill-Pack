@@ -179,7 +179,7 @@ Layer 3 說明便條新增必備段落「**修改記錄**」，放在模板最�
 5. 日期取修改當天；不確定當天日期時，向使用者確認，不自行編造。
 6. **這只是建議**：缺少「修改記錄」段，或有標題卻沒有任何一列資料，掃描器只提醒（`notes:missing-change-log`，severity `info`，見 [`security-guardrails.md`](security-guardrails.md) 2.15），不阻擋、不使檢查失敗。使用者不想要時，照使用者的決定，可在節點 notes 以 `guardrail-ack: notes:missing-change-log` 表示知悉。
 7. **掃描器怎麼辨識**：標題為「修改記錄」（或「修改紀錄」）、`Change log`、`Changelog`，且該段落內至少一列含 `YYYY-MM-DD` 日期。完全沒有 Layer 3 便條時，這條不重複提醒。
-8. **與實際變更是否相符**，Pack 內無法判斷（需要與前一版比對），由管線在 PR 層級比對（之後的工作）；因此 AI 寫記錄要如實，不要為了通過提醒而補一列與實際變更不符的內容。
+8. **與實際變更是否相符**，Pack 內無法判斷（需要與前一版比對），由管線在 PR 層級比對（由 AI 審查者提出建議，見 [`agent-reviewer-mode.md`](agent-reviewer-mode.md) 的準則 C7，仍只是提醒）；因此 AI 寫記錄要如實，不要為了通過提醒而補一列與實際變更不符的內容。
 
 ---
 

@@ -1,0 +1,122 @@
+{
+  "name": "Order Sync (fixture)",
+  "nodes": [
+    {
+      "id": "t1",
+      "name": "Every Morning",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "h1",
+      "name": "Fetch Orders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.example.invalid/orders"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "c1",
+      "name": "Rename Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        330,
+        0
+      ],
+      "parameters": {
+        "jsCode": "return $input.all().map(i => ({ json: { id: i.json.id } }));"
+      }
+    },
+    {
+      "id": "h2",
+      "name": "Push To CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://crm.example.invalid/v1/contacts"
+      }
+    },
+    {
+      "id": "s3",
+      "name": "AI 實作說明",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        600
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 560,
+        "height": 320,
+        "content": "### AI 實作說明\n\n**參考來源**\n- 沒有參考外部範本\n\n**建議事項**\n- 以上皆為建議\n\n**修改記錄**\n| 日期 | 變更摘要 | 提出者 | 原因 |\n|---|---|---|---|\n| 2026-11-01 | 建立 | AI | 依需求產生初版 |"
+      }
+    }
+  ],
+  "connections": {
+    "Every Morning": {
+      "main": [
+        [
+          {
+            "node": "Fetch Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Orders": {
+      "main": [
+        [
+          {
+            "node": "Rename Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rename Fields": {
+      "main": [
+        [
+          {
+            "node": "Push To CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

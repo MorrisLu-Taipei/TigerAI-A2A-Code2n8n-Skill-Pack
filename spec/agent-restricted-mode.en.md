@@ -5,7 +5,7 @@
 > **Audience**: hosts that load this Pack's Skills as the brain of a company Portal chat Agent (Portal engineers), Pack maintainers, and the AI running in restricted mode
 > **Positioning**: this Pack was originally designed for "a single-machine AI operating n8n directly" (generate, write and activate in one motion). Inside a company Portal the Agent's role shrinks to "produce drafts only". This spec defines that reduced behavior and what the host must enforce
 > **In one sentence**: **the Agent hands over workflow JSON and comments only; it does not touch n8n, does not approve anything, and does not invent credentials; it says plainly what is missing so that CI fails and the administrator is told**
-> **Related specs**: closing blocks in [`references-disclosure.en.md`](references-disclosure.en.md) chapters 4 and 8; security recommendations in [`security-guardrails.en.md`](security-guardrails.en.md); native nodes in [`native-first.en.md`](native-first.en.md); CI blocking codes in [`../docs/ci-for-n8n-workflows.md`](../docs/ci-for-n8n-workflows.md) (Traditional Chinese)
+> **Related specs**: closing blocks in [`references-disclosure.en.md`](references-disclosure.en.md) chapters 4 and 8; security recommendations in [`security-guardrails.en.md`](security-guardrails.en.md); native nodes in [`native-first.en.md`](native-first.en.md); CI blocking codes in [`../docs/ci-for-n8n-workflows.md`](../docs/ci-for-n8n-workflows.md) (Traditional Chinese); the sibling mode "AI reviewer" in [`agent-reviewer-mode.en.md`](agent-reviewer-mode.en.md)
 
 ---
 
