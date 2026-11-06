@@ -189,6 +189,8 @@ description: Applies TigerAI enterprise-grade design patterns when generating n8
 - [ ] 對應 SDD 的 6 段是否都能在 Layer 1+3 找到？
 - [ ] 原生節點優先：能用運算式、Edit Fields 或原生節點完成的，沒有寫成 Code 節點？保留的每個 Code 節點，`notes` 都有「為什麼用 Code」一行（依 [`spec/native-first.md`](../../../spec/native-first.md)）？
 - [ ] Layer 3 便條已寫入「參考來源」「建議事項」「資安掃描結果」，對話只放摘要？
+- [ ] Layer 3 便條有「修改記錄」段（新建第一列「建立」，修改既有 workflow 新增一列；日期 `YYYY-MM-DD`、變更摘要、提出者「使用者」或「AI」、原因；不得含機密；規則見 [`spec/sticky-note-three-layer.md`](../../../spec/sticky-note-three-layer.md) §4.4，缺少只被提醒）？
+- [ ] 企業情境常有的高影響動作（寄信、寫入或刪除資料庫、HTTP 寫入方法、執行指令）與外連網域，掃描器會以 `impact:high-impact-node`、`egress:external-domain` 提醒（只提醒）；已寫進「資安掃描結果」，讓核准人特別確認？
 
 少一條即不算企業級。
 

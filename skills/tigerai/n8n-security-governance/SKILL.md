@@ -250,6 +250,7 @@ Workflows whose risk profile demands monitoring but ship without it must publish
 - [ ] Findings have evidence, severity, status, owner, and target version.
 - [ ] Unresolved risks are disclosed in `SECURITY-CAVEATS.md`.
 - [ ] Workflow sticky-note version and repository changelog were updated.
+- [ ] The Layer 3 note's "Change log" section has a row for this change (recommendation; a missing one only draws `notes:missing-change-log`, see [`spec/sticky-note-three-layer.md`](../../../spec/sticky-note-three-layer.md) §4.4). The scanner's other reminder-only rules, `egress:external-domain` and `impact:high-impact-node`, are reported in the scan result for the approver ([`spec/security-guardrails.md`](../../../spec/security-guardrails.md) 2.13 to 2.15).
 - [ ] Reviewed JSON maps to a Git commit SHA and n8n release tag.
 - [ ] CI validation and rollback evidence exist.
 - [ ] Deployment decision is PASS, CONDITIONAL, or BLOCKED.

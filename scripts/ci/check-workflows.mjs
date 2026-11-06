@@ -4,7 +4,7 @@
 // 用法：
 //   node scripts/ci/check-workflows.mjs --dir <workflows目錄> --target-version <例如 2.44.6>
 //        [--credential-map <json檔或JSON字串>] [--existing-webhook-paths <json檔或JSON字串>] [--existing-workflow-ids <json檔或JSON字串>]
-//        [--out <ci-report.json>] [--comment <ci-comment.md>]
+//        [--egress-allow <逗號分隔網域>] [--egress-allow-file <檔>] [--out <ci-report.json>] [--comment <ci-comment.md>]
 //
 // 阻擋項（使 CI 失敗）：JSON_INVALID、STRUCTURE_INVALID、SECRET_DETECTED、MALICIOUS_CODE、CREDENTIAL_PLAINTEXT、
 //   NODE_NOT_FOUND、NODE_DEPRECATED、TYPEVERSION_INVALID、CREDENTIAL_MISSING、WEBHOOK_PATH_CONFLICT。
@@ -12,7 +12,9 @@
 //   node:hidden-legacy（目錄標示 hidden 但未 deprecated 的舊節點，實測仍可匯入啟用）、
 //   workflow:unknown-subworkflow-reference（Execute Workflow 指向的 workflow 在同批與既有清單都找不到）、
 //   trigger:external-registration（觸發節點需要對外註冊，無法在無網路環境測試啟用）、
-//   credentials:missing-field（節點類型在目錄中有「無條件需要」的憑證，但節點沒有 credentials 欄位；可能誤報，見 docs/ci-for-n8n-workflows.md）。
+//   credentials:missing-field（節點類型在目錄中有「無條件需要」的憑證，但節點沒有 credentials 欄位；可能誤報，見 docs/ci-for-n8n-workflows.md）、
+//   egress:external-domain（外連網域提醒，可用 --egress-allow 提供允許清單）、impact:high-impact-node（高影響動作提醒）、
+//   notes:missing-change-log（Layer 3 說明便條缺修改記錄）；這三條是 scripts/security-scan.mjs 的護欄建議，一律只提醒。
 // 退出碼：0 無阻擋項；1 有阻擋項；2 使用錯誤或內部工具失敗。
 // 輸出與日誌只寫規則名稱、檔名、節點名，不印任何疑似機密的原文。
 
@@ -24,13 +26,13 @@ import { fileURLToPath } from 'node:url';
 import { finalizeReport, isExternalTrigger, listJsonFiles, parseArgs, renderComment, scrub, writeJson } from './lib.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const USAGE = 'node scripts/ci/check-workflows.mjs --dir <目錄> --target-version <版本> [--credential-map <json>] [--existing-webhook-paths <json>] [--existing-workflow-ids <json>] [--out <檔>] [--comment <檔>]';
+const USAGE = 'node scripts/ci/check-workflows.mjs --dir <目錄> --target-version <版本> [--credential-map <json>] [--existing-webhook-paths <json>] [--existing-workflow-ids <json>] [--egress-allow <網域,...>] [--egress-allow-file <檔>] [--out <檔>] [--comment <檔>]';
 
 const die = msg => { console.error(`錯誤：${msg}`); console.error(`用法：${USAGE}`); process.exit(2); };
 
 const { opts, errors } = parseArgs(process.argv.slice(2), {
   dir: 'string', 'target-version': 'string', 'credential-map': 'string', 'existing-webhook-paths': 'string', 'existing-workflow-ids': 'string',
-  out: 'string', comment: 'string', help: 'boolean',
+  'egress-allow': 'string', 'egress-allow-file': 'string', out: 'string', comment: 'string', help: 'boolean',
 });
 if (opts.help) { console.log(`用法：${USAGE}`); process.exit(0); }
 if (errors.length) die(errors.join('；'));
@@ -74,6 +76,15 @@ if (opts['existing-webhook-paths'] !== undefined) {
   if (!Array.isArray(existingPaths) || !existingPaths.every(s => typeof s === 'string')) {
     die('--existing-webhook-paths 格式需為 ["METHOD path", ...]');
   }
+}
+
+// 外連網域允許清單（選用）：沒給就只列出外連網域、不判斷；檔案內容直接當參數轉交 security-scan（逗號、空白、換行分隔，# 開頭為註解）
+const egressArgs = [];
+if (opts['egress-allow'] !== undefined) egressArgs.push('--egress-allow', opts['egress-allow']);
+if (opts['egress-allow-file'] !== undefined) {
+  let text;
+  try { text = readFileSync(opts['egress-allow-file'], 'utf8'); } catch { die('--egress-allow-file 讀不到檔案'); }
+  egressArgs.push('--egress-allow', text);
 }
 
 let catalog;
@@ -287,14 +298,14 @@ for (const r of subRefs) {
 
 // ---- 呼叫既有腳本：資安掃描（偵測類 error 為阻擋，其餘為建議）與原生節點提醒（建議） ----
 
-function runTool(script, targets, tmp, tag) {
+function runTool(script, targets, tmp, tag, extraArgs = []) {
   const out = [];
   for (let i = 0; i < targets.length; i += 40) {
     const outFile = join(tmp, `${tag}-${i}.json`);
     const fd = openSync(outFile, 'w');
     let r;
     try {
-      r = spawnSync(process.execPath, [join(root, 'scripts', script), '--format', 'json', ...targets.slice(i, i + 40)],
+      r = spawnSync(process.execPath, [join(root, 'scripts', script), '--format', 'json', ...extraArgs, ...targets.slice(i, i + 40)],
         { cwd: root, stdio: ['ignore', fd, 'pipe'], encoding: 'utf8' });
     } finally { closeSync(fd); }
     let j;
@@ -325,7 +336,12 @@ const SCAN_MESSAGES = {
   'jscode:base64-decode-suspect': 'Code 節點內有大段固定的 base64 內容被解碼，請確認用意',
   'jscode:require-fs-with-write': 'Code 節點內 require("fs")，建議改用原生檔案節點',
   'schema:empty-nodes': 'workflow 沒有任何節點',
+  'egress:external-domain': '節點會連到外部網域，請核准人確認是否在允許清單內',
+  'impact:high-impact-node': '高影響動作（寄信、寫入或刪除資料庫、HTTP 寫入方法、執行系統指令），請核准人在工單上特別確認',
+  'notes:missing-change-log': 'Layer 3 說明便條沒有填寫「修改記錄」',
 };
+// 這三條的說明文字本身帶有節點的具體內容（網域清單、動作種類、缺漏狀況），直接用掃描器的說明
+const SAMPLE_AS_MESSAGE = new Set(['egress:external-domain', 'impact:high-impact-node', 'notes:missing-change-log']);
 
 function scanNodeOf(where, nodeNames) {
   if (typeof where !== 'string' || !where.startsWith('node:')) return null;
@@ -342,7 +358,7 @@ try {
   const valid = parsed;
   const byAbs = new Map(valid.map(p => [p.abs, p]));
 
-  for (const r of runTool('security-scan.mjs', valid.map(p => p.abs), tmp, 'scan')) {
+  for (const r of runTool('security-scan.mjs', valid.map(p => p.abs), tmp, 'scan', egressArgs)) {
     const p = byAbs.get(resolve(root, r.file));
     if (!p) continue;
     const names = Array.isArray(p.wf?.nodes) ? p.wf.nodes.map(n => n?.name).filter(x => typeof x === 'string') : [];
@@ -356,7 +372,8 @@ try {
         else if (rule === 'json:parse-failed' || rule === 'io:read-failed') block('JSON_INVALID', p.rel, null, '檔案無法讀取或解析');
         else advise('security-scan', rule, p.rel, node, SCAN_MESSAGES[rule] ?? '資安掃描提醒，請參考 spec/security-guardrails.md');
       } else {
-        advise('security-scan', rule, p.rel, node, SCAN_MESSAGES[rule] ?? '資安護欄建議，請參考 spec/security-guardrails.md');
+        const msg = SAMPLE_AS_MESSAGE.has(rule) && typeof f.sample === 'string' && f.sample !== '' ? f.sample : SCAN_MESSAGES[rule];
+        advise('security-scan', rule, p.rel, node, msg ?? '資安護欄建議，請參考 spec/security-guardrails.md');
       }
     }
   }

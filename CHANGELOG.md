@@ -1,5 +1,12 @@
 # Changelog
 
+## 未發布
+
+- **新增三條只提醒的規則（ADR-014）**：`scripts/security-scan.mjs` 新增 `egress:external-domain`（HTTP 類節點的網址參數連到非內網網域，列出網域並提醒核准人確認；網址由運算式組出時提醒「無法靜態判斷」）、`impact:high-impact-node`（寄信、寫入或刪除資料庫、HTTP 寫入方法、執行系統指令的節點）、`notes:missing-change-log`（Layer 3 說明便條沒有填寫「修改記錄」）。三條的 severity 為 `info`：輸出為 `INFO` 行，彙總另計 `reminder`，**預設與 `--strict` 都不會讓退出碼變成失敗**，CI 只進建議項、沒有新增任何阻擋碼；可用 `guardrail-ack: <規則編號>` 確認。外連網域可提供選用的允許清單：`--egress-allow <逗號分隔網域>`、`--egress-allow-file <檔案>` 或環境變數 `SKILLPACK_EGRESS_ALLOW`（`*.example.com` 涵蓋子網域；沒給清單就只列出、不判斷），`scripts/ci/check-workflows.mjs` 同樣接受前兩個旗標。
+- **Layer 3 便條新增「修改記錄」段**：`spec/sticky-note-three-layer.md`／`.en.md` 新增 §4.4，模板與範例加上必備段落（日期、變更摘要、提出者、原因；新建第一列「建立」，修改既有 workflow 新增一列，不得含機密；缺少只提醒）。`sticky-note-to-workflow`、`code2n8n-pipeline`、`code-to-workflow`、`tigerai-enterprise-patterns`、`n8n-code-to-native`、`n8n-security-governance` 同步加入使用規則。記錄與實際變更是否相符，需與前一版比對，Pack 內不判斷，之後由管線在 PR 層級比對。
+- 文件：`spec/security-guardrails.md`／`.en.md` 新增 2.13 至 2.15，`spec/references-disclosure` 與 `docs/ci-for-n8n-workflows.md` 補充提醒類層級與建議代碼。
+- 測試：新增夾具與檢查（`run-security-scan-tests.mjs` 63 → 179 項，`run-ci-tests.mjs` 368 → 393 項）；`pass-schedule-http`、`pass-credential-field-exempt` 兩個夾具的預期建議項加上 `security-scan:egress:external-domain`（它們含對外 HTTP 呼叫）。
+
 ## v1.1.0 — 2026-11-06
 
 - **Portal 內建支援**：含 Portal 受限 Agent 模式規格；新增 `scripts/portal/flatten-bundle.mjs`、`check-bundle.mjs` 與範例白名單（把 Skill 攤平成一層、附授權聲明與來源記錄、檢查內容與 Pack 逐位元組相同），測試 `scripts/__test__/run-portal-bundle-tests.mjs` 已接上 CI，更新程序見 `docs/portal-bundle-sync.md`。

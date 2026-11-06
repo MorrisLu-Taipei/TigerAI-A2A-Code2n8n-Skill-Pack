@@ -356,10 +356,11 @@ n8n 官方 Skill（`n8n-workflow-lifecycle-official` 的「Readability」段落�
 
 ### 8.2 怎麼解讀結果（與腳本實際行為一致）
 
-掃描器的規則分兩類：
+掃描器的規則分三類：
 
 - **護欄類**（對應 [`security-guardrails.md`](security-guardrails.md) 的建議，例如 `webhook:no-auth`）：一律是 warning，是建議，預設執行不會因為它們失敗。節點 notes 若有 `guardrail-ack: <規則編號>`，表示使用者已知悉，掃描器輸出 `ACK` 行，不計入 warning。
 - **偵測類**（`secret:*`、`jscode:*`、`credential:plaintext` 等）：是 error，供 Pack 自己的 CI 檢查 repo 內的檔案。`guardrail-ack:` 對它們無效。
+- **提醒類**（`egress:external-domain`、`impact:high-impact-node`、`notes:missing-change-log`，見 [`security-guardrails.md`](security-guardrails.md) 2.13 至 2.15）：severity 為 `info`，輸出為 `INFO` 行，彙總另計 `reminder`；只提醒，連 `--strict` 都不計入，永遠不會讓退出碼變成 1。可用 `guardrail-ack:` 確認。揭露時照實寫進「資安掃描結果」，狀態寫「提醒」。
 
 | 退出碼 | 意義 |
 |---|---|
@@ -388,7 +389,7 @@ n8n 官方 Skill（`n8n-workflow-lifecycle-official` 的「Readability」段落�
 ```markdown
 **資安掃描結果**
 - 規則式掃描（不代表沒有其他風險）：<N> 項命中，<K> 項已知悉
-  - <規則名稱> @ <節點名稱>（<error／warning>）：<建議做法，或使用者的決定>
+  - <規則名稱> @ <節點名稱>（<error／warning／提醒>）：<建議做法，或使用者的決定>
   - <規則名稱> @ <節點名稱>（已知悉）
 ```
 

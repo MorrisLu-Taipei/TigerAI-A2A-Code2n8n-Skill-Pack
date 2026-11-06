@@ -143,6 +143,8 @@ After producing enterprise-grade workflow, **must verify each**:
 - [ ] All 6 SDD sections findable in Layer 1+3?
 - [ ] Native-first: nothing that an expression, Edit Fields or a native node can do was written as a Code node? Does every Code node that remains carry a "Why Code" line in its `notes` (per [`spec/native-first.en.md`](../../../spec/native-first.en.md))?
 - [ ] The Layer 3 note carries "References", "Recommendations" and "Security scan result", with only a summary in the conversation?
+- [ ] The Layer 3 note has a "Change log" section (first row "Created" for a new workflow, one added row for each change to an existing one; date `YYYY-MM-DD`, change summary, proposed by "User" or "AI", reason; no secrets; rules in [`spec/sticky-note-three-layer.en.md`](../../../spec/sticky-note-three-layer.en.md) §4.4, a missing one only draws a reminder)?
+- [ ] The high-impact actions common in enterprise scenarios (sending mail, writing or deleting database data, HTTP write methods, running commands) and the external domains are reminded by the scanner as `impact:high-impact-node` and `egress:external-domain` (reminder only); are they written into the "Security scan result" so the approver confirms them specially?
 
 Missing one = not enterprise-grade.
 

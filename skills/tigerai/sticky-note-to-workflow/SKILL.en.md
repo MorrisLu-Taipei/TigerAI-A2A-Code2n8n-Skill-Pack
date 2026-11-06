@@ -197,8 +197,18 @@ Same n8n instance can't have 2 active workflows sharing `webhook + path`. When g
   4. Test recipe (≥ 2 cases: golden + error)
   5. Known limits
   6. Mapping to user requirements (each @trigger / @step / @output / @on-error)
+  7. **Change log** (last; rules under "Using the change log" below; a missing one only draws a scanner reminder and never blocks)
 - Apply anti-pattern check (`research/patterns.md` §3) — if any triggers, add to "Known limits"
 - Per Chapter 4 of [`spec/references-disclosure.en.md`](../../../spec/references-disclosure.en.md), add the "References", "Recommendations" and "Security scan result" blocks right after the title (see Step 8); these three blocks are the official record of recommendations and information
+
+**Using the change log** (full spec in [`spec/sticky-note-three-layer.en.md`](../../../spec/sticky-note-three-layer.en.md) §4.4; a recommendation, not a requirement):
+
+- Format: a table or a list; each row has a date (`YYYY-MM-DD`), a change summary, who proposed it ("User" or "AI") and the reason.
+- **New workflow**: the first row reads "Created".
+- **Changing an existing workflow** (whether the user asked or the AI fixed something on its own): **add one row** to the change log of the existing Layer 3 note; only add, never rewrite or delete older rows. If an older note has no change log, add the "Change log" section first and then this row; do not invent earlier history.
+- **No secrets**: no keys, tokens, passwords, internal addresses, personal data or full commands; say what changed, without pasting parameter values.
+- The date is the day of the change; ask the user if unsure instead of inventing one. Keep the log honest: do not write something that does not match the real change just to avoid the reminder.
+- The scanner's `notes:missing-change-log` only reminds (severity `info`); if the user does not want it, follow that, optionally with `guardrail-ack: notes:missing-change-log` in node notes. Whether the log matches the real change cannot be judged inside the Pack; the pipeline compares at pull-request level (later work).
 
 > **Restricted Agent mode (Portal)**: with the marker, this step does not write to n8n and only outputs JSON. See "Restricted Agent mode (Portal)" above.
 

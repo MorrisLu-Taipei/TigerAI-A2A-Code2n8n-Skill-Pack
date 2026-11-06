@@ -198,8 +198,18 @@ function safeWebhookNodeName(s) { return s.replace(/[^A-Za-z0-9]/g, ''); }
   4. 測試建議（≥ 2 case：golden + error）
   5. 已知限制
   6. 對應使用者需求（@trigger / @step / @output / @on-error 一一對應）
+  7. **修改記錄**（放在最後，規則見下方「修改記錄的使用規則」；缺少只會被掃描器提醒，不阻擋）
 - 套用反模式檢查（`research/patterns.md` §3）— 若觸發任一條，加入「已知限制」
 - 依 [`spec/references-disclosure.md`](../../../spec/references-disclosure.md) 第 4 章，在標題之後加入「參考來源」「建議事項」「資安掃描結果」三個區塊（見 Step 8）；這三個區塊是建議與資訊的正式紀錄
+
+**修改記錄的使用規則**（完整規格見 [`spec/sticky-note-three-layer.md`](../../../spec/sticky-note-three-layer.md) §4.4，這是建議，不是強制）：
+
+- 格式：表格或清單，每列含 日期（`YYYY-MM-DD`）、變更摘要、提出者（「使用者」或「AI」）、原因。
+- **新建 workflow**：第一列寫「建立」。
+- **修改既有 workflow**（使用者要求或 AI 主動修正都算）：在既有 Layer 3 便條的修改記錄**新增一列**；只新增，不改寫、不刪除舊列。沒有修改記錄的舊便條，先補上「修改記錄」段再新增這一列，不要假造更早的歷史。
+- **不得寫入機密**：不寫金鑰、權杖、密碼、內網位址、個資、完整指令；只寫改了什麼，不貼參數值。
+- 日期取修改當天；不確定就問使用者，不自行編造。記錄要如實，不為了避開提醒而寫與實際變更不符的內容。
+- 掃描器的 `notes:missing-change-log` 只提醒（severity `info`）；使用者不想要就照辦，可在節點 notes 寫 `guardrail-ack: notes:missing-change-log`。記錄與實際變更是否相符，Pack 內無法判斷，由管線在 PR 層級比對（之後的工作）。
 
 > **受限 Agent 模式（Portal）**：有標記時本步驟不寫入 n8n，只輸出 JSON，見上方「受限 Agent 模式（Portal）」。
 

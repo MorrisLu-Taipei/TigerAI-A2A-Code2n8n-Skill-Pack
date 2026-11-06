@@ -255,7 +255,7 @@ Cross-branch shared steps (e.g. all paths must write audit log) — don't repeat
 3. **Resolve**: map values to node types via §3 / §4 vocabularies
 4. **Disambiguate**: ambiguity → pick first match in vocabulary; record alternatives in Layer 3 "Node choices"
 5. **Generate**: build nodes + connections; apply `position.y` zones (see `sticky-note-three-layer.en.md`)
-6. **Annotate**: write Layer 3 sticky note
+6. **Annotate**: write Layer 3 sticky note, including the "Change log" section (a new workflow's first row reads "Created"; changing an existing workflow adds one row; rules in `sticky-note-three-layer.en.md` §4.4; a missing one only draws a reminder, never blocks)
 
 ### 6.1 Cross-node variable reference gotcha (**most common pitfall**)
 

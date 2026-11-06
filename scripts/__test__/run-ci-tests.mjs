@@ -139,9 +139,36 @@ try {
   expect(cfa.length === 1 && cfa[0].node === 'Send message' && /telegramApi/.test(cfa[0].message) && /待補憑證/.test(cfa[0].message) && /可能誤報/.test(cfa[0].message), 'credentials:missing-field：建議項的節點或訊息不對');
   expect(cf.comment.includes('憑證欄位（建議）') && cf.comment.includes('credentials:missing-field') && !cf.comment.includes('### 阻擋項'), 'credentials:missing-field：註解的建議區應列出該規則');
   const cx = check(stage(['pass-credential-field-exempt.workflow.json']));
-  expect(cx.code === 0 && cx.report.advisories.length === 0, 'credentials:missing-field：有 credentials 欄位、authentication 為 none、已停用的節點都不應被提醒');
+  expect(cx.code === 0 && !cx.report.advisories.some(a => a.rule === 'credentials:missing-field'), 'credentials:missing-field：有 credentials 欄位、authentication 為 none、已停用的節點都不應被提醒');
   const cmix = check(stage(['advisory-credential-field-missing.workflow.json', 'fail-function-node.workflow.json']));
   expect(cmix.report.blocking.length === 1 && cmix.report.blocking[0].code === 'NODE_DEPRECATED', 'credentials:missing-field 與 fail 同批：阻擋項不因此增加');
+
+  // ---- 外連網域／高影響動作／修改記錄（ADR-014：建議，不阻擋） ---------------------------------------------------
+  const rem = stage(['advisory-egress-impact-changelog.workflow.json']);
+  const remF = 'advisory-egress-impact-changelog.workflow.json';
+  const rr = check(rem);
+  const ra = rule => rr.report.advisories.filter(a => a.rule === rule);
+  expect(rr.code === 0 && rr.report.status === 'pass' && rr.report.blocking.length === 0, '三條提醒：應為 pass、沒有阻擋項');
+  expect(ra('egress:external-domain').length === 1 && /api\.example\.invalid/.test(ra('egress:external-domain')[0].message) && /請核准人確認這些網域是否在允許清單內/.test(ra('egress:external-domain')[0].message), 'egress:external-domain：建議項要列出網域並提醒核准人');
+  expect(ra('impact:high-impact-node').length === 1 && ra('impact:high-impact-node')[0].node === 'Create item' && /POST/.test(ra('impact:high-impact-node')[0].message) && /特別確認/.test(ra('impact:high-impact-node')[0].message), 'impact:high-impact-node：建議項要指出節點與動作');
+  expect(ra('notes:missing-change-log').length === 1 && /修改記錄/.test(ra('notes:missing-change-log')[0].message), 'notes:missing-change-log：建議項要提到修改記錄');
+  expect(rr.report.advisories.filter(a => a.file === remF).every(a => a.source === 'security-scan'), '三條提醒：來源應為 security-scan');
+  expect(['egress:external-domain', 'impact:high-impact-node', 'notes:missing-change-log'].every(r => rr.comment.includes(r)) && rr.comment.includes('資安護欄（建議）') && !rr.comment.includes('### 阻擋項'), '三條提醒：註解的建議區應列出且沒有阻擋區塊');
+  expect(!(rr.text + rr.comment).includes('/v1/items'), '三條提醒：輸出只寫網域，不寫網址路徑');
+  const rmap = check(rem, ['--egress-allow', 'other.example.invalid,*.example.invalid']);
+  expect(rmap.code === 0 && !rmap.report.advisories.some(a => a.rule === 'egress:external-domain') && rmap.report.advisories.some(a => a.rule === 'impact:high-impact-node'), '--egress-allow：萬用字元涵蓋的網域不再提醒，其他兩條不受影響，退出碼仍為 0');
+  const rbare = check(rem, ['--egress-allow', 'example.invalid']);
+  expect(rbare.report.advisories.some(a => a.rule === 'egress:external-domain' && /不在允許清單/.test(a.message)), '--egress-allow：裸網域不涵蓋子網域，提醒改為「不在允許清單」');
+  const allowFile = join(tmpRoot, 'egress-allow.txt');
+  writeFileSync(allowFile, '# 核准的外連網域\napi.example.invalid\n');
+  const rfile = check(rem, ['--egress-allow-file', allowFile]);
+  expect(rfile.code === 0 && !rfile.report.advisories.some(a => a.rule === 'egress:external-domain'), '--egress-allow-file：檔案內的網域不再提醒');
+  const renv = spawnSync(process.execPath, [checker, '--dir', rem, '--target-version', expected.target], { cwd: root, encoding: 'utf8', env: { ...process.env, SKILLPACK_EGRESS_ALLOW: 'api.example.invalid' } });
+  expect(renv.status === 0 && !/egress:external-domain/.test(renv.stdout), 'SKILLPACK_EGRESS_ALLOW 環境變數會傳給資安掃描');
+  expect(run0('--egress-allow-file', join(tmpRoot, 'nope.txt')) === 2, '--egress-allow-file 讀不到檔案：退出碼應為 2');
+  expect(run0('--egress-allow') === 2, '--egress-allow 缺值：退出碼應為 2');
+  const rmix = check(stage([remF, 'fail-function-node.workflow.json']));
+  expect(rmix.report.blocking.length === 1 && rmix.report.blocking[0].code === 'NODE_DEPRECATED', '三條提醒與 fail 同批：阻擋項不因此增加');
 
   // ---- sub-workflow 引用 ------------------------------------------------------------------------
   const sub = stage(['advisory-unknown-subworkflow.workflow.json']);

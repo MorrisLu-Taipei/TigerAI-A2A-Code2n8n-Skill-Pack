@@ -1,0 +1,444 @@
+{
+  "name": "reminder impact fixture",
+  "settings": {},
+  "connections": {},
+  "nodes": [
+    {
+      "id": "gmail-send",
+      "name": "Gmail send",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send"
+      }
+    },
+    {
+      "id": "gmail-get-all",
+      "name": "Gmail get all",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "getAll"
+      }
+    },
+    {
+      "id": "gmail-default",
+      "name": "Gmail default",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "resource": "message"
+      }
+    },
+    {
+      "id": "gmail-send-and-wait",
+      "name": "Gmail send and wait",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendAndWait"
+      }
+    },
+    {
+      "id": "gmail-approval-tool",
+      "name": "Gmail approval tool",
+      "type": "n8n-nodes-base.gmailHitlTool",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "operation": "send"
+      }
+    },
+    {
+      "id": "email-send",
+      "name": "Email send",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "subject": "hello"
+      }
+    },
+    {
+      "id": "outlook-reply",
+      "name": "Outlook reply",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "reply"
+      }
+    },
+    {
+      "id": "outlook-get",
+      "name": "Outlook get",
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "get"
+      }
+    },
+    {
+      "id": "postgres-insert",
+      "name": "Postgres insert",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "operation": "insert"
+      }
+    },
+    {
+      "id": "postgres-delete",
+      "name": "Postgres delete",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "operation": "deleteTable"
+      }
+    },
+    {
+      "id": "postgres-query",
+      "name": "Postgres query",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "operation": "executeQuery"
+      }
+    },
+    {
+      "id": "postgres-select",
+      "name": "Postgres select",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "operation": "select"
+      }
+    },
+    {
+      "id": "postgres-tool-update",
+      "name": "Postgres tool update",
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "operation": "update"
+      }
+    },
+    {
+      "id": "postgres-expression",
+      "name": "Postgres expression",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "operation": "={{ $json.op }}"
+      }
+    },
+    {
+      "id": "postgres-default",
+      "name": "Postgres default",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "operation": ""
+      }
+    },
+    {
+      "id": "mysql-select",
+      "name": "MySql select",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "operation": "select"
+      }
+    },
+    {
+      "id": "mongo-update",
+      "name": "Mongo update",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "operation": "update"
+      }
+    },
+    {
+      "id": "mongo-find",
+      "name": "Mongo find",
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "operation": "find"
+      }
+    },
+    {
+      "id": "redis-set",
+      "name": "Redis set",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "operation": "set"
+      }
+    },
+    {
+      "id": "redis-get",
+      "name": "Redis get",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "operation": "get"
+      }
+    },
+    {
+      "id": "redis-publish-acked",
+      "name": "Redis publish acked",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "operation": "publish"
+      },
+      "notes": "Reviewed by owner.\nguardrail-ack: impact:high-impact-node -- fixed channel, reviewed in ticket"
+    },
+    {
+      "id": "http-get",
+      "name": "Http get",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "http://localhost:8080/a",
+        "method": "GET"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "http-default",
+      "name": "Http default",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "http://localhost:8080/b"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "http-post",
+      "name": "Http post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "http://localhost:8080/c",
+        "method": "POST"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "http-put-lower",
+      "name": "Http put lower",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "http://localhost:8080/d",
+        "method": "put"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "http-patch-expr-mode",
+      "name": "Http patch expr mode",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "http://localhost:8080/e",
+        "method": "=PATCH"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "http-delete",
+      "name": "Http delete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "http://localhost:8080/f",
+        "method": "DELETE"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "http-method-expression",
+      "name": "Http method expression",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "http://localhost:8080/g",
+        "method": "={{ $json.method }}"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "http-v1-legacy",
+      "name": "Http v1 legacy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "http://localhost:8080/h",
+        "requestMethod": "POST"
+      }
+    },
+    {
+      "id": "tool-http-post",
+      "name": "Tool HTTP post",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "http://localhost:8080/i",
+        "method": "POST"
+      }
+    },
+    {
+      "id": "run-command",
+      "name": "Run command",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "command": "echo hello"
+      }
+    },
+    {
+      "id": "remote-command",
+      "name": "Remote command",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "command": "echo hello"
+      }
+    }
+  ]
+}

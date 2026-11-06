@@ -102,6 +102,8 @@ The first sticky note in the workflow is the change log. Append a line like:
 
 Format: `v<file-internal-version> <YYYY-MM-DD>: <what changed in plain language>`. Do **not** rename the workflow file (filename version stays — internal patch bump only). If the file has no sticky note, create one — that file was non-conformant.
 
+If the workflow also has a Layer 3 note, add **one row** to its "Change log" section as well (date `YYYY-MM-DD`, change summary such as "Converted N Code nodes to native nodes", proposed by "User" or "AI", reason); only add, never rewrite older rows; if the note has no "Change log" section yet, add the section first and do not invent earlier history. No secrets in it. This is a recommendation ([`spec/sticky-note-three-layer.md`](../../../spec/sticky-note-three-layer.md) §4.4): a missing log only draws the scanner reminder `notes:missing-change-log`.
+
 ### Step 5 — Verify before committing
 
 - Re-read the node JSON: type is `n8n-nodes-base.set`, typeVersion matches the lookup table's `default` for the target version, parameters has `assignments.assignments[]`.

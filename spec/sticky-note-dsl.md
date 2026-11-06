@@ -269,7 +269,7 @@
 3. **Resolve**：依第 3、4 章詞彙表把 value 對應到 node type。
 4. **Disambiguate**：模糊時取詞彙表第一個 match；同時記錄到 Layer 3「節點選型/可能的替代」。
 5. **Generate**：建立 nodes + connections，套 `position.y` 區間（見 `sticky-note-three-layer.md`）。
-6. **Annotate**：填寫 Layer 3 sticky note。
+6. **Annotate**：填寫 Layer 3 sticky note，含「修改記錄」段（新建的第一列寫「建立」，修改既有 workflow 就新增一列，規則見 `sticky-note-three-layer.md` §4.4；缺少只提醒，不阻擋）。
 
 ### 6.1 跨節點變數引用 gotcha（**最常踩坑**）
 

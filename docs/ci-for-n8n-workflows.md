@@ -38,6 +38,7 @@ PR 開啟或更新
 | 來源 | 內容 |
 |---|---|
 | `security-scan` | 護欄規則的 warning，例如 `webhook:no-auth`、`ai:agent-no-guardrails`、`error:no-handling`；規則說明見 [`spec/security-guardrails.md`](../spec/security-guardrails.md) |
+| `security-scan`（提醒類） | 三條只提醒的規則（ADR-014，**都是建議代碼，不是阻擋碼**，沒有新增任何阻擋碼）：`egress:external-domain`（HTTP 類節點的網址參數連到非內網網域，列出網域並提醒核准人確認是否在允許清單內；網址由運算式組出時提醒「無法靜態判斷」）、`impact:high-impact-node`（寄信、寫入或刪除資料庫、HTTP 寫入方法、執行系統指令的節點，提醒核准人在工單上特別確認）、`notes:missing-change-log`（Layer 3 說明便條沒有「修改記錄」段，或有標題卻沒有任何一列資料）。說明文字直接帶具體內容（網域、動作種類），PR 註解的「說明」欄可以直接給核准人看。可在節點 notes 用 `guardrail-ack: <規則編號>` 確認。規則細節見 [`spec/security-guardrails.md`](../spec/security-guardrails.md) 2.13 至 2.15 |
 | `native-first` | 可能可以用原生節點取代的 Code 節點，見 [`spec/native-first.md`](../spec/native-first.md)；是樣式比對，可能有誤 |
 | `node-catalog` | 規則 `node:hidden-legacy`：目錄標示 `hidden: true` 但未 `deprecated` 的舊節點。訊息為「此節點在節點面板中已隱藏，屬舊節點，建議評估新版替代」；本 Pack 在 2.44.6、2.46.6 實測這類節點仍可匯入，是否阻擋以實測為準，不以 hidden 旗標為準 |
 | `workflow-refs` | 規則 `workflow:unknown-subworkflow-reference`：Execute Workflow 節點的 `workflowId` 在同一批檔案與 `--existing-workflow-ids` 清單中都找不到。可能指向目標環境既有的 workflow，所以只提醒 |
@@ -57,6 +58,7 @@ node scripts/ci/check-workflows.mjs \
   [--credential-map <json檔或JSON字串>] \
   [--existing-webhook-paths <json檔或JSON字串>] \
   [--existing-workflow-ids <json檔或JSON字串>] \
+  [--egress-allow <逗號分隔網域>] [--egress-allow-file <檔案>] \
   [--out ci-report.json] [--comment ci-comment.md]
 ```
 
@@ -65,6 +67,7 @@ node scripts/ci/check-workflows.mjs \
 - `--credential-map` 格式：`{"<憑證type>":["<名稱1>","<名稱2>"]}`，例如 `{"httpHeaderAuth":["webhook-header-auth"]}`。比對的是節點 `credentials` 裡的類型與名稱。沒有提供時略過此檢查，並在建議項說明。
 - `--existing-webhook-paths` 格式：`["POST my-path", "GET other/path"]`；沒有寫方法的項目視為任何方法。清單由呼叫端從目標環境取得，本 Pack 不負責產生。
 - `--existing-workflow-ids` 格式：`["<workflow id>", ...]`，供 Execute Workflow 的引用比對；同一批檔案的頂層 `id` 或 `name` 也算已知。只比對 `source` 為 `database`（或未設定）且字面值的 `workflowId`，運算式略過。
+- `--egress-allow`／`--egress-allow-file`（選用）：外連網域的允許清單，交給 `security-scan.mjs` 的 `egress:external-domain` 規則比對；檔案可一行一個或逗號分隔，`#` 開頭為註解，讀不到檔案是使用錯誤（退出碼 2）。環境變數 `SKILLPACK_EGRESS_ALLOW` 也會傳給掃描器（旗標優先）。`*.example.com` 涵蓋所有子網域、不含 `example.com` 本身；沒有提供清單時只列出網域、不做判斷。這只影響建議項的內容，**不會讓 CI 失敗**。
 - 檔案結構不合（`STRUCTURE_INVALID`）時，略過該檔的節點、憑證、webhook 檢查，但仍會做資安掃描。
 - 內部會呼叫 `scripts/security-scan.mjs --format json` 與 `scripts/native-first-check.mjs --format json`（輸出導向暫存檔再讀，結束後刪除）。
 

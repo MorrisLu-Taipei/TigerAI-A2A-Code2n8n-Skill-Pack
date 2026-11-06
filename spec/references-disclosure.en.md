@@ -357,10 +357,11 @@ After every generate or modify action, the third item (3) of the closing block i
 
 ### 8.2 Reading the result (matches the script's actual behavior)
 
-The scanner's rules fall into two kinds:
+The scanner's rules fall into three kinds:
 
 - **Guardrail rules** (matching the recommendations in [`security-guardrails.en.md`](security-guardrails.en.md), for example `webhook:no-auth`): always warnings, always recommendations; a default run does not fail because of them. If a node's notes contain `guardrail-ack: <rule ID>`, the user has acknowledged it, and the scanner prints an `ACK` line that does not count as a warning.
 - **Detection rules** (`secret:*`, `jscode:*`, `credential:plaintext` and similar): errors, meant for the Pack's own CI checking files in the repo. `guardrail-ack:` has no effect on them.
+- **Reminder rules** (`egress:external-domain`, `impact:high-impact-node`, `notes:missing-change-log`, see 2.13 to 2.15 of [`security-guardrails.en.md`](security-guardrails.en.md)): severity `info`, printed as `INFO` lines and counted separately as `reminder` in the summary; reminder only, not counted even by `--strict`, they never make the exit code 1. `guardrail-ack:` acknowledges them. Disclose them honestly in the "Security scan result" block with the status "reminder".
 
 | Exit code | Meaning |
 |---|---|
@@ -389,7 +390,7 @@ With findings or acknowledged items:
 ```markdown
 **Security scan result**
 - Rule-based scan (does not mean there are no other risks): <N> hit(s), <K> acknowledged
-  - <rule name> @ <node name> (<error/warning>): <suggested handling, or the user's decision>
+  - <rule name> @ <node name> (<error/warning/reminder>): <suggested handling, or the user's decision>
   - <rule name> @ <node name> (acknowledged)
 ```
 

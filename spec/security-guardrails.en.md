@@ -56,6 +56,16 @@ The rule IDs below are fixed and are not renamed. The scanner, the "Recommendati
 | `ai:agent-code-tool` | Prefer not to give an Agent tools that run arbitrary code | Yes (partial): `ai:agent-code-tool` (recommendation reminder) |
 | `data:pii-minimization` | Minimize personal data | No scan rule yet; relies on AI and human checks (secret-shaped content in `pinData` is covered by `secret:*`) |
 
+**Reminder rules (added by ADR-014; three; reminder only)**: besides the 13 recommendations above, the scanner has three "reminder" rules. They are not practices the AI should adopt while building; they point at "places the approver should look at once". Details are in 2.13 to 2.15.
+
+| Rule ID | Reminder in one line | Scan rule |
+|---|---|---|
+| `egress:external-domain` | List the external domains the workflow talks to; the approver checks them against the allow-list | Yes: `egress:external-domain` (reminder, severity `info`) |
+| `impact:high-impact-node` | Mark nodes that send mail, write or delete database rows, use HTTP write methods, or run system commands | Yes: `impact:high-impact-node` (reminder, severity `info`) |
+| `notes:missing-change-log` | The Layer 3 sticky note carries a "Change log" section | Yes: `notes:missing-change-log` (reminder, severity `info`) |
+
+Behavior shared by the reminder rules: **reminder only, never enforced**. The severity is `info`; the scan prints an `INFO` line and the summary line counts them separately as `reminder`; they do not count toward `warning`, **neither a default run nor `--strict` ever fails because of them**, and in CI they land in the advisory list only, with no blocking code added. When the user already knows, the same `guardrail-ack: <rule ID>` line acknowledges them (Chapter 3) and the scanner prints an `ACK` line instead. The reminder rules do not need a line each in the "Recommendations" block of the Layer 3 note; when the scan reports them, write them into the "Security scan result" block as in Chapter 5, with the status "reminder".
+
 > **About the "Scan rule" column**: it records what the scanner implemented when this spec was written; actual behavior is whatever `scripts/security-scan.mjs` outputs. Guardrail rules are always "recommendation reminders" (the scanner labels them warning internally) and a default run never fails because of them; only detection rules (`secret:*`, `jscode:*`, `credential:plaintext`, plus read or JSON-parse failures) are labelled error, meant for the Pack's own CI checking files in the repo, while the Skill flow just tells the user the result. The scanner's labels are not a threshold that decides whether delivery may go ahead. "Coarse" and "partial" mean the scanner covers only part of the recommendation, so no finding does not mean the whole recommendation is met. Items with no scanner rule are listed in the "Recommendations" block as "cannot be checked automatically yet" (Section 5). Update this table when the scanner changes.
 
 Every recommendation has the same shape: **situation**, **recommended practice**, **why**, **risk** (if not adopted), **what the AI does if the user does not adopt it**, **scan rule**.
@@ -220,6 +230,47 @@ The part common to all rules, "what the AI does if the user does not adopt it": 
 - **If the user does not adopt it**: for example the user wants to keep full fields, or to put their own real data in `pinData`. The AI follows that, and reminds them to clear it before exporting or sharing.
 - **Scan rule**: no scan rule yet; relies on AI and human checks (secret-shaped content in `pinData` is covered by `secret:*`).
 
+### 2.13 `egress:external-domain`: external domain reminder (reminder only)
+
+- **Situation**: the URL parameters (`url`, `endpoint`, `baseUrl`, `nextURL`, including those in nested options) of HTTP Request nodes (tool and legacy versions too), the LangChain HTTP Request tool and GraphQL nodes point at a non-internal domain. Literal URLs inside expressions (for example `={{ 'https://api.example.invalid/x' }}`, or a fallback URL in an expression) are read as well.
+- **Recommended practice**:
+  1. The approver checks whether these domains are on the organization's egress allow-list; for any that are not, first confirm the purpose and the data being sent.
+  2. When an allow-list exists, hand it to the scanner: `--egress-allow <comma-separated domains>`, `--egress-allow-file <file>` (one per line or comma-separated; `#` starts a comment), or the environment variable `SKILLPACK_EGRESS_ALLOW`; the flags win over the variable. The CI script `scripts/ci/check-workflows.mjs` accepts the first two flags too and passes the variable on to the scanner. Domains on the list are no longer reminded; **with no list the domains are only listed, with no judgement**.
+  3. Matching: case-insensitive; `api.example.invalid` matches only that domain; `*.example.invalid` matches its sub-domains at any depth and **not** `example.invalid` itself; ports, paths and query strings are not part of the match.
+  4. When the URL is built by an expression and the scanner cannot tell the destination (for example `={{ $json.target }}`, `=https://{{ $json.host }}/v1`), it says "cannot be judged statically" and **never** reports it as some fixed domain; check by hand where it really connects. A fixed domain with only the path in an expression (`=https://api.example.invalid/items/{{ $json.id }}`) counts as a fixed domain.
+  5. Write the domain as a fixed URL where you can, so the approver can see it.
+- **Not counted as egress**: `localhost` and loopback addresses, private ranges (RFC 1918), link-local, CGNAT shared addresses, IPv6 `::1`, `fc00::/7` and `fe80::/10`, names ending in `.local`, `.internal`, `.lan`, `.intranet`, `.corp`, `.home.arpa`, `.svc` or `.cluster.local`, single-label names with no dot (for example Docker Compose service names), and n8n's own address (`$execution.resumeUrl`, `$execution.resumeFormUrl`, `$env.WEBHOOK_URL`, `$env.N8N_EDITOR_BASE_URL`). Public IP addresses are listed.
+- **Why**: egress is how data leaves the organization; with the domains pulled out of node parameters, the approver sees them in one place without reading every node.
+- **Risk**: data goes to a domain nobody approved.
+- **If the user does not adopt it**: follow the user's decision; for a node the user knows about, write `guardrail-ack: egress:external-domain -- note` in that node's notes and the scanner prints `ACK`.
+- **Scan rule**: `egress:external-domain` (reminder, node level). It reads only the URL parameters above; URLs inside request bodies, inside Code node source, inside credentials, or in calls made by sub-workflows are not seen, so no reminder does not mean no egress. The output carries the domain only, never the path or query string, and host names with odd characters are not echoed.
+
+### 2.14 `impact:high-impact-node`: high-impact action reminder (reminder only)
+
+- **Situation** (each node is reminded at most once, and the text says which kind it is):
+  1. **Sending mail**: Email Send (SMTP) and Mailgun always count; Gmail, Microsoft Outlook, SendGrid, Mailjet, Mandrill and Brevo (`sendInBlue`) count when `operation` starts with `send`, `reply` or `forward` (including `sendAndWait`).
+  2. **Writing or deleting database data**: Postgres, MySQL, MongoDB, Redis, Microsoft SQL, Oracle Database, Snowflake, CrateDB, QuestDB, TimescaleDB, Supabase, Elasticsearch, NocoDB, Baserow and DynamoDB (and the `...Tool` versions where they exist) count when `operation` is not a read: `executeQuery` (arbitrary SQL, whatever the statement), `insert`, `update`, `upsert`, `delete...`, `create`, `set`, `push`, `pop`, `publish` and the like. Reads such as `select`, `find`, `get`, `getAll` do not count.
+  3. **HTTP write methods**: HTTP Request (tool and legacy `requestMethod` too) and the LangChain HTTP Request tool with `method` POST, PUT, PATCH or DELETE. They count **whether the destination is internal or external** (a POST to an internal service can change data as well).
+  4. **Running system commands**: Execute Command and SSH.
+  5. When `operation` or `method` is an expression and cannot be judged statically, the node is reminded too, with "cannot be judged statically".
+- **Not listed**: nodes with no `operation` or `method` written (exports do not record defaults, so the scanner cannot see the action); the Human Review tool versions (`...HitlTool`, which already include human approval); GraphQL nodes (no method field to judge); write actions of cloud-service nodes such as Slack or Google Sheets; vector store and memory nodes. These rely on human checks and `approval:destructive-needs-gate`.
+- **Recommended practice**: the approver confirms these nodes specially on the ticket: is the target right, is the data source trustworthy, is a human approval step needed first (see `approval:destructive-needs-gate`).
+- **Why**: these actions are usually hard to undo (sent mail, rewritten data, requests already made); marking them in one place saves the approver from hunting node by node.
+- **If the user does not adopt it**: follow the user's decision; for a node the user knows about, write `guardrail-ack: impact:high-impact-node -- note` in that node's notes.
+- **Where the node classification comes from**: node names were looked up in the node catalogs under `docs/node-versions/` (all three of 2.37.3, 2.44.6 and 2.46.6 contain them); `n8n-nodes-base.executeCommand` is not in the default catalogs (a default instance does not offer it), so the name already used by the `exec:execute-command` rule is kept. The catalogs hold no "operation value" data, so operation values come from the vendored official Skill text (`skills/_vendor/n8n-node-configuration-official/references/DATABASE_NODES.md` and others) plus general verb matching; operation names that are not recognized are **not listed**, so this rule prefers missing a case to covering everything.
+- **Scan rule**: `impact:high-impact-node` (reminder, node level).
+
+### 2.15 `notes:missing-change-log`: the change log on the Layer 3 note (reminder only)
+
+- **Situation**: the workflow has a Layer 3 sticky note (a note with `color` 5), but the note has no "Change log" section, or has the heading and no row of data.
+- **Recommended practice**: follow [`sticky-note-three-layer.en.md`](sticky-note-three-layer.en.md) §4.4 and add a "Change log" section to the Layer 3 note: each row has a date (YYYY-MM-DD), a change summary, who proposed it (user or AI) and the reason; the first row of a new workflow is "Created"; changing an existing workflow adds one row; no secrets.
+- **How it is recognized**: a heading of "修改記錄" (or "修改紀錄"), `Change log` or `Changelog`, with at least one row (a table row or a list item) under it containing a date in `YYYY-MM-DD` form. With several Layer 3 notes, any one that qualifies is enough.
+- **When there is no Layer 3 note at all**: this rule **does not repeat the reminder**; the existing sticky-note reminders stand (the Skill flow requires a Layer 3 note on every workflow).
+- **What the scanner cannot see**: whether what the log says matches the real change needs a comparison with the previous version, which the Pack cannot do; the pipeline compares at pull-request level later, outside this rule.
+- **Why**: after export a workflow is separated from Git, and people in production see only the workflow itself; a history on the note saves the approver and later maintainers from looking elsewhere.
+- **If the user does not adopt it**: follow the user's decision; write `guardrail-ack: notes:missing-change-log -- note` in the notes of any node (the trigger node is recommended).
+- **Scan rule**: `notes:missing-change-log` (reminder, workflow level).
+
 ---
 
 ## 3. User acknowledgement
@@ -255,9 +306,9 @@ guardrail-ack: webhook:no-auth
 > **Relation to the scanner** (matches what `scripts/security-scan.mjs` does today):
 >
 > - **It prints an ACK line**: a line in a node's notes of the form `guardrail-ack: <rule ID>` (leading whitespace allowed, optionally followed by ` -- note`; the note may be omitted and has no minimum length) is read by the scanner. The matching reminder is printed as an `ACK` line (rule ID, node name and note) instead, **does not count toward the reminders**, and the summary line reports the number acknowledged.
-> - **It works only for guardrail-rule recommendation reminders**: node-level rules (for example `webhook:no-auth`, `form:no-auth`, `exec:*`, `file:rw-access`) must be written in **that node's** notes; workflow-level rules (`error:no-handling`, `ai:agent-no-guardrails`) can go in any node's notes, with the trigger node recommended.
+> - **It works only for guardrail-rule recommendation reminders**: node-level rules (for example `webhook:no-auth`, `form:no-auth`, `exec:*`, `file:rw-access`, `egress:external-domain`, `impact:high-impact-node`) must be written in **that node's** notes; workflow-level rules (`error:no-handling`, `ai:agent-no-guardrails`, `notes:missing-change-log`) can go in any node's notes, with the trigger node recommended. The reminder rules (severity `info`) can be acknowledged with `guardrail-ack:` too.
 > - **It has no effect on detection-rule errors**: `secret:*`, `jscode:*`, `credential:plaintext` and similar detection rules are not recommendations, and `guardrail-ack:` does not make them go away; the scanner prints a `NOTE` line saying the acknowledgement was ignored. A mistyped rule ID, or one with no matching reminder, also produces a `NOTE` line.
-> - **`--strict` is an optional flag**: with it, un-acknowledged recommendation reminders also make the exit code 1. The Pack's Skill flow **does not use it and does not ask for it**; it is for a user or CI that wants stricter behavior.
+> - **`--strict` is an optional flag**: with it, un-acknowledged recommendation reminders (`warning`) also make the exit code 1; the reminder rules (`info`) are **not counted** and never make it 1. The Pack's Skill flow **does not use it and does not ask for it**; it is for a user or CI that wants stricter behavior.
 > - For items with no scanner rule (for example `approval:destructive-needs-gate`, `data:pii-minimization`), the line is a record only and the scanner does nothing with it.
 > - The scanner reads only `guardrail-ack:` today, not the earlier `guardrail-waiver:` form.
 
@@ -302,6 +353,7 @@ The default mode is the advisory mode. The scanner also has an optional `--stric
 ### 4.2 How to read the result
 
 - Scan output is **information and recommendations**. The AI reports the results to the user as they are, explains what risk each item represents, and suggests how to handle it; **the user decides whether to act**.
+- Scan output has three levels: `ERROR` (detection rules), `WARNING` (guardrail recommendations) and `INFO` (reminder rules: `egress:external-domain`, `impact:high-impact-node`, `notes:missing-change-log`). Write `INFO` lines into the "Security scan result" block as they are (status "reminder"); the external domains and high-impact actions are there precisely so the approver sees them.
 - Findings do not cause delivery to be refused. Exit code 1 only means there are detection-rule reminders (for example a suspected secret pattern); it does not mean delivery cannot proceed.
 - Where the user decides to act, rescan the final JSON after the change; the last result is the one that counts. Where the user decides not to act, record it honestly in the "Recommendations" block of the Layer 3 note (Section 5).
 - After any further change to the JSON (including writing the recommendations into a sticky note or adding acknowledgement lines), rescan the final file.
@@ -385,4 +437,4 @@ To show the user a result quickly, the AI pastes an API key directly into the Au
 ---
 
 **Version**: v1.1
-**Status**: draft spec. The "Scan rule" column in Section 2 and the description of the scanner in Section 3.2 will be updated as `scripts/security-scan.mjs` changes; where they differ from the scanner's actual output, the scanner prevails.
+**Status**: draft spec. The "Scan rule" column in Section 2 and the description of the scanner in Section 3.2 will be updated as `scripts/security-scan.mjs` changes; where they differ from the scanner's actual output, the scanner prevails. Sections 2.13 to 2.15 are reminder rules added after ADR-014 (reminder only, never enforced).

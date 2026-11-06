@@ -9,10 +9,10 @@
   "static": {
     "pass-webhook-echo.workflow.json":      { "status": "pass", "blocking": [], "advisories": [] },
     "pass-webhook-branch.workflow.json":    { "status": "pass", "blocking": [], "advisories": [] },
-    "pass-schedule-http.workflow.json":     { "status": "pass", "blocking": [], "advisories": [] },
+    "pass-schedule-http.workflow.json":     { "status": "pass", "blocking": [], "advisories": ["security-scan:egress:external-domain"] },
     "pass-manual-set.workflow.json":        { "status": "pass", "blocking": [], "advisories": [] },
     "pass-subworkflow-callee.workflow.json":{ "status": "pass", "blocking": [], "advisories": [] },
-    "pass-credential-field-exempt.workflow.json":{ "status": "pass", "blocking": [], "advisories": [] },
+    "pass-credential-field-exempt.workflow.json":{ "status": "pass", "blocking": [], "advisories": ["security-scan:egress:external-domain"] },
     "pass-subworkflow-caller.workflow.json":{ "status": "pass", "blocking": [], "advisories": [], "with": ["pass-subworkflow-callee.workflow.json"] },
 
     "advisory-webhook-no-auth.workflow.json":      { "status": "pass", "blocking": [], "advisories": ["security-scan:webhook:no-auth"] },
@@ -22,6 +22,7 @@
     "advisory-hidden-legacy-node.workflow.json":   { "status": "pass", "blocking": [], "advisories": ["node-catalog:node:hidden-legacy"] },
     "advisory-credential-field-missing.workflow.json": { "status": "pass", "blocking": [], "advisories": ["credentials:credentials:missing-field"] },
     "advisory-unknown-subworkflow.workflow.json":  { "status": "pass", "blocking": [], "advisories": ["workflow-refs:workflow:unknown-subworkflow-reference"] },
+    "advisory-egress-impact-changelog.workflow.json": { "status": "pass", "blocking": [], "advisories": ["security-scan:egress:external-domain", "security-scan:impact:high-impact-node", "security-scan:notes:missing-change-log"] },
 
     "fail-json-invalid.workflow.json":        { "status": "fail", "blocking": ["JSON_INVALID"] },
     "fail-structure.workflow.json":           { "status": "fail", "blocking": ["STRUCTURE_INVALID"] },

@@ -497,6 +497,7 @@ v0.36.0 SEC-017 修補 commit `456c311` 之後，本 SKILL 的 critic gate 會�
 ### 完成後：參考來源、建議事項與掃描結果
 
 - **在哪個步驟做**：本 Skill 是管線型 Skill，這一步在**管線最後一個階段（Stage 11）** 執行；Stage 0–10 邊做邊記「參考紀錄」，不在中途各自寫入。每個子階段實際讀過且影響設計的資料都彙總進同一份紀錄（例如 Stage 2 的 partition 依據、Stage 3 的 SECURITY-REVIEW 參考、Stage 5 產生 workflow 所用的骨架與範例、Stage 10 的目標 n8n 版本），同一來源在不同階段用到就合併成一條。
+- **修改記錄**：每個產出 workflow 的 Layer 3 便條都要有「修改記錄」段（依 [`spec/sticky-note-three-layer.md`](../../../spec/sticky-note-three-layer.md) §4.4，這是建議，缺少只被掃描器提醒）。管線新產生的 workflow 第一列寫「建立」（提出者「AI」，原因寫來源專案與階段，不貼機密）；重跑管線而修改既有 workflow 時，在既有記錄新增一列，不改寫舊列。日期取當天，不得寫入機密。記錄與實際變更是否相符由管線在 PR 層級比對（之後的工作）。
 - 把參考來源、建議事項與掃描結果寫進每個產出 workflow 的 Layer 3 便條與相關節點 notes，對話只放摘要；`COMPLETION-REPORT.md` 只摘要並指向這些註解。順序、格式、狀態與誠實規則依 [`spec/references-disclosure.md`](../../../spec/references-disclosure.md) 第 4 章（掃描見第 8 章），本 Skill 不重複；資安掃描對最終要上架的每個 workflow JSON 執行（Stage 10 之前若又改過 JSON，對最終版重掃）。語言依 §1.5 的語言鎖定規則，與使用者發起時的語言一致。
 
 ---
@@ -575,6 +576,7 @@ examples/<repo-name>-n8n/
 - [ ] Stage 10 ACTIVATION-LOG 含所有 workflow id + tag
 - [ ] COMPLETION-REPORT 無禁用詞彙、claim ↔ evidence 對齊
 - [ ] 每個產出的 workflow 的 Layer 3 便條含「參考來源」「建議事項」「資安掃描結果」，COMPLETION-REPORT 與收尾訊息只放摘要並指向註解（依 `spec/references-disclosure.md`）
+- [ ] 每個產出的 workflow 的 Layer 3 便條含「修改記錄」（新建的第一列為「建立」；建議項，缺少只提醒）
 - [ ] REVIEW-SIGN-OFF 含 critic agent 識別與時間戳
 
 任一未過 → critic 不簽 → pipeline 未完成。

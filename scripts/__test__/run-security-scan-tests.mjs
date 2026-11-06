@@ -3,7 +3,7 @@
 // Usage: node scripts/__test__/run-security-scan-tests.mjs
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +14,7 @@ const scanner = join(root, 'scripts', 'security-scan.mjs');
 const fx = n => join(here, n);
 
 function scan(file, ...flags) {
-  const r = spawnSync(process.execPath, [scanner, file, ...flags], { cwd: root, encoding: 'utf8' });
+  const r = spawnSync(process.execPath, [scanner, file, ...flags], { cwd: root, encoding: 'utf8', env: { ...process.env, SKILLPACK_EGRESS_ALLOW: '' } });
   return { code: r.status, out: (r.stdout ?? '') + (r.stderr ?? '') };
 }
 
@@ -133,6 +133,169 @@ expect(hit(ai, 'jscode:require-child-process', 'LangChain Supply'), 'ai-code: La
 expect(!ai.some(f => f.where === 'node:Tool Code Python'), 'ai-code: Python toolCode is out of scope and must stay silent');
 expect(!ai.some(f => f.where === 'node:LangChain Benign'), 'ai-code: benign LangChain Code must stay silent');
 expect(scan(fx('ai-code-nodes.workflow.json')).code === 1, 'ai-code: expected exit 1');
+
+// ---- ADR-014 reminder-only rules: egress:external-domain, impact:high-impact-node, notes:missing-change-log ----
+// They are severity "info": visible, acknowledgeable, but never a failure (not even with --strict).
+{
+  const json = (file, ...flags) => JSON.parse(scan(file, '--format', 'json', ...flags).out);
+  const hitsOf = (j, rule) => j.results[0].findings.filter(f => f.rule === rule);
+  const nodesOf = (j, rule) => hitsOf(j, rule).map(f => f.where.replace(/^node:/, '')).sort();
+  const same = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+  const runWithEnv = (file, env, ...flags) => spawnSync(process.execPath, [scanner, file, '--format', 'json', ...flags], { cwd: root, encoding: 'utf8', env: { ...process.env, ...env } });
+  const tmp2 = mkdtempSync(join(tmpdir(), 'scan-reminder-'));
+  try {
+    const put = (label, obj) => { const f = join(tmp2, `${label}.workflow.json`); writeFileSync(f, JSON.stringify(obj)); return f; };
+    const wfOf = nodes => ({ name: 'tmp', settings: {}, connections: {}, nodes });
+    const httpNode = (name, url, extra = {}) => ({ id: name, name, type: 'n8n-nodes-base.httpRequest', typeVersion: 4.2, position: [0, 0], parameters: { url }, onError: 'continueRegularOutput', ...extra });
+    const sticky = (id, color, content) => ({ id, name: id, type: 'n8n-nodes-base.stickyNote', typeVersion: 1, position: [0, 700], parameters: { color, content } });
+
+    // -- egress: no allow-list = list only ---------------------------------------------------------------------
+    const egFile = fx('reminder-egress.workflow.json');
+    const eg = json(egFile);
+    const egText = scan(egFile).out;
+    const egDynamic = ['Dynamic whole', 'Dynamic host', 'Fallback expression'];
+    const egFixed = ['Static external', 'Wildcard sub', 'Wildcard bare', 'Allowed exact', 'Path expression', 'Literal in expression', 'Fallback expression', 'Public ip', 'Nested option', 'Tool HTTP', 'Graphql'];
+    expect(same(nodesOf(eg, 'egress:external-domain'), [...new Set([...egFixed, ...egDynamic])]), `egress: wrong node set ${nodesOf(eg, 'egress:external-domain')}`);
+    expect(hitsOf(eg, 'egress:external-domain').every(f => f.severity === 'info'), 'egress: severity must be info');
+    const egOnly = put('egress-only', wfOf([httpNode('Fetch', 'https://only.example.invalid/x')]));
+    expect(scan(egFile).code === 0 && scan(egOnly).code === 0 && scan(egOnly, '--strict').code === 0, 'egress: must never fail, not even with --strict');
+    expect(/^INFO +.*\[egress:external-domain\]/m.test(egText) && !/^(?:WARNING|ERROR) .*\[egress:/m.test(egText), 'egress: text output should label it INFO');
+    const sampleOf = (j, node) => hitsOf(j, 'egress:external-domain').find(f => f.where === `node:${node}`)?.sample ?? '';
+    const s1 = sampleOf(eg, 'Static external');
+    expect(/api\.example\.invalid/.test(s1) && /未提供允許清單，僅列出/.test(s1) && /請核准人確認這些網域是否在允許清單內/.test(s1), 'egress: reminder should list the domain, say it is only listed and ask the approver to check');
+    expect(!/無法靜態判斷/.test(sampleOf(eg, 'Path expression')) && /path\.example\.invalid/.test(sampleOf(eg, 'Path expression')), 'egress: a dynamic path after a literal host is a fixed domain');
+    expect(!/無法靜態判斷/.test(sampleOf(eg, 'Literal in expression')) && /lit\.example\.invalid/.test(sampleOf(eg, 'Literal in expression')), 'egress: a single quoted literal inside an expression is a fixed domain');
+    for (const n of egDynamic) expect(/無法靜態判斷/.test(sampleOf(eg, n)), `egress: ${n} should say it cannot be judged statically`);
+    for (const n of ['Dynamic whole', 'Dynamic host']) expect(!/外連網域/.test(sampleOf(eg, n)), `egress: ${n} must not be reported as a fixed domain`);
+    expect(/fallback\.example\.invalid/.test(sampleOf(eg, 'Fallback expression')), 'egress: the literal fallback in an expression is listed too');
+    for (const n of ['Localhost', 'Compose service', 'N8n self', 'Set only']) expect(!nodesOf(eg, 'egress:external-domain').includes(n), `egress: ${n} must not be reported (internal / built-in / not an HTTP node)`);
+    expect(!/body\.example\.invalid/.test(egText), 'egress: URLs in request bodies are not URL parameters');
+    expect(!/not-a-real-key|\/v1\/items/.test(egText), 'egress: output shows the domain only, never the path or query string');
+    expect(eg.results[0].acknowledged.some(a => a.rule === 'egress:external-domain' && a.where === 'node:Acked') && !nodesOf(eg, 'egress:external-domain').includes('Acked'), 'egress: guardrail-ack should acknowledge it');
+    const total = ['egress:external-domain', 'impact:high-impact-node', 'notes:missing-change-log'].reduce((n, r) => n + hitsOf(eg, r).length, 0);
+    expect(eg.summary.reminders === total && total > 0, 'egress: summary.reminders should count the info findings');
+    expect(/ · \d+ reminder$/m.test(egText), 'egress: text summary should end with the reminder count');
+
+    // -- egress: allow-list (flag, file with comments, environment variable) ------------------------------------------
+    const egA = json(egFile, '--egress-allow', 'allowed.example.invalid, *.svc.example.invalid,API.example.invalid');
+    const left = nodesOf(egA, 'egress:external-domain');
+    expect(!left.includes('Wildcard sub') && !left.includes('Allowed exact') && !left.includes('Static external'), 'allow-list: exact and wildcard matches (case-insensitive) are not reminded');
+    expect(left.includes('Wildcard bare'), 'allow-list: *.svc.example.invalid does not match svc.example.invalid itself');
+    expect(left.includes('Path expression') && left.includes('Public ip') && left.includes('Tool HTTP'), 'allow-list: domains outside the list are still reminded');
+    expect(/外連網域不在允許清單：path\.example\.invalid/.test(sampleOf(egA, 'Path expression')), 'allow-list: message says the domain is not in the list');
+    expect(egDynamic.every(n => left.includes(n) && /無法靜態判斷/.test(sampleOf(egA, n))), 'allow-list: dynamic URLs stay "cannot judge" even with a list');
+    const allowFile = join(tmp2, 'allow.txt');
+    writeFileSync(allowFile, '# approved egress\nallowed.example.invalid  # exact\n*.svc.example.invalid\n\n');
+    const leftF = nodesOf(json(egFile, '--egress-allow-file', allowFile), 'egress:external-domain');
+    expect(!leftF.includes('Allowed exact') && !leftF.includes('Wildcard sub') && leftF.includes('Static external'), 'allow-list file: comments and blank lines are ignored, only listed domains are exempt');
+    const leftE = nodesOf(JSON.parse(runWithEnv(egFile, { SKILLPACK_EGRESS_ALLOW: 'allowed.example.invalid' }).stdout), 'egress:external-domain');
+    expect(!leftE.includes('Allowed exact') && leftE.includes('Static external'), 'allow-list: SKILLPACK_EGRESS_ALLOW works');
+    const leftEF = nodesOf(JSON.parse(runWithEnv(egFile, { SKILLPACK_EGRESS_ALLOW: 'allowed.example.invalid' }, '--egress-allow', 'api.example.invalid').stdout), 'egress:external-domain');
+    expect(leftEF.includes('Allowed exact') && !leftEF.includes('Static external'), 'allow-list: the flag wins over the environment variable');
+    expect(scan(egFile, '--egress-allow').code === 2 && scan(egFile, '--egress-allow-file', join(tmp2, 'missing.txt')).code === 2, 'allow-list: a missing value or unreadable file is a usage error (exit 2)');
+    expect(scan(egOnly, '--egress-allow', 'a.example.invalid', '--strict').code === 0, 'allow-list: still never fails');
+
+    // -- egress: internal ranges are built at run time so no private address is stored in the repo ------------------------
+    const ip = (...p) => p.join('.');
+    const internal = [ip(10, 1, 2, 3), ip(172, 16, 0, 9), ip(172, 31, 255, 1), ip(192, 168, 5, 6), ip(127, 0, 0, 2), ip(169, 254, 1, 1), ip(100, 64, 0, 1),
+      '[::1]', '[fd00::1]', 'db.internal', 'svc.local', 'api.svc.cluster.local', 'gateway.lan', 'LOCALHOST'];
+    const outside = [ip(172, 32, 0, 1), ip(172, 15, 0, 1), ip(100, 63, 0, 1), ip(100, 128, 0, 1), ip(8, 8, 8, 8), 'internal.example.invalid', 'locally.example.invalid'];
+    const mixed = put('internal-ranges', wfOf([...internal.map((h, i) => httpNode(`In ${i}`, `http://${h}:8080/x`)), ...outside.map((h, i) => httpNode(`Out ${i}`, `https://${h}/x`))]));
+    expect(same(nodesOf(json(mixed), 'egress:external-domain'), outside.map((_, i) => `Out ${i}`)), `egress ranges: internal hosts skipped, near-miss public hosts reported (got ${nodesOf(json(mixed), 'egress:external-domain')})`);
+    const leak = scan(put('leak', wfOf([httpNode('Userinfo', 'https://someone:not-a-real-pw@basic.example.invalid:8443/p?token=not-a-real-token'), httpNode('Odd host', 'https://ex_ample.invalid/x')]))).out;
+    const leakReminders = leak.split('\n').filter(l => /\[egress:external-domain\]/.test(l)).join('\n');
+    expect(/basic\.example\.invalid/.test(leakReminders) && !/not-a-real-pw|not-a-real-token|8443|someone/.test(leakReminders), 'egress: userinfo, port and query never appear in the reminder');
+    expect(/主機名稱含特殊字元/.test(leakReminders) && !/ex_ample/.test(leakReminders), 'egress: odd host names are not echoed');
+
+    // -- impact: table vs. catalogs, then each class -------------------------------------------------------------------
+    const catalogs = ['2.37.3', '2.44.6', '2.46.6'].map(v => new Set(JSON.parse(readFileSync(join(root, 'docs', 'node-versions', `${v}.json`), 'utf8')).nodes.map(n => n.name)));
+    const hiType = {
+      mail: ['n8n-nodes-base.emailSend', 'n8n-nodes-base.emailSendTool', 'n8n-nodes-base.mailgun', 'n8n-nodes-base.gmail', 'n8n-nodes-base.gmailTool', 'n8n-nodes-base.microsoftOutlook', 'n8n-nodes-base.microsoftOutlookTool', 'n8n-nodes-base.sendGrid', 'n8n-nodes-base.mailjet', 'n8n-nodes-base.mandrill', 'n8n-nodes-base.sendInBlue'],
+      db: ['n8n-nodes-base.postgres', 'n8n-nodes-base.postgresTool', 'n8n-nodes-base.mySql', 'n8n-nodes-base.mongoDb', 'n8n-nodes-base.redis', 'n8n-nodes-base.microsoftSql', 'n8n-nodes-base.oracleDatabase', 'n8n-nodes-base.snowflake', 'n8n-nodes-base.crateDb', 'n8n-nodes-base.questDb', 'n8n-nodes-base.timescaleDb', 'n8n-nodes-base.supabase', 'n8n-nodes-base.elasticsearch', 'n8n-nodes-base.nocoDb', 'n8n-nodes-base.baserow', 'n8n-nodes-base.awsDynamoDb'],
+      http: ['n8n-nodes-base.httpRequest', 'n8n-nodes-base.httpRequestTool', '@n8n/n8n-nodes-langchain.toolHttpRequest'],
+      cmd: ['n8n-nodes-base.ssh'],
+    };
+    for (const t of Object.values(hiType).flat()) expect(catalogs.every(c => c.has(t)), `impact: ${t} is not in every docs/node-versions catalog`);
+    expect(catalogs.every(c => !c.has('n8n-nodes-base.executeCommand')), 'impact: executeCommand is absent from the default catalogs; it stays because exec:execute-command already uses that type');
+    const tableNodes = [
+      ...hiType.mail.map(t => ({ type: t, parameters: /emailSend|mailgun/.test(t) ? {} : { operation: 'send' } })),
+      ...hiType.db.map(t => ({ type: t, parameters: { operation: 'insert' } })),
+      ...hiType.http.map(t => ({ type: t, parameters: { url: 'http://localhost:1/', method: 'POST' } })),
+      ...hiType.cmd.map(t => ({ type: t, parameters: {} })),
+      { type: 'n8n-nodes-base.executeCommand', parameters: {} },
+    ].map((n, i) => ({ id: `t${i}`, name: `T${i} ${n.type}`, typeVersion: 1, position: [0, 0], ...n }));
+    expect(same(nodesOf(json(put('impact-table', wfOf(tableNodes))), 'impact:high-impact-node'), tableNodes.map(n => n.name)), 'impact: every type in the table should be reported');
+    const notHigh = ['n8n-nodes-base.gmailHitlTool', 'n8n-nodes-base.emailSendHitlTool', 'n8n-nodes-base.microsoftOutlookHitlTool', 'n8n-nodes-base.slack', 'n8n-nodes-base.googleSheets', 'n8n-nodes-base.graphql']
+      .map((t, i) => ({ id: `n${i}`, name: `N${i}`, type: t, typeVersion: 1, position: [0, 0], parameters: { operation: 'send', method: 'POST' } }));
+    expect(nodesOf(json(put('impact-not', wfOf(notHigh))), 'impact:high-impact-node').length === 0, 'impact: approval (Hitl) tools, other SaaS nodes and GraphQL are not listed');
+
+    const imFile = fx('reminder-impact.workflow.json');
+    const im = json(imFile);
+    const imHit = ['Gmail send', 'Gmail send and wait', 'Email send', 'Outlook reply', 'Postgres insert', 'Postgres delete', 'Postgres query', 'Postgres tool update', 'Postgres expression',
+      'Mongo update', 'Redis set', 'Http post', 'Http put lower', 'Http patch expr mode', 'Http delete', 'Http method expression', 'Http v1 legacy', 'Tool HTTP post', 'Run command', 'Remote command'];
+    expect(same(nodesOf(im, 'impact:high-impact-node'), imHit), `impact fixture: wrong node set (${nodesOf(im, 'impact:high-impact-node')})`);
+    for (const n of ['Gmail get all', 'Gmail default', 'Gmail approval tool', 'Outlook get', 'Postgres select', 'Postgres default', 'MySql select', 'Mongo find', 'Redis get', 'Http get', 'Http default'])
+      expect(!nodesOf(im, 'impact:high-impact-node').includes(n), `impact fixture: ${n} must not be reported`);
+    expect(im.results[0].acknowledged.some(a => a.rule === 'impact:high-impact-node' && a.where === 'node:Redis publish acked'), 'impact fixture: guardrail-ack should acknowledge it');
+    const sampleI = node => hitsOf(im, 'impact:high-impact-node').find(f => f.where === `node:${node}`)?.sample ?? '';
+    expect(/寄信/.test(sampleI('Email send')) && /POST/.test(sampleI('Http post')) && /deleteTable/.test(sampleI('Postgres delete')) && /Execute Command/.test(sampleI('Run command')), 'impact fixture: reason text names the action');
+    expect(/請核准人在工單上特別確認/.test(sampleI('Email send')), 'impact fixture: reminder asks the approver to confirm');
+    expect(hitsOf(im, 'impact:high-impact-node').every(f => f.severity === 'info'), 'impact fixture: severity must be info');
+    expect(scan(imFile).code === 0, 'impact fixture: default run exits 0');
+    expect(scan(imFile, '--strict').code === 1 && hitsOf(im, 'exec:execute-command').length === 1, 'impact fixture: --strict fails only because of the older exec:* warnings');
+    const infoOnly = put('impact-info-only', wfOf([{ id: 'p', name: 'Send mail', type: 'n8n-nodes-base.emailSend', typeVersion: 2.1, position: [0, 0], parameters: {}, onError: 'continueRegularOutput' }]));
+    expect(scan(infoOnly, '--strict').code === 0 && /^INFO /m.test(scan(infoOnly).out), 'impact: an info-only workflow passes --strict and prints INFO');
+    const execAck = json(put('impact-ack-scope', wfOf([{ id: 'x', name: 'Run', type: 'n8n-nodes-base.executeCommand', typeVersion: 1, position: [0, 0], parameters: {}, notes: 'guardrail-ack: exec:execute-command' }])));
+    expect(execAck.results[0].acknowledged.length === 1 && hitsOf(execAck, 'impact:high-impact-node').length === 1, 'impact: an ack for exec:execute-command does not silence impact:high-impact-node');
+
+    // -- change log ----------------------------------------------------------------------------------------------------
+    expect(hitsOf(json(fx('reminder-change-log-ok.workflow.json')), 'notes:missing-change-log').length === 0, 'change log: a filled-in table is not reminded');
+    const missFile = fx('reminder-change-log-missing.workflow.json');
+    const miss = json(missFile);
+    const m1 = hitsOf(miss, 'notes:missing-change-log');
+    expect(m1.length === 1 && m1[0].severity === 'info' && m1[0].where === 'workflow' && /沒有「修改記錄」段/.test(m1[0].sample), 'change log: a Layer 3 note without the section gives one workflow-level info reminder');
+    expect(scan(missFile).code === 0 && scan(missFile, '--strict').code === 0, 'change log: never fails');
+    expect(hitsOf(json(fx('reminder-no-layer3.workflow.json')), 'notes:missing-change-log').length === 0, 'change log: no Layer 3 note at all gives nothing extra');
+    const row = '| 2026-11-07 | 建立 | AI | 依需求產生 |';
+    const variants = [
+      ['bullet list', '**修改記錄**\n- 2026-11-07 建立（AI，依需求產生）', 0],
+      ['English heading', '#### Change log\n| Date | Summary | By | Why |\n|---|---|---|---|\n| 2026-11-07 | Created | AI | first version |', 0],
+      ['Changelog one word', '### Changelog\n1. 2026-11-07 created by AI', 0],
+      ['alt spelling', `**修改紀錄**\n${row}`, 0],
+      ['heading with suffix', `**修改記錄（Change log）**\n${row}`, 0],
+      ['emoji heading', `📝 **修改記錄**\n${row}`, 0],
+      ['log followed by other sections', `**修改記錄**\n${row}\n\n**已知限制**\n- 無`, 0],
+      ['heading only', '**修改記錄**\n\n**已知限制**\n- 無', 'empty'],
+      ['header row only', '**修改記錄**\n| 日期 | 變更摘要 | 提出者 | 原因 |\n|---|---|---|---|', 'empty'],
+      ['placeholder row', '**修改記錄**\n| YYYY-MM-DD | 建立 | AI | 原因 |', 'empty'],
+      ['row in a later section', `**修改記錄**\n\n**已知限制**\n${row}`, 'empty'],
+      ['date without a row marker', '**修改記錄**\n建立於 2026-11-07', 'empty'],
+      ['mention only', '這裡沒有修改記錄，也沒有 change log 欄位', 'none'],
+      ['sentence starting with the words', '修改記錄見 git 歷史', 'none'],
+      ['nothing', '### 🤖 AI 實作說明\n**參考來源**\n- 無', 'none'],
+    ];
+    for (const [label, content, want] of variants) {
+      const hit = hitsOf(json(put(`cl-${label.replace(/\W+/g, '-')}`, wfOf([sticky('l3', 5, content)]))), 'notes:missing-change-log');
+      if (want === 0) expect(hit.length === 0, `change log (${label}): should be accepted`);
+      else expect(hit.length === 1 && (want === 'empty' ? /沒有任何一列資料/.test(hit[0].sample) : /沒有「修改記錄」段/.test(hit[0].sample)), `change log (${label}): expected the "${want}" reminder, got ${JSON.stringify(hit.map(h => h.sample))}`);
+    }
+    expect(hitsOf(json(put('cl-layer1', wfOf([sticky('a', 4, `**修改記錄**\n${row}`)]))), 'notes:missing-change-log').length === 0, 'change log: only Layer 3 (color 5) notes are checked');
+    expect(hitsOf(json(put('cl-two', wfOf([sticky('a', 5, 'no log here'), sticky('b', 5, `**修改記錄**\n${row}`)]))), 'notes:missing-change-log').length === 0, 'change log: with several Layer 3 notes one filled-in log is enough');
+    expect(hitsOf(json(put('cl-color-string', wfOf([sticky('a', '5', 'no log')]))), 'notes:missing-change-log').length === 1, 'change log: color "5" as a string is still Layer 3');
+    const ackJ = json(put('cl-ack', wfOf([sticky('a', 5, 'no log here'), { id: 't', name: 'Trigger', type: 'n8n-nodes-base.manualTrigger', typeVersion: 1, position: [0, 0], parameters: {}, notes: 'guardrail-ack: notes:missing-change-log -- tracked in the ticket' }])));
+    expect(hitsOf(ackJ, 'notes:missing-change-log').length === 0 && ackJ.results[0].acknowledged.some(a => a.rule === 'notes:missing-change-log'), 'change log: guardrail-ack on a node acknowledges the workflow-level reminder');
+    const stray = scan(put('stray-ack', wfOf([{ id: 'x', name: 'Plain', type: 'n8n-nodes-base.set', typeVersion: 3, position: [0, 0], parameters: {}, notes: 'guardrail-ack: egress:external-domain' }]))).out;
+    expect(/^NOTE .*\[egress:external-domain\].*ack ignored: rule id mismatch or no such finding/m.test(stray), 'ack: a stray ack for a new rule produces a NOTE');
+
+    // -- output formats ------------------------------------------------------------------------------------------------
+    const md = scan(missFile, '--format', 'markdown').out;
+    expect(md.includes('ℹ️') && /1 reminder/.test(md) && md.includes('**info** `notes:missing-change-log`'), 'markdown: an info-only file uses the info icon and label');
+    expect(json(missFile).summary.reminders === 1, 'json: summary.reminders is present');
+    expect(!/^ERROR /m.test(egText + scan(imFile).out), 'reminder rules never produce ERROR lines');
+  } finally {
+    rmSync(tmp2, { recursive: true, force: true });
+  }
+}
 
 if (failures.length > 0) {
   console.error(`FAIL security-scan tests: ${failures.length}/${checks} check(s) failed`);

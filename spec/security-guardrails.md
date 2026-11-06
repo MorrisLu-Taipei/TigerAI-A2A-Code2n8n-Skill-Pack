@@ -56,6 +56,16 @@ n8n 本身已提供原生的 Guardrails 節點（type：`@n8n/n8n-nodes-langchai
 | `ai:agent-code-tool` | Agent 預設不接可執行任意程式的工具 | 有（局部）：`ai:agent-code-tool`（建議提醒） |
 | `data:pii-minimization` | 個資最小化 | 尚無掃描規則，靠 AI 與人工檢查（`pinData` 內的機密樣式由 `secret:*` 涵蓋） |
 
+**提醒類規則（ADR-014 新增，三條，只提醒）**：除了上面的 13 項建議，掃描器另有三條「提醒類」規則。它們不是要 AI 在建的時候去採用的做法，而是把「核准人該特別看一眼的地方」標出來；詳細說明見 2.13 至 2.15。
+
+| 規則編號 | 一句話提醒 | 掃描規則 |
+|---|---|---|
+| `egress:external-domain` | 列出會連到的外部網域，請核准人確認是否在允許清單內 | 有：`egress:external-domain`（提醒，severity 為 `info`） |
+| `impact:high-impact-node` | 標出寄信、寫入或刪除資料庫、HTTP 寫入方法、執行系統指令的節點 | 有：`impact:high-impact-node`（提醒，severity 為 `info`） |
+| `notes:missing-change-log` | Layer 3 說明便條要有「修改記錄」段 | 有：`notes:missing-change-log`（提醒，severity 為 `info`） |
+
+提醒類規則的共通行為：**只提醒，不強制**。severity 標為 `info`，掃描輸出以 `INFO` 行呈現、彙總行另計 `reminder` 數量；不計入 `warning`，**預設與 `--strict` 都不會讓退出碼變成失敗**，在 CI 只進「建議項」，不新增任何阻擋碼。使用者已知悉時，用同一個 `guardrail-ack: <規則編號>` 標記確認（第 3 章），掃描器改輸出 `ACK` 行。提醒類規則不要求逐條寫進 Layer 3 便條的「建議事項」；掃描有命中時，照第 5 章寫進「資安掃描結果」區塊，狀態寫「提醒」。
+
 > **關於「掃描規則」欄**：本欄記錄撰寫本規格時掃描器的實作狀況，實際行為以 `scripts/security-scan.mjs` 的輸出為準。護欄類規則一律是「建議提醒」（掃描器內部標為 warning），預設執行不會因為它們失敗；只有偵測類規則（`secret:*`、`jscode:*`、`credential:plaintext`，以及讀檔或 JSON 解析失敗）會標為 error，供 Pack 自己的 CI 檢查 repo 檔案，Skill 流程只把結果告知使用者。掃描器的標示不是決定能否交付的門檻。「粗略」「局部」表示掃描器只涵蓋該項建議的一部分，所以沒命中不等於整項都做到。掃描器沒有對應規則的項目，收尾歸入「尚未能自動檢查」（第 5 章）。掃描器日後調整時，同步更新本表。
 
 每項建議的寫法相同：**觸發情境**、**建議做法**、**為什麼**、**風險**（不採用時）、**使用者不採用時 AI 怎麼做**、**掃描規則**。
@@ -220,6 +230,47 @@ n8n 本身已提供原生的 Guardrails 節點（type：`@n8n/n8n-nodes-langchai
 - **使用者不採用時**：例如使用者要保留完整欄位或把自己的真實資料放進 `pinData`，AI 照辦，並提醒匯出或分享前先清掉。
 - **掃描規則**：尚無掃描規則，靠 AI 與人工檢查（`pinData` 內的機密樣式由 `secret:*` 涵蓋）。
 
+### 2.13 `egress:external-domain`：外連網域提醒（只提醒）
+
+- **觸發情境**：HTTP Request 節點（含工具版與舊版）、LangChain 的 HTTP Request 工具、GraphQL 節點的網址參數（`url`、`endpoint`、`baseUrl`、`nextURL`，巢狀選項裡的也算），指向非內網的網域。運算式裡的字面網址（例如 `={{ 'https://api.example.invalid/x' }}`、或運算式中的備用網址）也會讀。
+- **建議做法**：
+  1. 請核准人確認這些網域是否在組織的外連允許清單內；不在清單內的，先確認用途與送出的資料內容。
+  2. 有允許清單時交給掃描器：`--egress-allow <逗號分隔網域>`、`--egress-allow-file <檔案>`（一行一個或逗號分隔，`#` 開頭為註解），或環境變數 `SKILLPACK_EGRESS_ALLOW`；旗標優先於環境變數。CI 的 `scripts/ci/check-workflows.mjs` 也接受前兩個旗標，並會把環境變數一併傳給掃描器。清單內的網域不再提醒；**沒有提供清單時只列出網域、不做判斷**。
+  3. 比對規則：不分大小寫；`api.example.invalid` 只符合該網域；`*.example.invalid` 符合它的任何層級的子網域，**不含** `example.invalid` 本身；埠號、路徑與查詢字串不納入比對。
+  4. 網址由運算式組出、掃描器無法判斷目的地時（例如 `={{ $json.target }}`、`=https://{{ $json.host }}/v1`），會提醒「無法靜態判斷」，**不會**誤報成某個固定網域；請人工確認實際會連到哪裡。網域固定、只有路徑用運算式（`=https://api.example.invalid/items/{{ $json.id }}`）則視為固定網域。
+  5. 能固定的網域盡量寫成固定網址，讓核准人看得到。
+- **不算外連的位址**：`localhost` 與迴路位址、私有網段（RFC 1918）、link-local、CGNAT 共享位址、IPv6 的 `::1` 與 `fc00::/7`、`fe80::/10`、以 `.local`、`.internal`、`.lan`、`.intranet`、`.corp`、`.home.arpa`、`.svc`、`.cluster.local` 結尾的名稱、沒有點的單一名稱（例如 Docker Compose 的服務名稱），以及 n8n 自己的位址（`$execution.resumeUrl`、`$execution.resumeFormUrl`、`$env.WEBHOOK_URL`、`$env.N8N_EDITOR_BASE_URL`）。公開的 IP 位址則會列出。
+- **為什麼**：外連是資料離開組織的路徑；網域在節點參數裡，核准人不必讀懂每個節點也能一次看到。
+- **風險**：資料被送到沒有核准過的網域。
+- **使用者不採用時**：照使用者的決定處理；已知悉的節點，在該節點 notes 寫 `guardrail-ack: egress:external-domain -- 說明`，掃描器改輸出 `ACK`。
+- **掃描規則**：`egress:external-domain`（提醒，節點層級）。只讀上述網址參數；請求內容（body）裡的網址、Code 節點程式碼裡的網址、憑證裡的位址、以及子 workflow 內的呼叫都看不到，所以沒提醒不等於沒有外連。輸出只寫網域，不寫路徑與查詢字串，主機名稱含特殊字元時不照原文輸出。
+
+### 2.14 `impact:high-impact-node`：高影響動作提醒（只提醒）
+
+- **觸發情境**（每個節點最多提醒一次，說明裡寫明是哪一類）：
+  1. **寄信**：Email Send（SMTP）、Mailgun 每次都算；Gmail、Microsoft Outlook、SendGrid、Mailjet、Mandrill、Brevo（`sendInBlue`）在 `operation` 為 `send`、`reply`、`forward` 開頭（含 `sendAndWait`）時算。
+  2. **寫入或刪除資料庫**：Postgres、MySQL、MongoDB、Redis、Microsoft SQL、Oracle Database、Snowflake、CrateDB、QuestDB、TimescaleDB、Supabase、Elasticsearch、NocoDB、Baserow、DynamoDB（含有工具版的 `…Tool`），`operation` 不是讀取時算：`executeQuery`（可執行任意 SQL，不論實際語句）、`insert`、`update`、`upsert`、`delete…`、`create`、`set`、`push`、`pop`、`publish` 等。`select`、`find`、`get`、`getAll` 這類讀取不算。
+  3. **HTTP 寫入方法**：HTTP Request（含工具版與舊版的 `requestMethod`）與 LangChain 的 HTTP Request 工具，`method` 為 POST、PUT、PATCH、DELETE。**不論目的地是內網或外部**都算（對內部服務的 POST 一樣可能改變資料）。
+  4. **執行系統指令**：Execute Command、SSH。
+  5. `operation` 或 `method` 是運算式、無法靜態判斷時，也提醒並註明「無法靜態判斷」。
+- **不列入**：沒有寫 `operation` 或 `method` 的節點（匯出檔不會記錄預設值，掃描器看不出實際動作）；Human Review 的工具版（`…HitlTool`，本身已含人工核准）；GraphQL 節點（沒有可判斷的方法欄位）；Slack、Google Sheets 這類雲端服務節點的寫入動作；向量資料庫與記憶體節點。這些要靠人工與 `approval:destructive-needs-gate`。
+- **建議做法**：核准人在工單上針對這些節點特別確認：動作對象是否正確、資料來源是否可信、是否需要先加人工核准步驟（見 `approval:destructive-needs-gate`）。
+- **為什麼**：這些動作做錯了通常難以復原（寄出的信、被改寫的資料、已送出的請求）；把它們集中標出來，核准人不用逐節點找。
+- **使用者不採用時**：照使用者的決定處理；已知悉的節點，在該節點 notes 寫 `guardrail-ack: impact:high-impact-node -- 說明`。
+- **節點分類出處**：節點名稱查自 `docs/node-versions/` 的節點目錄（2.37.3、2.44.6、2.46.6 三份都查得到）；`n8n-nodes-base.executeCommand` 在預設目錄查不到（預設實例不提供），沿用既有 `exec:execute-command` 規則使用的名稱。節點目錄沒有「操作值」資料，操作值取自原廠 Skill 的說明（`skills/_vendor/n8n-node-configuration-official/references/DATABASE_NODES.md` 等）加上一般動詞比對；認不得的操作名稱**不列入**，所以這條寧可漏報，不求全面。
+- **掃描規則**：`impact:high-impact-node`（提醒，節點層級）。
+
+### 2.15 `notes:missing-change-log`：Layer 3 便條的修改記錄（只提醒）
+
+- **觸發情境**：workflow 有 Layer 3 說明便條（`color` 為 5 的便條），但便條裡沒有「修改記錄」段，或有標題卻沒有任何一列資料。
+- **建議做法**：依 [`sticky-note-three-layer.md`](sticky-note-three-layer.md) §4.4，在 Layer 3 便條加上「修改記錄」段：每列有日期（YYYY-MM-DD）、變更摘要、提出者（使用者或 AI）、原因；新建的 workflow 第一列為「建立」；修改既有 workflow 就新增一列；不寫入機密。
+- **辨識方式**：標題為「修改記錄」（或「修改紀錄」）、`Change log`、`Changelog`，且該段落內至少有一列（表格列或清單項目）含 `YYYY-MM-DD` 格式的日期。有多張 Layer 3 便條時，任一張符合即可。
+- **完全沒有 Layer 3 便條時**：本規則**不重複提醒**，沿用既有的便條相關提醒（Skill 流程要求每個 workflow 附 Layer 3 便條）。
+- **掃描器看不到的部分**：修改記錄寫的內容與實際變更是否相符，需要與前一版比對，Pack 內無法判斷；之後由管線在 PR 層級比對，不在本規則範圍。
+- **為什麼**：workflow 匯出後會與 Git 分離，正式環境的人只看得到 workflow 本身；便條上的歷程讓核准人與日後維護者不必另外找紀錄。
+- **使用者不採用時**：照使用者的決定處理；在任一節點的 notes（建議在觸發節點）寫 `guardrail-ack: notes:missing-change-log -- 說明`。
+- **掃描規則**：`notes:missing-change-log`（提醒，workflow 層級）。
+
 ---
 
 ## 3. 使用者已知悉（acknowledge）
@@ -255,9 +306,9 @@ guardrail-ack: webhook:no-auth
 > **與掃描器的關係**（對應 `scripts/security-scan.mjs` 目前的行為）：
 >
 > - **輸出 ACK 行**：節點 notes 中符合 `guardrail-ack: <規則編號>`（行首可有空白，可附 ` -- 說明`，說明可省略、沒有最短長度）的行，會被掃描器讀取；對應的提醒改以 `ACK` 行輸出（含規則編號、節點名稱與說明），**不計入提醒數**，彙總行另列已知悉的數量。
-> - **只對護欄類建議提醒有效**：節點層級的規則（例如 `webhook:no-auth`、`form:no-auth`、`exec:*`、`file:rw-access`）要寫在**該節點**的 notes；整個 workflow 層級的規則（`error:no-handling`、`ai:agent-no-guardrails`）寫在任一節點的 notes 都可以，建議寫在觸發節點。
+> - **只對護欄類建議提醒有效**：節點層級的規則（例如 `webhook:no-auth`、`form:no-auth`、`exec:*`、`file:rw-access`、`egress:external-domain`、`impact:high-impact-node`）要寫在**該節點**的 notes；整個 workflow 層級的規則（`error:no-handling`、`ai:agent-no-guardrails`、`notes:missing-change-log`）寫在任一節點的 notes 都可以，建議寫在觸發節點。提醒類規則（severity `info`）同樣可以用 `guardrail-ack:` 確認。
 > - **對偵測類 error 無效**：`secret:*`、`jscode:*`、`credential:plaintext` 等偵測類規則不是建議，寫 `guardrail-ack:` 不會讓它消失；掃描器會輸出 `NOTE` 行說明「這個已知悉被忽略」。規則編號寫錯、或根本沒有對應的提醒時，也會有 `NOTE` 行。
-> - **`--strict` 是選用旗標**：加上之後，未被知悉的建議提醒也會讓退出碼為 1。Pack 的 Skill 流程**不使用，也不要求使用**；使用者或 CI 想要更嚴格時才用。
+> - **`--strict` 是選用旗標**：加上之後，未被知悉的建議提醒（`warning`）也會讓退出碼為 1；提醒類規則（`info`）**不計入**，永遠不會讓退出碼為 1。Pack 的 Skill 流程**不使用，也不要求使用**；使用者或 CI 想要更嚴格時才用。
 > - 掃描器沒有對應規則的項目（例如 `approval:destructive-needs-gate`、`data:pii-minimization`），這一行只是紀錄，掃描器不會處理。
 > - 掃描器目前只讀 `guardrail-ack:`，不讀較早的 `guardrail-waiver:` 寫法。
 
@@ -302,6 +353,7 @@ node scripts/security-scan.mjs <workflow.json>
 ### 4.2 怎麼看結果
 
 - 掃描輸出是**資訊與建議**。AI 把結果如實告訴使用者，說明每一項代表什麼風險，並提出建議的處理方式；**由使用者決定要不要處理**。
+- 掃描輸出有三種層級：`ERROR`（偵測類）、`WARNING`（護欄類建議）、`INFO`（提醒類：`egress:external-domain`、`impact:high-impact-node`、`notes:missing-change-log`）。`INFO` 要照實寫進「資安掃描結果」區塊（狀態寫「提醒」），特別是外連網域與高影響動作，目的就是讓核准人看到。
 - 掃描有命中，不因此拒絕交付。退出碼為 1 只表示有偵測類的提醒（例如疑似機密樣式），不代表不能交付。
 - 使用者決定處理的，修改後對最終那一份 JSON 重掃，結果以最後一次為準；使用者決定不處理的，照實記入 Layer 3 便條的「建議事項」區塊（第 5 章）。
 - 之後只要又改了 JSON（包含把建議事項寫進便條、加上已知悉行），就對最終那一份重掃。
@@ -385,4 +437,4 @@ AI 為了讓使用者馬上看到結果，把 API 金鑰直接填進 HTTP Reques
 ---
 
 **版本**：v1.1
-**狀態**：規範草案。第 2 章「掃描規則」欄與第 3.2 節對掃描器的描述，隨 `scripts/security-scan.mjs` 的調整更新；與掃描器實際輸出不一致時，以掃描器為準。
+**狀態**：規範草案。第 2 章「掃描規則」欄與第 3.2 節對掃描器的描述，隨 `scripts/security-scan.mjs` 的調整更新；與掃描器實際輸出不一致時，以掃描器為準。2.13 至 2.15 為 ADR-014 後新增的提醒類規則（只提醒、不強制）。
