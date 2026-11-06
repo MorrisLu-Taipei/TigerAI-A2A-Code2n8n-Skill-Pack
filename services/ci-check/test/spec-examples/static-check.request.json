@@ -1,0 +1,35 @@
+{
+  "requestId": "n8nwf-pr42-a1b2c3d-001",
+  "targetVersion": "2.44.6",
+  "workflows": [
+    {
+      "path": "workflows/alice/legacy-func.json",
+      "content": "{\n  \"name\": \"legacy-func\",\n  \"nodes\": [\n    {\n      \"parameters\": {},\n      \"id\": \"mt\",\n      \"name\": \"Manual\",\n      \"type\": \"n8n-nodes-base.manualTrigger\",\n      \"typeVersion\": 1,\n      \"position\": [\n        0,\n        0\n      ]\n    },\n    {\n      \"parameters\": {\n        \"functionCode\": \"return items;\"\n      },\n      \"id\": \"fn\",\n      \"name\": \"Old Function\",\n      \"type\": \"n8n-nodes-base.function\",\n      \"typeVersion\": 1,\n      \"position\": [\n        360,\n        0\n      ]\n    }\n  ],\n  \"connections\": {\n    \"Manual\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Old Function\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    }\n  },\n  \"settings\": {}\n}"
+    },
+    {
+      "path": "workflows/alice/order-notify.json",
+      "content": "{\n  \"name\": \"order-notify\",\n  \"nodes\": [\n    {\n      \"parameters\": {\n        \"httpMethod\": \"POST\",\n        \"path\": \"order-status\",\n        \"responseMode\": \"onReceived\",\n        \"options\": {}\n      },\n      \"id\": \"wh\",\n      \"name\": \"Webhook\",\n      \"type\": \"n8n-nodes-base.webhook\",\n      \"typeVersion\": 2.1,\n      \"position\": [\n        0,\n        0\n      ]\n    },\n    {\n      \"parameters\": {\n        \"select\": \"channel\",\n        \"channelId\": {\n          \"__rl\": true,\n          \"value\": \"C0000000\",\n          \"mode\": \"id\"\n        },\n        \"text\": \"=Order {{ $json.body.id }}\",\n        \"otherOptions\": {}\n      },\n      \"id\": \"sl\",\n      \"name\": \"Slack\",\n      \"type\": \"n8n-nodes-base.slack\",\n      \"typeVersion\": 2.3,\n      \"position\": [\n        360,\n        0\n      ],\n      \"credentials\": {\n        \"slackApi\": {\n          \"id\": \"1\",\n          \"name\": \"Slack-Ops\"\n        }\n      }\n    }\n  ],\n  \"connections\": {\n    \"Webhook\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Slack\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    }\n  },\n  \"settings\": {}\n}"
+    },
+    {
+      "path": "workflows/bob/echo-demo.json",
+      "content": "{\n  \"name\": \"echo-demo\",\n  \"nodes\": [\n    {\n      \"parameters\": {\n        \"httpMethod\": \"POST\",\n        \"path\": \"echo-demo\",\n        \"responseMode\": \"responseNode\",\n        \"options\": {}\n      },\n      \"id\": \"wh\",\n      \"name\": \"Webhook\",\n      \"type\": \"n8n-nodes-base.webhook\",\n      \"typeVersion\": 2.2,\n      \"position\": [\n        0,\n        0\n      ]\n    },\n    {\n      \"parameters\": {\n        \"respondWith\": \"json\",\n        \"responseBody\": \"={{ $json }}\",\n        \"options\": {}\n      },\n      \"id\": \"rs\",\n      \"name\": \"Respond\",\n      \"type\": \"n8n-nodes-base.respondToWebhook\",\n      \"typeVersion\": 1.5,\n      \"position\": [\n        360,\n        0\n      ]\n    }\n  ],\n  \"connections\": {\n    \"Webhook\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Respond\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    }\n  },\n  \"settings\": {}\n}"
+    }
+  ],
+  "credentialMap": {
+    "slackApi": [
+      "Slack-Prod"
+    ]
+  },
+  "existingWebhookPaths": [
+    "POST order-status",
+    "GET health-ping"
+  ],
+  "existingWorkflowIds": [
+    "wf-0001",
+    "wf-0002"
+  ],
+  "options": {
+    "includeComment": true,
+    "maxCommentChars": 60000
+  }
+}

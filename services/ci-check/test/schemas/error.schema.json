@@ -1,0 +1,77 @@
+{
+ "$id": "https://spec.example.internal/n8n-check/v1/error.schema.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": [
+  "error"
+ ],
+ "properties": {
+  "error": {
+   "$ref": "#/$defs/errorBody"
+  }
+ },
+ "$defs": {
+  "errorBody": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "code",
+    "message",
+    "retryable"
+   ],
+   "properties": {
+    "code": {
+     "type": "string",
+     "enum": [
+      "INVALID_REQUEST",
+      "INVALID_JSON_BODY",
+      "INVALID_PATH",
+      "DUPLICATE_PATH",
+      "UNAUTHORIZED",
+      "FORBIDDEN",
+      "NOT_FOUND",
+      "REQUEST_ID_CONFLICT",
+      "JOB_CONFLICT",
+      "PAYLOAD_TOO_LARGE",
+      "TOO_MANY_FILES",
+      "FILE_TOO_LARGE",
+      "UNSUPPORTED_MEDIA_TYPE",
+      "NODE_CATALOG_MISSING",
+      "UNSUPPORTED_VERSION",
+      "RATE_LIMITED",
+      "QUEUE_FULL",
+      "CHECK_TOOL_FAILED",
+      "INTERNAL_ERROR",
+      "EXECUTOR_UNAVAILABLE",
+      "DISK_FULL",
+      "CHECK_TIMEOUT",
+      "EXECUTOR_CRASHED",
+      "N8N_BOOT_FAILED",
+      "RESULT_INVALID",
+      "JOB_TIMEOUT"
+     ]
+    },
+    "message": {
+     "type": "string",
+     "maxLength": 500
+    },
+    "requestId": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "retryable": {
+     "type": "boolean"
+    },
+    "retryAfterSeconds": {
+     "type": "integer",
+     "minimum": 1
+    },
+    "details": {
+     "type": "object"
+    }
+   }
+  }
+ }
+}

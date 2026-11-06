@@ -1,0 +1,225 @@
+{
+ "$id": "https://spec.example.internal/n8n-check/v1/static-response.schema.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": [
+  "requestId",
+  "service",
+  "serviceVersion",
+  "apiVersion",
+  "blockingCatalogVersion",
+  "report",
+  "durationMs"
+ ],
+ "properties": {
+  "requestId": {
+   "$ref": "#/$defs/requestId"
+  },
+  "service": {
+   "const": "static-check"
+  },
+  "serviceVersion": {
+   "type": "string"
+  },
+  "apiVersion": {
+   "const": "v1"
+  },
+  "blockingCatalogVersion": {
+   "type": "integer",
+   "minimum": 1
+  },
+  "packVersion": {
+   "type": [
+    "string",
+    "null"
+   ]
+  },
+  "report": {
+   "$ref": "#/$defs/report"
+  },
+  "comment": {
+   "type": [
+    "string",
+    "null"
+   ]
+  },
+  "commentTruncated": {
+   "type": "boolean",
+   "default": false
+  },
+  "durationMs": {
+   "type": "integer",
+   "minimum": 0
+  }
+ },
+ "$defs": {
+  "requestId": {
+   "type": "string",
+   "pattern": "^[A-Za-z0-9._:-]{8,64}$"
+  },
+  "version": {
+   "type": "string",
+   "pattern": "^\\d+\\.\\d+\\.\\d+$"
+  },
+  "counts": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "files",
+    "filesWithBlocking",
+    "blocking",
+    "advisories",
+    "blockingByCode"
+   ],
+   "properties": {
+    "files": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "filesWithBlocking": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "blocking": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "advisories": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "blockingByCode": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "integer",
+      "minimum": 1
+     }
+    }
+   }
+  },
+  "blockingItem": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "code",
+    "file",
+    "node",
+    "message"
+   ],
+   "properties": {
+    "code": {
+     "type": "string",
+     "enum": [
+      "JSON_INVALID",
+      "STRUCTURE_INVALID",
+      "SECRET_DETECTED",
+      "MALICIOUS_CODE",
+      "CREDENTIAL_PLAINTEXT",
+      "NODE_NOT_FOUND",
+      "NODE_DEPRECATED",
+      "TYPEVERSION_INVALID",
+      "CREDENTIAL_MISSING",
+      "WEBHOOK_PATH_CONFLICT"
+     ]
+    },
+    "file": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "maxLength": 201
+    },
+    "node": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "maxLength": 201
+    },
+    "message": {
+     "type": "string",
+     "maxLength": 201
+    }
+   }
+  },
+  "advisoryItem": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "source",
+    "rule",
+    "file",
+    "node",
+    "message"
+   ],
+   "properties": {
+    "source": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 64
+    },
+    "rule": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 128
+    },
+    "file": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "maxLength": 201
+    },
+    "node": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "maxLength": 201
+    },
+    "message": {
+     "type": "string",
+     "maxLength": 201
+    }
+   }
+  },
+  "report": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "target",
+    "blocking",
+    "advisories",
+    "counts"
+   ],
+   "properties": {
+    "status": {
+     "type": "string",
+     "enum": [
+      "pass",
+      "fail"
+     ]
+    },
+    "target": {
+     "$ref": "#/$defs/version"
+    },
+    "blocking": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/blockingItem"
+     }
+    },
+    "advisories": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/advisoryItem"
+     }
+    },
+    "counts": {
+     "$ref": "#/$defs/counts"
+    }
+   }
+  }
+ }
+}

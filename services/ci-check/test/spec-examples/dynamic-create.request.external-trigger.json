@@ -1,0 +1,28 @@
+{
+  "requestId": "n8nwf-pr48-b7c8d9e-dyn-001",
+  "targetVersion": "2.44.6",
+  "matrixVersions": [
+    "2.37.3",
+    "2.44.6"
+  ],
+  "workflows": [
+    {
+      "path": "workflows/carol/telegram-notify.json",
+      "content": "{\n  \"name\": \"telegram-notify\",\n  \"nodes\": [\n    {\n      \"parameters\": {\n        \"updates\": [\n          \"message\"\n        ],\n        \"additionalFields\": {}\n      },\n      \"id\": \"tg\",\n      \"name\": \"Telegram Trigger\",\n      \"type\": \"n8n-nodes-base.telegramTrigger\",\n      \"typeVersion\": 1.2,\n      \"position\": [\n        0,\n        0\n      ],\n      \"credentials\": {\n        \"telegramApi\": {\n          \"id\": \"1\",\n          \"name\": \"Telegram-Bot\"\n        }\n      }\n    },\n    {\n      \"parameters\": {\n        \"assignments\": {\n          \"assignments\": []\n        },\n        \"options\": {}\n      },\n      \"id\": \"st\",\n      \"name\": \"Set\",\n      \"type\": \"n8n-nodes-base.set\",\n      \"typeVersion\": 3.4,\n      \"position\": [\n        360,\n        0\n      ]\n    }\n  ],\n  \"connections\": {\n    \"Telegram Trigger\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Set\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    }\n  },\n  \"settings\": {}\n}"
+    },
+    {
+      "path": "workflows/carol/github-hook.json",
+      "content": "{\n  \"name\": \"github-hook\",\n  \"nodes\": [\n    {\n      \"parameters\": {\n        \"owner\": {\n          \"__rl\": true,\n          \"value\": \"example-org\",\n          \"mode\": \"name\"\n        },\n        \"repository\": {\n          \"__rl\": true,\n          \"value\": \"example-repo\",\n          \"mode\": \"name\"\n        },\n        \"events\": [\n          \"push\"\n        ],\n        \"options\": {}\n      },\n      \"id\": \"gh\",\n      \"name\": \"GitHub Trigger\",\n      \"type\": \"n8n-nodes-base.githubTrigger\",\n      \"typeVersion\": 1,\n      \"position\": [\n        0,\n        0\n      ],\n      \"credentials\": {\n        \"githubApi\": {\n          \"id\": \"2\",\n          \"name\": \"GitHub-Bot\"\n        }\n      }\n    },\n    {\n      \"parameters\": {\n        \"assignments\": {\n          \"assignments\": []\n        },\n        \"options\": {}\n      },\n      \"id\": \"st\",\n      \"name\": \"Set\",\n      \"type\": \"n8n-nodes-base.set\",\n      \"typeVersion\": 3.4,\n      \"position\": [\n        360,\n        0\n      ]\n    }\n  ],\n  \"connections\": {\n    \"GitHub Trigger\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Set\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    }\n  },\n  \"settings\": {}\n}"
+    },
+    {
+      "path": "workflows/carol/misc-tool.json",
+      "content": "{\n  \"name\": \"misc-tool\",\n  \"nodes\": [\n    {\n      \"parameters\": {\n        \"httpMethod\": \"POST\",\n        \"path\": \"misc-tool\",\n        \"responseMode\": \"onReceived\",\n        \"options\": {}\n      },\n      \"id\": \"wh\",\n      \"name\": \"Webhook\",\n      \"type\": \"n8n-nodes-base.webhook\",\n      \"typeVersion\": 2.1,\n      \"position\": [\n        0,\n        0\n      ]\n    },\n    {\n      \"parameters\": {\n        \"assignments\": {\n          \"assignments\": []\n        },\n        \"options\": {}\n      },\n      \"id\": \"st\",\n      \"name\": \"Set\",\n      \"type\": \"n8n-nodes-base.set\",\n      \"typeVersion\": 3.4,\n      \"position\": [\n        360,\n        0\n      ]\n    }\n  ],\n  \"connections\": {\n    \"Webhook\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Set\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    }\n  },\n  \"settings\": {}\n}"
+    }
+  ],
+  "credentialStubPolicy": {
+    "mode": "stub-all"
+  },
+  "options": {
+    "jobTimeoutSeconds": 900
+  }
+}

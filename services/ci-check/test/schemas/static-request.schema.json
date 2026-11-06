@@ -1,0 +1,114 @@
+{
+ "$id": "https://spec.example.internal/n8n-check/v1/static-request.schema.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": [
+  "requestId",
+  "targetVersion",
+  "workflows"
+ ],
+ "properties": {
+  "requestId": {
+   "$ref": "#/$defs/requestId"
+  },
+  "targetVersion": {
+   "$ref": "#/$defs/version"
+  },
+  "workflows": {
+   "type": "array",
+   "minItems": 1,
+   "maxItems": 50,
+   "items": {
+    "$ref": "#/$defs/workflowFile"
+   }
+  },
+  "credentialMap": {
+   "$ref": "#/$defs/credentialMap"
+  },
+  "existingWebhookPaths": {
+   "$ref": "#/$defs/existingWebhookPaths"
+  },
+  "existingWorkflowIds": {
+   "$ref": "#/$defs/existingWorkflowIds"
+  },
+  "options": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "includeComment": {
+     "type": "boolean",
+     "default": true
+    },
+    "maxCommentChars": {
+     "type": "integer",
+     "minimum": 2000,
+     "maximum": 60000,
+     "default": 60000
+    }
+   }
+  }
+ },
+ "$defs": {
+  "requestId": {
+   "type": "string",
+   "pattern": "^[A-Za-z0-9._:-]{8,64}$"
+  },
+  "version": {
+   "type": "string",
+   "pattern": "^\\d+\\.\\d+\\.\\d+$"
+  },
+  "filePath": {
+   "type": "string",
+   "pattern": "^(?!/)(?!.*(?:^|/)\\.)(?!.*(?:^|/)node_modules(?:/|$))(?!.*//)[^\\\\\\x00-\\x1f\\x7f]{1,200}\\.json$"
+  },
+  "workflowFile": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "path",
+    "content"
+   ],
+   "properties": {
+    "path": {
+     "$ref": "#/$defs/filePath"
+    },
+    "content": {
+     "type": "string",
+     "minLength": 2,
+     "maxLength": 1048576
+    }
+   }
+  },
+  "credentialMap": {
+   "type": "object",
+   "maxProperties": 200,
+   "additionalProperties": {
+    "type": "array",
+    "maxItems": 200,
+    "items": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    }
+   }
+  },
+  "existingWebhookPaths": {
+   "type": "array",
+   "maxItems": 5000,
+   "items": {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 300
+   }
+  },
+  "existingWorkflowIds": {
+   "type": "array",
+   "maxItems": 5000,
+   "items": {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 100
+   }
+  }
+ }
+}

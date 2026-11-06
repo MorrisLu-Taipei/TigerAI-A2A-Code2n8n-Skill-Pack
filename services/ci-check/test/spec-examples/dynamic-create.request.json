@@ -1,0 +1,27 @@
+{
+  "requestId": "n8nwf-pr42-a1b2c3d-dyn-001",
+  "targetVersion": "2.44.6",
+  "matrixVersions": [
+    "2.37.3",
+    "2.44.6",
+    "2.46.6"
+  ],
+  "workflows": [
+    {
+      "path": "workflows/alice/order-notify.json",
+      "content": "{\n  \"name\": \"order-notify\",\n  \"nodes\": [\n    {\n      \"parameters\": {\n        \"httpMethod\": \"POST\",\n        \"path\": \"order-status\",\n        \"responseMode\": \"onReceived\",\n        \"options\": {}\n      },\n      \"id\": \"wh\",\n      \"name\": \"Webhook\",\n      \"type\": \"n8n-nodes-base.webhook\",\n      \"typeVersion\": 2.1,\n      \"position\": [\n        0,\n        0\n      ]\n    },\n    {\n      \"parameters\": {\n        \"select\": \"channel\",\n        \"channelId\": {\n          \"__rl\": true,\n          \"value\": \"C0000000\",\n          \"mode\": \"id\"\n        },\n        \"text\": \"=Order {{ $json.body.id }}\",\n        \"otherOptions\": {}\n      },\n      \"id\": \"sl\",\n      \"name\": \"Slack\",\n      \"type\": \"n8n-nodes-base.slack\",\n      \"typeVersion\": 2.3,\n      \"position\": [\n        360,\n        0\n      ],\n      \"credentials\": {\n        \"slackApi\": {\n          \"id\": \"1\",\n          \"name\": \"Slack-Ops\"\n        }\n      }\n    }\n  ],\n  \"connections\": {\n    \"Webhook\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Slack\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    }\n  },\n  \"settings\": {}\n}"
+    },
+    {
+      "path": "workflows/bob/echo-demo.json",
+      "content": "{\n  \"name\": \"echo-demo\",\n  \"nodes\": [\n    {\n      \"parameters\": {\n        \"httpMethod\": \"POST\",\n        \"path\": \"echo-demo\",\n        \"responseMode\": \"responseNode\",\n        \"options\": {}\n      },\n      \"id\": \"wh\",\n      \"name\": \"Webhook\",\n      \"type\": \"n8n-nodes-base.webhook\",\n      \"typeVersion\": 2.2,\n      \"position\": [\n        0,\n        0\n      ]\n    },\n    {\n      \"parameters\": {\n        \"respondWith\": \"json\",\n        \"responseBody\": \"={{ $json }}\",\n        \"options\": {}\n      },\n      \"id\": \"rs\",\n      \"name\": \"Respond\",\n      \"type\": \"n8n-nodes-base.respondToWebhook\",\n      \"typeVersion\": 1.5,\n      \"position\": [\n        360,\n        0\n      ]\n    }\n  ],\n  \"connections\": {\n    \"Webhook\": {\n      \"main\": [\n        [\n          {\n            \"node\": \"Respond\",\n            \"type\": \"main\",\n            \"index\": 0\n          }\n        ]\n      ]\n    }\n  },\n  \"settings\": {}\n}"
+    }
+  ],
+  "credentialStubPolicy": {
+    "mode": "stub-all"
+  },
+  "options": {
+    "settleSeconds": 3,
+    "perWorkflowTimeoutSeconds": 60,
+    "jobTimeoutSeconds": 600
+  }
+}

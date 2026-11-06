@@ -1,0 +1,435 @@
+{
+ "$id": "https://spec.example.internal/n8n-check/v1/dynamic-result.schema.json",
+ "type": "object",
+ "additionalProperties": false,
+ "required": [
+  "status",
+  "complete",
+  "target",
+  "blockingVersions",
+  "versions",
+  "blocking",
+  "advisories",
+  "counts",
+  "limitations",
+  "comment"
+ ],
+ "properties": {
+  "status": {
+   "type": "string",
+   "enum": [
+    "pass",
+    "fail",
+    "incomplete"
+   ]
+  },
+  "complete": {
+   "type": "boolean"
+  },
+  "target": {
+   "type": [
+    "string",
+    "null"
+   ]
+  },
+  "blockingVersions": {
+   "type": "array",
+   "items": {
+    "$ref": "#/$defs/version"
+   }
+  },
+  "versions": {
+   "type": "array",
+   "minItems": 1,
+   "items": {
+    "$ref": "#/$defs/versionResult"
+   }
+  },
+  "blocking": {
+   "type": "array",
+   "items": {
+    "$ref": "#/$defs/blockingItem"
+   }
+  },
+  "advisories": {
+   "type": "array",
+   "items": {
+    "$ref": "#/$defs/advisoryItem"
+   }
+  },
+  "counts": {
+   "$ref": "#/$defs/counts"
+  },
+  "limitations": {
+   "type": "array",
+   "uniqueItems": true,
+   "items": {
+    "type": "string",
+    "enum": [
+     "licensed-features",
+     "real-external-services",
+     "credential-validity",
+     "source-control",
+     "non-webhook-triggers",
+     "production-webhook-conflicts",
+     "queue-mode-behaviour",
+     "performance-and-load",
+     "python-code-not-scanned",
+     "external-trigger-registration",
+     "webhook-conflict-best-effort"
+    ]
+   }
+  },
+  "comment": {
+   "type": [
+    "string",
+    "null"
+   ]
+  }
+ },
+ "$defs": {
+  "version": {
+   "type": "string",
+   "pattern": "^\\d+\\.\\d+\\.\\d+$"
+  },
+  "counts": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "files",
+    "filesWithBlocking",
+    "blocking",
+    "advisories",
+    "blockingByCode"
+   ],
+   "properties": {
+    "files": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "filesWithBlocking": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "blocking": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "advisories": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "blockingByCode": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "integer",
+      "minimum": 1
+     }
+    }
+   }
+  },
+  "blockingItem": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "code",
+    "file",
+    "node",
+    "message"
+   ],
+   "properties": {
+    "code": {
+     "type": "string",
+     "enum": [
+      "IMPORT_FAILED",
+      "ACTIVATE_FAILED",
+      "WEBHOOK_PATH_CONFLICT",
+      "CREDENTIAL_MISSING"
+     ]
+    },
+    "file": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "maxLength": 201
+    },
+    "node": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "maxLength": 201
+    },
+    "message": {
+     "type": "string",
+     "maxLength": 201
+    },
+    "version": {
+     "$ref": "#/$defs/version"
+    }
+   }
+  },
+  "advisoryItem": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "source",
+    "rule",
+    "file",
+    "node",
+    "message"
+   ],
+   "properties": {
+    "source": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 64
+    },
+    "rule": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 128
+    },
+    "file": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "maxLength": 201
+    },
+    "node": {
+     "type": [
+      "string",
+      "null"
+     ],
+     "maxLength": 201
+    },
+    "message": {
+     "type": "string",
+     "maxLength": 201
+    },
+    "version": {
+     "$ref": "#/$defs/version"
+    }
+   }
+  },
+  "workflowResult": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "file",
+    "import",
+    "importStatus",
+    "activate",
+    "activateStatus",
+    "webhook",
+    "executions",
+    "executionSummary"
+   ],
+   "properties": {
+    "file": {
+     "type": "string"
+    },
+    "import": {
+     "type": "string",
+     "enum": [
+      "ok",
+      "failed",
+      "skipped"
+     ]
+    },
+    "importStatus": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "activate": {
+     "type": "string",
+     "enum": [
+      "ok",
+      "conflict",
+      "no-trigger",
+      "unverified",
+      "failed",
+      "skipped"
+     ]
+    },
+    "activateStatus": {
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    "webhook": {
+     "type": [
+      "array",
+      "null"
+     ],
+     "items": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "const": "ERR"
+       }
+      ]
+     }
+    },
+    "executions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "maxLength": 32
+     },
+     "maxItems": 10
+    },
+    "timeout": {
+     "type": "boolean",
+     "default": false
+    },
+    "executionSummary": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "total",
+      "success",
+      "error",
+      "crashed",
+      "other"
+     ],
+     "properties": {
+      "total": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "success": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "error": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "crashed": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "other": {
+       "type": "integer",
+       "minimum": 0
+      }
+     }
+    }
+   }
+  },
+  "versionResult": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "version",
+    "n8nVersion",
+    "status",
+    "boot",
+    "workflows",
+    "blocking",
+    "advisories",
+    "cleanup"
+   ],
+   "properties": {
+    "version": {
+     "$ref": "#/$defs/version"
+    },
+    "n8nVersion": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "status": {
+     "type": "string",
+     "enum": [
+      "pass",
+      "fail",
+      "error",
+      "incomplete",
+      "skipped"
+     ]
+    },
+    "boot": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "status",
+      "seconds"
+     ],
+     "properties": {
+      "status": {
+       "type": "string",
+       "enum": [
+        "ok",
+        "failed",
+        "timeout"
+       ]
+      },
+      "seconds": {
+       "type": [
+        "number",
+        "null"
+       ],
+       "minimum": 0
+      }
+     }
+    },
+    "workflows": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/workflowResult"
+     }
+    },
+    "blocking": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/blockingItem"
+     }
+    },
+    "advisories": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/advisoryItem"
+     }
+    },
+    "cleanup": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "workflowsCreated",
+      "workflowsDeleted",
+      "credentialsCreated",
+      "credentialsDeleted"
+     ],
+     "properties": {
+      "workflowsCreated": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "workflowsDeleted": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "credentialsCreated": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "credentialsDeleted": {
+       "type": "integer",
+       "minimum": 0
+      }
+     }
+    }
+   }
+  }
+ }
+}
