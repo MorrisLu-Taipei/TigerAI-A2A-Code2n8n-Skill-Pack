@@ -1,0 +1,92 @@
+{
+  "name": "電話號碼格式整理",
+  "nodes": [
+    {
+      "id": "s-l1",
+      "name": "使用者需求摘要",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -260
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 560,
+        "height": 200,
+        "content": "### 使用者需求摘要\n可被呼叫的子流程：輸入電話字串，輸出統一格式。"
+      }
+    },
+    {
+      "id": "n1",
+      "name": "When called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "notes": "輸入欄位約定：phone（字串）；輸出欄位：phoneNormalized。"
+    },
+    {
+      "id": "n2",
+      "name": "Normalize phone",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        320,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "phoneNormalized",
+              "type": "string",
+              "value": "={{ String($json.phone ?? \"\").replace(/\\D/g, \"\").replace(/^886/, \"0\") }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "去掉非數字，並把 886 開頭換回 0；只用運算式，不需 Code。"
+    },
+    {
+      "id": "s-l3",
+      "name": "AI 實作說明",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        700
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 560,
+        "height": 520,
+        "content": "### 🤖 AI 實作說明 — 電話號碼格式整理\n\n**參考來源**\n- 沒有參考外部範本，依需求與 Pack 內建規格設計\n- 骨架與統計知識：research/patterns.md §2 subworkflow\n- 原廠／社群 Skill：無\n- 目標 n8n 版本：2.44.6（使用者提供）\n- 參考方式：只參考做法，已用目前版本節點重新建構\n\n**建議事項**\n- `error:no-handling`：不適用（沒有外部呼叫）\n- 不適用：webhook:no-auth、form:no-auth、exec:ssh\n- `native-first:code-node`：已採用（未使用 Code 節點）\n- 以上皆為建議，最終決定在使用者；建議不等於安全\n\n**資安掃描結果**\n- 未執行資安掃描：由宿主檢查\n\n**所需 Credentials**\n- 不需要憑證\n\n**已知限制**\n- 參數名稱未經查證\n- 只處理台灣號碼的常見寫法"
+      }
+    }
+  ],
+  "connections": {
+    "When called": {
+      "main": [
+        [
+          {
+            "node": "Normalize phone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

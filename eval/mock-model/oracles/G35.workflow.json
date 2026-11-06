@@ -1,0 +1,213 @@
+{
+  "name": "名單逐筆查詢並限速",
+  "nodes": [
+    {
+      "id": "s-l1",
+      "name": "使用者需求摘要",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -260
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 560,
+        "height": 200,
+        "content": "### 使用者需求摘要\n試算表 500 筆客戶名單逐筆呼叫外部 API，API 每分鐘最多 30 次。"
+      }
+    },
+    {
+      "id": "n1",
+      "name": "Manual start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "n2",
+      "name": "Read customers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        280,
+        0
+      ],
+      "parameters": {
+        "authentication": "oAuth2",
+        "resource": "sheet",
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "客戶名單"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "name": "corp-sheets"
+        }
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Loop",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        560,
+        0
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Lookup company",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        840,
+        120
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.example.invalid/company",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "company-api-header"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "notes": "單筆失敗時略過，避免拖垮整批。"
+    },
+    {
+      "id": "n5",
+      "name": "Wait 2s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        120
+      ],
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "webhookId": "00000000-0000-4000-8000-000000000035",
+      "notes": "每筆間隔 2 秒，約每分鐘 30 次。"
+    },
+    {
+      "id": "n6",
+      "name": "Done",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        840,
+        -120
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "s-l3",
+      "name": "AI 實作說明",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        700
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 560,
+        "height": 520,
+        "content": "### 🤖 AI 實作說明 — 名單逐筆查詢並限速\n\n**參考來源**\n- 沒有參考外部範本，依需求與 Pack 內建規格設計\n- 骨架與統計知識：research/patterns.md §2 batch-loop\n- 原廠／社群 Skill：無\n- 目標 n8n 版本：2.44.6（使用者提供）\n- 參考方式：只參考做法，已用目前版本節點重新建構\n\n**建議事項**\n- `error:no-handling`：已採用（單筆失敗繼續並重試）\n- 不適用：webhook:no-auth、form:no-auth、exec:ssh\n- `native-first:code-node`：已採用（未使用 Code 節點）\n- 以上皆為建議，最終決定在使用者；建議不等於安全\n\n**資安掃描結果**\n- 未執行資安掃描：由宿主檢查\n\n**所需 Credentials**\n- [ ] Google Sheets OAuth2：`corp-sheets`（節點：Read customers）\n- [ ] HTTP Header Auth：`company-api-header`（節點：Lookup company）\n\n**已知限制**\n- 參數名稱未經查證\n- 查詢結果沒有寫回，需要時請補上\n- 試算表 ID 與 API 網址為佔位"
+      }
+    }
+  ],
+  "connections": {
+    "Manual start": {
+      "main": [
+        [
+          {
+            "node": "Read customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read customers": {
+      "main": [
+        [
+          {
+            "node": "Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Lookup company",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup company": {
+      "main": [
+        [
+          {
+            "node": "Wait 2s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 2s": {
+      "main": [
+        [
+          {
+            "node": "Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

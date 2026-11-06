@@ -1,0 +1,104 @@
+{
+  "name": "每日早安",
+  "nodes": [
+    {
+      "id": "s-l1",
+      "name": "使用者需求摘要",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -260
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 560,
+        "height": 200,
+        "content": "### 使用者需求摘要\n每天早上九點在 Slack 發一則「早安」。"
+      }
+    },
+    {
+      "id": "n1",
+      "name": "Every day 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n2",
+      "name": "Say good morning",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        320,
+        0
+      ],
+      "parameters": {
+        "authentication": "accessToken",
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#general"
+        },
+        "text": "早安",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "name": "corp-slack-bot"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "s-l3",
+      "name": "AI 實作說明",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        700
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 560,
+        "height": 520,
+        "content": "### 🤖 AI 實作說明 — 每日早安\n\n**參考來源**\n- 沒有參考外部範本，依需求與 Pack 內建規格設計\n- 骨架與統計知識：research/patterns.md §2 schedule\n- 原廠／社群 Skill：無\n- 目標 n8n 版本：2.44.6（使用者提供）\n- 參考方式：只參考做法，已用目前版本節點重新建構\n\n**建議事項**\n- `error:no-handling`：已採用（Slack 失敗時繼續）\n- 不適用：webhook:no-auth、form:no-auth、exec:ssh\n- `native-first:code-node`：已採用（未使用 Code 節點）\n- 以上皆為建議，最終決定在使用者；建議不等於安全\n\n**資安掃描結果**\n- 未執行資安掃描：由宿主檢查\n\n**所需 Credentials**\n- [ ] Slack API：`corp-slack-bot`（節點：Say good morning）\n\n**已知限制**\n- 參數名稱未經查證\n- 草稿的 active 為 false；匯入與啟用由系統與管理員處理"
+      }
+    }
+  ],
+  "connections": {
+    "Every day 09:00": {
+      "main": [
+        [
+          {
+            "node": "Say good morning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

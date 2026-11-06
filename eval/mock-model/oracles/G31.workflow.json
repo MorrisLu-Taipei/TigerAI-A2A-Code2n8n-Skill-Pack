@@ -1,0 +1,93 @@
+{
+  "name": "共用錯誤通知",
+  "nodes": [
+    {
+      "id": "s-l1",
+      "name": "使用者需求摘要",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -260
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 560,
+        "height": 200,
+        "content": "### 使用者需求摘要\n任何流程失敗時，在 Slack 通知流程名稱與出錯節點。"
+      }
+    },
+    {
+      "id": "n1",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "n2",
+      "name": "Notify Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        320,
+        0
+      ],
+      "parameters": {
+        "authentication": "accessToken",
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#值班"
+        },
+        "text": "={{ \"流程失敗：\" + $json.workflow.name + \"，節點：\" + $json.execution.lastNodeExecuted }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "name": "corp-slack-bot"
+        }
+      }
+    },
+    {
+      "id": "s-l3",
+      "name": "AI 實作說明",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        700
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 560,
+        "height": 520,
+        "content": "### 🤖 AI 實作說明 — 共用錯誤通知\n\n**參考來源**\n- 沒有參考外部範本，依需求與 Pack 內建規格設計\n- 骨架與統計知識：research/patterns.md §2 error-handler\n- 原廠／社群 Skill：無\n- 目標 n8n 版本：2.44.6（使用者提供）\n- 參考方式：只參考做法，已用目前版本節點重新建構\n\n**建議事項**\n- `error:no-handling`：已採用（本身就是錯誤處理流程）\n- 不適用：webhook:no-auth、form:no-auth、exec:ssh\n- `native-first:code-node`：已採用（未使用 Code 節點）\n- 以上皆為建議，最終決定在使用者；建議不等於安全\n\n**資安掃描結果**\n- 未執行資安掃描：由宿主檢查\n\n**所需 Credentials**\n- [ ] Slack API：`corp-slack-bot`（節點：Notify Slack）\n\n**已知限制**\n- 參數名稱未經查證\n- 各流程需在設定中指向本流程才會觸發"
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}
