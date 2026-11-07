@@ -39,6 +39,7 @@ TIGERAI_SKILLS=(
   tigerai-example-finder
   code-to-workflow
   n8n-security-governance
+  n8n-review-mode
   n8n-code-to-native
 )
 SHARED_DIR="_tigerai-pack-shared"

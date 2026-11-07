@@ -44,6 +44,7 @@ $TigerAISkills = @(
   'tigerai-example-finder',
   'code-to-workflow',
   'n8n-security-governance',
+  'n8n-review-mode',
   'n8n-code-to-native'
 )
 $ExpectedCount = $VendorSkills.Count + $TigerAISkills.Count   # 29 (21 vendor + 8 TigerAI)

@@ -58,7 +58,7 @@ We're also contributing an upstream-issue draft back: [`docs/upstream-issues/pai
 
 Receipts for the ✅ column: [`docs/responsibility-matrix.md`](docs/responsibility-matrix.md) (status per claim) and [`tests/REPORT-v0.24.1-evidence.md`](tests/REPORT-v0.24.1-evidence.md) (fresh dated evidence).
 
-> 📊 **The whole pack in one picture**: Natural-language intent *or* an existing program system → Code2n8n Skill Pack (Cookbook + digested statistics of 13,947 official public n8n.io templates *referenced, never copied; the repo ships no template files* + DSL v1.2 + **31 skills** + 4 enterprise patterns) → decides what logic stays as code vs lifts into an n8n node → emits a reviewable, hand-off-able, cross-system n8n workflow.
+> 📊 **The whole pack in one picture**: Natural-language intent *or* an existing program system → Code2n8n Skill Pack (Cookbook + digested statistics of 13,947 official public n8n.io templates *referenced, never copied; the repo ships no template files* + DSL v1.2 + **32 skills** + 4 enterprise patterns) → decides what logic stays as code vs lifts into an n8n node → emits a reviewable, hand-off-able, cross-system n8n workflow.
 > *by n8n Taipei Ambassador Morris Lu*
 
 ---
@@ -85,7 +85,7 @@ Code2n8n **does not transliterate every line of Python or JavaScript into nodes*
 
 ### 🧪 Case study evidence — samples of the methodology applied, not the deliverable
 
-> The deliverable is the **methodology + 31 SKILLs + templates + V&V gate (§10 two-layer + A2A 11-language + §1.6 lexical) + main/critic architecture** above. Case studies below are **evidence of methodology applied to real codebases**, kept in `examples/` as reference. More will be added as new GitHub repos go through the [`code2n8n-pipeline`](skills/tigerai/code2n8n-pipeline/SKILL.md) SKILL. Each case maintains its own `SECURITY-REVIEW.md` and (where the case surfaced new methodology gaps) `REFLECTION.md`.
+> The deliverable is the **methodology + 32 SKILLs + templates + V&V gate (§10 two-layer + A2A 11-language + §1.6 lexical) + main/critic architecture** above. Case studies below are **evidence of methodology applied to real codebases**, kept in `examples/` as reference. More will be added as new GitHub repos go through the [`code2n8n-pipeline`](skills/tigerai/code2n8n-pipeline/SKILL.md) SKILL. Each case maintains its own `SECURITY-REVIEW.md` and (where the case surfaced new methodology gaps) `REFLECTION.md`.
 
 | Case | Upstream → n8n | Methodology status |
 |---|---|---|
@@ -119,7 +119,7 @@ This Skill Pack is itself a working demo of **Agentic Engineering**:
 
 ### Agentic footprints in this repo
 
-- **`skills/`** — `plugin.json` registers **31 Claude Code / Antigravity skills** (21 vendored + 10 TigerAI, incl. v0.30.0 `code2n8n-pipeline` auto-pilot); each `SKILL.md` is co-authored by humans and AI
+- **`skills/`** — `plugin.json` registers **32 Claude Code / Antigravity skills** (21 vendored + 11 TigerAI, incl. v0.30.0 `code2n8n-pipeline` auto-pilot); each `SKILL.md` is co-authored by humans and AI
 - **`.agent/workflows/`** — Antigravity-native agentic workflows (e.g. `/install-n8n-pack` one-shot installer)
 - **`cookbook/`** — 8 natural-language → workflow examples showing how to "talk to" the AI
 - **`spec/sticky-note-three-layer.md`** — Three-layer structure spec that forces reviewable AI output
@@ -234,7 +234,7 @@ TigerAI-Code2n8n-Skill-Pack/
 ├── cookbook/                  ← 8 copy-paste recipes (each has plain-language + DSL fold)
 │   └── 00-INDEX.md/.en.md
 │
-├── skills/                    ← 31 skills (plugin.json manifest matches on-disk)
+├── skills/                    ← 32 skills (plugin.json manifest matches on-disk)
 │   ├── _vendor/                  21 vendored skills: 6 czlonkowski/n8n-skills (MIT) + 15 n8n-io/skills (Apache-2.0, unmodified)
 │   └── tigerai/                  11 TigerAI skills
 │       ├── code-to-workflow/        ← Marquee: existing code / system → n8n

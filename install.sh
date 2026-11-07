@@ -41,6 +41,7 @@ TIGERAI_SKILLS=(
   tigerai-example-finder
   code-to-workflow
   n8n-security-governance
+  n8n-review-mode
   n8n-code-to-native
 )
 EXPECTED_COUNT=$(( ${#VENDOR_SKILLS[@]} + ${#TIGERAI_SKILLS[@]} ))   # 29 (21 vendor + 8 TigerAI)

@@ -71,6 +71,7 @@
     { "path": "skills/tigerai/tigerai-example-finder", "source": "tigerai", "role": "interaction" },
     { "path": "skills/tigerai/code-to-workflow", "source": "tigerai", "role": "marquee" },
     { "path": "skills/tigerai/n8n-security-governance", "source": "tigerai", "role": "security" },
+    { "path": "skills/tigerai/n8n-review-mode", "source": "tigerai", "role": "security" },
     { "path": "skills/tigerai/external-dependency-security", "source": "tigerai", "role": "security" },
     { "path": "skills/tigerai/n8n-code-to-native", "source": "tigerai", "role": "refactor" },
     { "path": "skills/tigerai/code2n8n-pipeline", "source": "tigerai", "role": "auto-pilot" }

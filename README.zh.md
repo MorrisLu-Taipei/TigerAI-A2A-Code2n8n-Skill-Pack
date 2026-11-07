@@ -58,7 +58,7 @@ MIT 授權讓本 Pack 能把 SDK 包成 svc + n8n 治理層對外發布 — 是 
 
 ✅ 欄位的證據放這裡：[`docs/responsibility-matrix.md`](docs/responsibility-matrix.md)（逐項狀態）、[`tests/REPORT-v0.24.1-evidence.md`](tests/REPORT-v0.24.1-evidence.md)（最新驗收紀錄）。
 
-> 📊 **一張圖看懂**：自然語言需求或既有程式系統 → Code2n8n Skill Pack（Cookbook + n8n.io 13,947 個官方公開範本的消化統計 *範本只被參考、不被複製，repo 不含範本檔* + DSL v1.2 + 31 個 Skill + 4 大企業模式）→ 分析哪些邏輯留在程式、哪些上升為 n8n 節點 → 產出可檢查、可交接、可跨系統編排的 workflow。
+> 📊 **一張圖看懂**：自然語言需求或既有程式系統 → Code2n8n Skill Pack（Cookbook + n8n.io 13,947 個官方公開範本的消化統計 *範本只被參考、不被複製，repo 不含範本檔* + DSL v1.2 + 32 個 Skill + 4 大企業模式）→ 分析哪些邏輯留在程式、哪些上升為 n8n 節點 → 產出可檢查、可交接、可跨系統編排的 workflow。
 > *by n8n Taipei Ambassador Morris Lu*
 
 ---
@@ -85,7 +85,7 @@ Code2n8n **不是逐行把 Python 或 JavaScript 翻成節點**。它做的是�
 
 ### 🧪 案例見證 — 方法論被套用後的樣本，不是 Pack 的賣點
 
-> Pack 的賣點是上方的**方法論 + 31 個 SKILLs + templates + V&V gate（§10 兩層 + A2A 11 語 + §1.6 lexical）+ main/critic 雙 agent 架構**。下面這些案例是**方法論被套到真實程式碼後的樣本**，放在 `examples/` 當參考。每個案例獨立負責自己的 `SECURITY-REVIEW.md`（必要時還有 `REFLECTION.md`）。未來會有更多 GitHub repo 透過 [`code2n8n-pipeline`](skills/tigerai/code2n8n-pipeline/SKILL.md) SKILL 自動加入。
+> Pack 的賣點是上方的**方法論 + 32 個 SKILLs + templates + V&V gate（§10 兩層 + A2A 11 語 + §1.6 lexical）+ main/critic 雙 agent 架構**。下面這些案例是**方法論被套到真實程式碼後的樣本**，放在 `examples/` 當參考。每個案例獨立負責自己的 `SECURITY-REVIEW.md`（必要時還有 `REFLECTION.md`）。未來會有更多 GitHub repo 透過 [`code2n8n-pipeline`](skills/tigerai/code2n8n-pipeline/SKILL.md) SKILL 自動加入。
 
 | 案例 | 上游 → n8n | 方法論套用紀錄 |
 |---|---|---|
@@ -119,7 +119,7 @@ Code2n8n **不是逐行把 Python 或 JavaScript 翻成節點**。它做的是�
 
 ### 你會在這個 repo 看到的 Agentic 痕跡
 
-- **`skills/`** — `plugin.json` 登錄 31 個 Claude Code / Antigravity Skill（21 個收錄 + 10 個 TigerAI，含 v0.30.0 新增 `code2n8n-pipeline` 自動駕駛 SKILL），每個 SKILL.md 都是 AI 與人共筆
+- **`skills/`** — `plugin.json` 登錄 32 個 Claude Code / Antigravity Skill（21 個收錄 + 11 個 TigerAI，含 v0.30.0 新增 `code2n8n-pipeline` 自動駕駛 SKILL），每個 SKILL.md 都是 AI 與人共筆
 - **`.agent/workflows/`** — Antigravity 專屬的 agentic workflow（如 `/install-n8n-pack` 一鍵安裝）
 - **`cookbook/`** — 8 個自然語言 → workflow 的對照範例，示範如何「對 AI 講話」
 - **`spec/sticky-note-three-layer.md`** — 三層結構規範，強制 AI 產出可 review 的 workflow
@@ -234,9 +234,9 @@ TigerAI-Code2n8n-Skill-Pack/
 ├── cookbook/                  ← 8 個照抄範例（每個有自然語言版 + DSL 折疊）
 │   └── 00-INDEX.md
 │
-├── skills/                    ← 31 個 Skill（plugin.json manifest 與磁碟一致）
+├── skills/                    ← 32 個 Skill（plugin.json manifest 與磁碟一致）
 │   ├── _vendor/                  21 個收錄 Skill：6 個 czlonkowski/n8n-skills（MIT）+ 15 個 n8n-io/skills（Apache-2.0，未修改）
-│   └── tigerai/                  10 個 TigerAI Skill
+│   └── tigerai/                  11 個 TigerAI Skill
 │       ├── code-to-workflow/        ← 旗艦：既有程式 / 系統 → n8n
 │       ├── n8n-security-governance/ ← 安全、版本控制、CI/CD、回滾閘門
 │       └── n8n-code-to-native/      ← Code node → 原生 n8n node

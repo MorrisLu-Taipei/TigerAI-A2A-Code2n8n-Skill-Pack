@@ -43,6 +43,7 @@ $TigerAISkills = @(
   'tigerai-example-finder',
   'code-to-workflow',
   'n8n-security-governance',
+  'n8n-review-mode',
   'n8n-code-to-native'
 )
 $SharedDir = '_tigerai-pack-shared'
