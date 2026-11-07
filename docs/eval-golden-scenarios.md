@@ -182,7 +182,7 @@
 
 ## 4. 如何接上內網模型
 
-前提（先確認，再動手）：LLM Manager 閘道的暴露方式與認證由 Founder 另行決定；srv01 的模型目前只綁本機。本評測**不動模型服務**，只作為用戶端呼叫 OpenAI 相容的 `POST {base}/chat/completions`。模型顯存吃緊，任何需要新載入或卸載模型的事先回報，不自行動手。
+前提（先確認，再動手）：LLM Manager 閘道的暴露方式與認證由 Founder 另行決定；內部測試主機上的模型目前只綁本機。本評測**不動模型服務**，只作為用戶端呼叫 OpenAI 相容的 `POST {base}/chat/completions`。模型顯存吃緊，任何需要新載入或卸載模型的事先回報，不自行動手。
 
 ```bash
 export EVAL_API_KEY='<由人取得，不要寫進指令列、腳本或版本控制>'
@@ -210,7 +210,7 @@ node eval/run-eval.mjs \
 | 量載入 Skill 的影響 | `node eval/run-eval.mjs ... --skill sticky-note-to-workflow --skill-max-chars 4000` |
 | 動態檢查（選用） | 見下 |
 
-**動態檢查的資源提醒**：`--dynamic` 會對「最終通過靜態檢查」的 workflow 呼叫 `scripts/ci/run-on-n8n.mjs`，需要一個可丟棄的 n8n 實例，且每個 workflow 都要匯入、啟用、觸發、清理。**srv01 記憶體吃緊，動態檢查一次只跑一個**（評分程式本身是序列執行）。建議先用 `--dynamic-limit 5` 小量試跑，確認實例資源足夠再放大。尚未實作經檢查服務 HTTP 呼叫動態檢查。
+**動態檢查的資源提醒**：`--dynamic` 會對「最終通過靜態檢查」的 workflow 呼叫 `scripts/ci/run-on-n8n.mjs`，需要一個可丟棄的 n8n 實例，且每個 workflow 都要匯入、啟用、觸發、清理。**測試主機記憶體吃緊，動態檢查一次只跑一個**（評分程式本身是序列執行）。建議先用 `--dynamic-limit 5` 小量試跑，確認實例資源足夠再放大。尚未實作經檢查服務 HTTP 呼叫動態檢查。
 
 結果在 `eval/results/<run-id>/`：`results.json`（逐情境）、`summary.json`、`summary.md`（繁體中文）、`outputs/`（模型產出的 workflow，已遮罩金鑰樣式）。`results/` 已在 `eval/.gitignore` 排除。
 
@@ -282,7 +282,7 @@ node eval/run-eval.mjs \
 | API 金鑰 | 只讀環境變數，不印出、不寫入；子行程不繼承 |
 | 外部位址 | 預設拒絕；`--allow-external` 由人明確加上，輸出標紅警示 |
 | 評測結果被當成品質保證 | 結構性評測；通過靜態檢查不等於語意正確，更不等於放行 |
-| 動態檢查的資源與副作用 | 只對可丟棄的實例；一次一個；srv01 記憶體吃緊 |
+| 動態檢查的資源與副作用 | 只對可丟棄的實例；一次一個；測試主機記憶體吃緊 |
 
 ---
 

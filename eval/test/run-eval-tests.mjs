@@ -1143,7 +1143,7 @@ function testRepoHygiene() {
     for (const g of loadScenarios()) check(`文件的表格列出 ${g.id}`, doc.includes(`| ${g.id} |`));
   }
   const readme = textOf(join(EVAL, 'README.md'));
-  for (const k of ['結構性評測', '--base-url', '--dynamic', 'srv01', '待討論', '指標定義', '私有網段', 'results/']) check(`eval/README.md 提到：${k}`, readme.includes(k));
+  for (const k of ['結構性評測', '--base-url', '--dynamic', '測試主機', '待討論', '指標定義', '私有網段', 'results/']) check(`eval/README.md 提到：${k}`, readme.includes(k));
   check('summarizeExpect 對可拒絕情境有標示', summarizeExpect({ mode: 'refuse-or-safe', allowRefusal: true }).includes('拒絕或交安全草稿皆可'));
 }
 

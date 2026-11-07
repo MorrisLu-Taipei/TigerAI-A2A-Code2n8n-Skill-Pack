@@ -136,7 +136,7 @@ export N8N_API_KEY='<該實例的 API 金鑰>'
 node eval/run-eval.mjs ... --dynamic --dynamic-limit 10 --dynamic-disposable
 ```
 
-- **srv01 記憶體吃緊**：動態檢查一次只跑一個 workflow，評分程式本身是序列執行，不提供並行選項；請先用 `--dynamic-limit` 小量試跑，並確認沒有其他重負載的工作同時進行。
+- **測試主機記憶體吃緊**：動態檢查一次只跑一個 workflow，評分程式本身是序列執行，不提供並行選項；請先用 `--dynamic-limit` 小量試跑，並確認沒有其他重負載的工作同時進行。
 - 只對「最終通過靜態檢查」的 workflow 執行；實際呼叫 `scripts/ci/run-on-n8n.mjs`，它會匯入、補假憑證、啟用、觸發、停用並清理，只動自己建立的東西。
 - 對全新空實例可加 `--dynamic-bootstrap`；用完即銷毀的實例可加 `--dynamic-disposable`。
 - 尚未實作經由檢查服務 HTTP 呼叫動態檢查（第 11 節）。
