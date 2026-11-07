@@ -1,3 +1,5 @@
+> 歷史紀錄：文中的 `reference-workflows/` 已於 2026-11-06 自 repo 移除，見 `research/n8n-templates-method.md`
+
 # 來源盤點 Source Inventory（Phase 0）
 
 > 🌐 [English](source-inventory.en.md) | **繁體中文**

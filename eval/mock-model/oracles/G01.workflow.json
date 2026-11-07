@@ -1,0 +1,128 @@
+{
+  "name": "訂單狀態查詢 API",
+  "nodes": [
+    {
+      "id": "s-l1",
+      "name": "使用者需求摘要",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -260
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 560,
+        "height": 200,
+        "content": "### 使用者需求摘要\n外部系統 POST 訂單編號，回傳狀態；先用寫死的對照表。"
+      }
+    },
+    {
+      "id": "n1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "order-status-g01",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "00000000-0000-4000-8000-000000000001",
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "internal-api-header"
+        }
+      },
+      "notes": "認證用管理員建好的標頭憑證；回應交給 Respond 節點。"
+    },
+    {
+      "id": "n2",
+      "name": "Lookup status",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "status",
+              "type": "string",
+              "value": "={{ ({\"A001\":\"處理中\",\"A002\":\"已出貨\"})[$json.body.orderId] ?? \"查無此單\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "先用寫死的對照，之後換成資料庫查詢。"
+    },
+    {
+      "id": "n3",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        600,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"orderId\": $(\"Webhook\").item.json.body.orderId, \"status\": $json.status } }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "s-l3",
+      "name": "AI 實作說明",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        700
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 560,
+        "height": 520,
+        "content": "### 🤖 AI 實作說明 — 訂單狀態查詢 API\n\n**參考來源**\n- 沒有參考外部範本，依需求與 Pack 內建規格設計\n- 骨架與統計知識：research/patterns.md §2 webhook-api\n- 原廠／社群 Skill：無\n- 目標 n8n 版本：2.44.6（使用者提供）\n- 參考方式：只參考做法，已用目前版本節點重新建構\n\n**建議事項**\n- `webhook:no-auth`：已採用（Webhook 設標頭認證）\n- `error:no-handling`：尚未能自動檢查（沒有外部呼叫）\n- 不適用：form:no-auth、exec:ssh\n- `native-first:code-node`：已採用（未使用 Code 節點）\n- 以上皆為建議，最終決定在使用者；建議不等於安全\n\n**資安掃描結果**\n- 未執行資安掃描：由宿主檢查\n\n**所需 Credentials**\n- [ ] HTTP Header Auth：`internal-api-header`（節點：Webhook）\n\n**已知限制**\n- 參數名稱未經查證\n- 對照表是寫死的示意資料，未連資料庫"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Lookup status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup status": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

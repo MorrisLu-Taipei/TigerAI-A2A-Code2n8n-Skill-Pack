@@ -1,0 +1,59 @@
+{
+  "name": "ci-fixture advisory reminders",
+  "settings": {},
+  "connections": {
+    "Manual trigger": {
+      "main": [
+        [
+          {
+            "node": "Create item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "id": "manual-trigger",
+      "name": "Manual trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "create-item",
+      "name": "Create item",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "url": "https://api.example.invalid/v1/items",
+        "method": "POST"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "ai-notes",
+      "name": "AI notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        520,
+        700
+      ],
+      "parameters": {
+        "color": 5,
+        "content": "### 🤖 AI 實作說明 — 範例\n\n**參考來源**\n- 沒有參考外部範本\n\n**建議事項**\n- 建議事項：無\n\n**資安掃描結果**\n- 規則式掃描：未發現規則命中（不代表沒有其他風險）\n\n**已知限制**\n- 無"
+      }
+    }
+  ]
+}

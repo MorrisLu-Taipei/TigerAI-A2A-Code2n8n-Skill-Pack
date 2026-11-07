@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "description": "Portal 內建 Pack Skill 的範例白名單：社群 6 個、n8n 官方 15 個、TigerAI 7 個。暫不內建 code-to-workflow、code2n8n-pipeline 與 tigerai-example-finder。",
+  "_comment": "白名單外的 Skill 一律不會複製。名稱不可重複，也不可同時存在於 skills/_vendor 與 skills/tigerai。",
+  "skills": [
+    "n8n-expression-syntax",
+    "n8n-workflow-patterns",
+    "n8n-validation-expert",
+    "n8n-node-configuration",
+    "n8n-code-javascript",
+    "n8n-code-python",
+
+    "n8n-agents-official",
+    "n8n-ai-nodes-official",
+    "n8n-binary-and-data-official",
+    "n8n-code-nodes-official",
+    "n8n-credentials-and-security-official",
+    "n8n-data-tables-official",
+    "n8n-debugging-official",
+    "n8n-error-handling-official",
+    "n8n-expressions-official",
+    "n8n-extending-mcp-official",
+    "n8n-loops-official",
+    "n8n-node-configuration-official",
+    "n8n-subworkflows-official",
+    "n8n-workflow-lifecycle-official",
+    "using-n8n-skills-official",
+
+    "sticky-note-to-workflow",
+    "n8n-api-bridge",
+    "tigerai-enterprise-patterns",
+    "tigerai-qa-mode",
+    "n8n-security-governance",
+    "external-dependency-security",
+    "n8n-code-to-native"
+  ],
+  "notices": {
+    "include": true,
+    "_comment_include": "必須為 true：散布時授權全文與歸屬聲明要跟著走，設成 false 時 flatten-bundle 會拒絕執行。",
+    "restricted_mode_spec": [
+      "spec/agent-restricted-mode.md",
+      "spec/agent-restricted-mode.en.md"
+    ],
+    "_comment_spec": "會複製到 bundle 的 _spec/；Pack 內還沒有的檔案會略過並提示，不算錯誤。"
+  },
+  "_comment_example_finder": "tigerai-example-finder 未列入：它的舊版靠約 820 KB 的範例索引，新版改為即時查詢 n8n.io，需要 Portal 決定如何處理對外查詢（網路規則、限速、使用者同意）後再決定是否內建。",
+  "_comment_n8n_api_bridge": "n8n-api-bridge 含寫入與啟用的 REST 步驟，列入白名單不代表 Agent 可以執行；實際能做什麼由 Portal 的工具白名單決定。是否內建請 Portal 決定。",
+  "_comment_n8n_extending_mcp": "n8n-extending-mcp-official 與 n8n-agents-official 等官方 Skill 是為 MCP 工具而寫，Pack 為 REST-only；是否全部內建請 Portal 決定（可視需要從 skills 移除，bundle 其餘部分不受影響）。",
+  "_comment_external_dependency_security": "external-dependency-security 與 n8n-security-governance 屬於審查類建議，不是強制閘門；是否內建請 Portal 決定。"
+}

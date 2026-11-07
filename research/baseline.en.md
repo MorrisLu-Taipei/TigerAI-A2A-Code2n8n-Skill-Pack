@@ -1,3 +1,5 @@
+> Historical record: the `reference-workflows/` mentioned below was removed from the repo on 2026-11-06; see `research/n8n-templates-method.en.md`
+
 # Baseline Alignment (Phase 0)
 
 > 🌐 **English** | [繁體中文](baseline.md)

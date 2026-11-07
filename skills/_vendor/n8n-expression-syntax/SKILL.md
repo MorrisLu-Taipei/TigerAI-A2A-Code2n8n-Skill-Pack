@@ -1,6 +1,6 @@
 ---
 name: n8n-expression-syntax
-description: Validate n8n expression syntax and fix common errors. Use when writing n8n expressions, using {{}} syntax, accessing $json/$node variables, troubleshooting expression errors, mapping data between nodes, or referencing webhook data in workflows. Use this skill whenever configuring node fields that reference data from previous nodes — expressions are how n8n passes data between nodes, and getting the syntax wrong is the most common source of workflow errors.
+description: Validate n8n expression syntax and fix common errors. Use when writing n8n expressions, using {{}} syntax, accessing $json/$node variables, troubleshooting expression errors, mapping data between nodes, or referencing webhook data in workflows. Use this skill whenever configuring node fields that reference data from previous nodes — expressions are how n8n passes data between nodes, and getting the syntax wrong is the most common source of workflow errors. Also use when asked whether a complex expression hurts performance.
 ---
 
 # n8n Expression Syntax
@@ -205,6 +205,136 @@ apiKey: "={{$env.API_KEY}}"
 // ✅ CORRECT
 Use n8n credential system, not expressions
 ```
+
+---
+
+## The transform gatekeeper
+
+Before you add a node — or write any code — to transform data, walk this order and stop at the first that fits:
+
+1. **The service's own node** does it in its own fields: a CRM node's field slots, the Slack node's Blocks field, a
+   Data Table insert's per-column slots. HTTP Request only when no node covers the operation.
+2. **A native node for the job.** Filter, IF / Switch, Summarize, Aggregate, Split Out, Merge, Compare Datasets, Remove
+   Duplicates, Sort + Limit, Date & Time, XML / HTML / Extract From File, HTTP Request pagination, Crypto. The job-to-node
+   table in `using-n8n-mcp-skills` maps jobs to nodes; their configs are in `n8n-node-configuration` → NATIVE_NODES.md.
+3. **A short expression** (`{{ ... }}`) inside that node's field. Property access, method chains
+   (`.map().filter().join()`), a ternary, string building, Luxon date math, the helper functions below — "take A,
+   produce B" in one expression, without intermediate variables.
+   - **Querying nested JSON for one field** (pick, filter, sum inside an array) → `$jmespath()` in that same expression
+     (rules below). When downstream needs one item per element, use Split Out / Filter / Aggregate instead.
+4. **Code node**, only for the closed list: loops or recursion no node expresses, state across runs, parsing no node
+   handles, an allowlisted library, heavy all-items work (thousands of items, stated or measured), or one short Code node
+   (~15 lines) replacing 4+ glue nodes. Give it a `Why Code:` note. See `n8n-code-javascript`.
+
+**A function body is code.** When the logic needs `const`, `if`, `return` or several statements — an
+`(() => { ... })()` wrapped in `{{ }}` — it has outgrown an expression. Split it into a native node plus short
+expressions, or move it into a Code node with a `Why Code:` note. A long expression is harder to read than either, and a
+runtime error inside it resolves silently to `null` (see Debugging). The create/update hooks flag function bodies in
+non-Code nodes.
+
+**Why the order matters.** Readability: a native node says on the canvas what it does, and a short expression stays
+visible in the field that uses it, instead of hiding in an upstream node someone has to open. Performance rarely decides
+it — below a few hundred items none of the costs matter, and the measured model lives in `n8n-code-javascript`.
+
+## `$jmespath()` — query nested JSON in one expression
+
+```
+{{ $jmespath($json, "customers[?country=='PL' && revenue > `100000`].name") }}    →  ["Acme"]
+```
+
+Verified on n8n 2.38: this one expression returns exactly what Split Out → Filter → Aggregate
+returns, with no extra nodes. The syntax is unforgiving, and **most mistakes fail silently**:
+
+| Write | Not | What the wrong form does |
+|---|---|---|
+| `$jmespath(object, "query")`, object first | `$jmespath("query", object)` | throws `expected two arguments (Object, string) for this function` (JMESPath's own docs show `search(query, data)`) |
+| strings in single quotes: `country=='PL'` | `country=="PL"` | double quotes mean a **field name** → returns `[]`, no error |
+| numbers/booleans in backticks: `` revenue > `100000` `` | `revenue > 100000` | parse error → whole expression becomes `null` (see Debugging) |
+| `&&` `\|\|` `!` `==` | `and` `or` `=` | parse error → `null` |
+| hyphenated keys quoted: `'customers[*].contact."first-name"'` (single-quote the JS string) | `contact.first-name` | parse error → `null` |
+| over items, keep the wrapper: `$jmespath($('Node').all(), "[?json.country=='PL'].json.name")` or `$jmespath($input.all().map(i => i.json), "[?country=='PL'].name")` | `"[?country=='PL'].name"` on `.all()` | items are `{json: …}` wrappers → `[]` |
+
+- **Results:** missing path or index → `null`; filter with no match → `[]`; `sum()` over an empty
+  projection → `0`.
+- **First argument must be an object or array.** A string (e.g. an HTTP Request with a text
+  response) or `undefined` (`$json.missingField`) throws the same `expected two arguments` error.
+  That one does fail the node.
+- **Handy pieces:** `length()`, `sum()`, `max_by(arr, &field)`, `sort_by(arr, &field)`,
+  `reverse()`, `contains()`, `starts_with()`, `keys()`, `to_number()`; projection `[*]`, flatten
+  `[]`, pipe `| [0]`, reshape `{name: name, email: contact.email}`.
+- **It returns a value, not items.** Use it where the result feeds one field (message text, HTTP
+  body, IF/Filter condition). When downstream needs one item per match, narrow with `$jmespath` in
+  Edit Fields and follow with a single Split Out on that field.
+- **Where it exists:** expressions and JavaScript Code nodes (same argument order). Not in native
+  Python Code nodes.
+
+## Built-in helper functions
+
+n8n adds methods to values inside `{{ }}`. Together with a native node they replace most one-line Code nodes. **They
+exist only in expressions, not in Code nodes** — inside Code use plain JavaScript (and `toFormat()` instead of `format()`).
+They see only the current item's values: jobs across items (dedupe items, group and total, join two lists) belong in a
+node. On n8n-mcp 2.97.0+, `tools_documentation({topic: "expression_helpers", depth: "full"})` lists every helper with a
+tested example.
+
+| Need | Expression | Note |
+|---|---|---|
+| One field from every object | `{{ $json.items.pluck('name') }}` | several names → one array per object |
+| Sum / average / min / max | `{{ $json.prices.sum() }}` | throws on non-numbers, numeric strings included |
+| Dedupe an array | `{{ $json.rows.unique('email') }}` | each argument is one field name; none → compares whole values (`removeDuplicates` is an alias) |
+| Default for an empty value | `{{ $ifEmpty($json.name, 'there') }}` | empty = undefined, null, `''`, `[]`, `{}`; exactly two arguments |
+| Email or domain in text | `{{ $json.text.extractEmail() }}`, `.extractDomain()` | `undefined` when nothing matches |
+| Hash a string | `{{ $json.email.hash('sha256') }}` | md5 by default; HMAC needs the Crypto node |
+| Days between dates | `{{ $now.diffTo($json.created_at, 'days') }}` | receiver minus argument: positive when the argument is earlier |
+| String to date | `{{ $json.created_at.toDateTime().format('yyyy-MM-dd') }}` | then `.diffTo()`, `.plus(7, 'days')`, `.extract('month')` |
+| Split an array into batches | `{{ $json.ids.chunk(100) }}` | for bulk API bodies |
+| Drop empty values | `{{ $json.tags.compact() }}`, `{{ $json.compact() }}` | arrays and objects |
+
+- `diffTo` takes a DateTime, a JS Date or an ISO string, and an optional unit (default `days`) or a list of units (then it
+  returns an object). `$json.created_at.toDateTime().diffToNow('days')` is **negative** for past dates.
+- `.sum()` over strings throws: `{{ $json.items.pluck('price').map(Number).sum() }}`.
+- A helper called on `null` or `undefined` throws: guard with `?.` (`{{ $json.email?.extractDomain() }}`) or `$ifEmpty()`.
+- A helper that throws (bad unit, wrong argument count, a missing value) fails the node; a plain JavaScript error inside
+  `{{ }}` returns `null` silently. Test with real items either way.
+
+## The Set-node antipattern and branch convergence
+
+### Delete Set nodes that only re-map fields for the next node
+
+A Set / Edit Fields node whose only job is to copy or rename fields so the **next** node can read them is dead weight. Inline its expressions at the consumer instead.
+
+```
+❌  Webhook → Set { customer_id: {{ $json.body.customer_id }} } → Postgres: WHERE id = {{ $json.customer_id }}
+
+✅  Webhook → Postgres: WHERE id = {{ $('Webhook').item.json.body.customer_id }}
+```
+
+The Set node adds a hop, more canvas clutter, and a refactor hazard, while doing nothing the consumer couldn't do itself. To remove it cleanly with `n8n_update_partial_workflow`: rewire the connection (`removeConnection` from the Set's source-and-target, `addConnection` straight from source to consumer), `patchNodeField` the consumer's expression to reference the original source by node name, then `removeNode` the Set.
+
+**Quick test:** does the Set only re-map fields the next node could read directly (`$('Source').item.json.x`)?
+- **Yes** → delete it, inline the expressions at the consumer.
+- **No, it creates something** → keep it as a named step (name it for what it produces).
+
+**Edit Fields earns its place** when:
+- **It creates a constant item** — fixed config, a default payload, a test fixture.
+- **It builds an error or return item** — `{ error: 'validation_error', message: … }` before a Respond, or a sub-workflow's output.
+- **It builds a payload object** several nodes, or a whole request body, are built from.
+- **2+ consumers** read the same derived value and the derivation is non-trivial (a name aids readability and you compute it once).
+- **It's a sub-workflow's final Return node**, shaping the output contract. Here the "single consumer" is every caller, so the Set *is* the API boundary — and with `Include Other Fields: false` it whitelists the output shape so internal scratch fields don't leak.
+- **You're renaming or whitelisting fields** and want that visible in one place rather than spread across consumer expressions.
+
+### Branch convergence: anchor with a NoOp
+
+When branches converge (after IF/Switch/Merge), `$json` becomes "whichever branch fired last" — non-deterministic, and a silent source of wrong data. Insert a **NoOp** node at the convergence, name it descriptively (`Combine Inputs`), and have downstream nodes reference it by name:
+
+```
+Branch A ──┐
+           ├─→ [NoOp: Combine Inputs] ──→ downstream uses $('Combine Inputs').item.json.x
+Branch B ──┘
+```
+
+The NoOp survives refactors: inserting a transform later between it and the consumer doesn't break the `$('Combine Inputs')` reference. (If the branches produce *different* shapes, use a Set node instead of a NoOp to normalize both into one shape — see the exceptions above.)
+
+More broadly in branchy flows, **prefer `$('Node').item.json.x` over deep `$json.x`.** `$json` breaks the moment an intermediate node is inserted or a node clears item context (Aggregate, Code with Run for All, branching merges); the failure is silent and downstream gets the wrong data with no error. A node-name reference is unambiguous regardless of what sits between source and consumer.
 
 ---
 
@@ -425,7 +555,42 @@ Hello {{$json.name}}!
 
 ---
 
+## Performance: expression complexity is (almost) free
+
+A common worry is that a complex `{{ }}` is slow. It isn't — what costs is *how many times* n8n evaluates an
+expression, not how elaborate each one is. Measured on n8n 2.x, an elaborate expression (`sqrt`, `split`, `reduce`)
+costs about the same per item as `{{ $json.x > 50 }}`: most of the cost is n8n building the per-item evaluation context.
+
+What this means in practice:
+
+- **Don't split a working short expression into extra nodes for speed**, and don't grow it into a function body for
+  speed either. Choose by readability: native node, then a short expression, then Code (the gatekeeper above).
+- Per-item costs only bite at thousands of items, mostly through the number of per-item boundaries (Code in "Each Item"
+  mode is the worst case). The **n8n Code JavaScript** skill has the measured per-item model.
+
+---
+
 ## Debugging Expressions
+
+### Runtime errors don't fail the node — they become `null`
+
+Verified on n8n 2.38 with the default expression runtime: during execution the handler around
+each `{{ }}` re-throws only n8n's own `ExpressionError`s and swallows other JavaScript errors, so
+the field resolves to empty/`null` and the node still reports **success**. `$json.missing.field`
+(TypeError), `JSON.parse('{bad')`, `throw new Error(...)` and JMESPath syntax errors all
+produced `null`. In a Filter or IF condition every item then silently fails the check. On other
+versions or expression engines the same mistake may fail the node instead. Either way, never
+trust a green run on its own.
+
+This isn't a reason to avoid expressions (a Code node has silent traps of its own). It's a
+reason to **test with real items**:
+
+- Check the expression editor preview against real data. The preview *does* show the error.
+- After a test run, look at the output values. `null` where you expected data is the symptom.
+  `validate_workflow` and a green execution won't tell you.
+- To surface the real message, wrap the expression temporarily:
+  `{{ (() => { try { return JSON.stringify(<expr>) } catch (e) { return 'ERROR: ' + e.message } })() }}`
+- n8n's own errors still fail the node (e.g. `$jmespath` given a non-object argument).
 
 ### Test in Expression Editor
 
@@ -435,6 +600,8 @@ Hello {{$json.name}}!
 4. Check for errors highlighted in red
 
 ### Common Error Messages
+
+These appear in the editor preview; at runtime most of them resolve to `null` instead (see above).
 
 **"Cannot read property 'X' of undefined"**
 → Parent object doesn't exist
@@ -470,6 +637,9 @@ Hello {{$json.name}}!
 **Number**:
 - `.toFixed()`, `.toString()`
 - Math operations: `+`, `-`, `*`, `/`, `%`
+
+**JSON query**:
+- `$jmespath(object, "query")`: filter/pick/aggregate nested JSON (see the `$jmespath()` section for the quoting rules)
 
 ---
 
@@ -509,6 +679,8 @@ Hello {{$json.name}}!
 3. No {{ }} in Code nodes
 4. Quote node names with spaces
 5. Node names are case-sensitive
+6. Runtime errors inside `{{ }}` become `null` silently. Check output values after a test run
+7. `$jmespath(object, "query")`: `'string'`, `` `number` ``, `"field"`; `json.` prefix over `.all()`
 
 **Most Common Mistakes**:
 - Missing {{ }} → Add braces

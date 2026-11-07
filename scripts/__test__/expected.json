@@ -1,0 +1,53 @@
+{
+  "_說明": "檔名對應預期結果。static 區：status 為預期狀態，blocking 為預期的阻擋碼（集合相等），advisories 為預期的建議項（source:rule，集合相等；省略代表不檢查）。with 為必須一起放進同一個目錄才會成立的檔案。dynamic 區：在拋棄式 n8n 實例上的預期，overrides 以 n8n 版本為鍵。",
+  "target": "2.44.6",
+  "credentialMap": {
+    "httpHeaderAuth": ["ci-header-auth", "ci-http-header-auth"],
+    "openAiApi": ["ci-openai"],
+    "telegramApi": ["ci-telegram"]
+  },
+  "static": {
+    "pass-webhook-echo.workflow.json":      { "status": "pass", "blocking": [], "advisories": [] },
+    "pass-webhook-branch.workflow.json":    { "status": "pass", "blocking": [], "advisories": [] },
+    "pass-schedule-http.workflow.json":     { "status": "pass", "blocking": [], "advisories": ["security-scan:egress:external-domain"] },
+    "pass-manual-set.workflow.json":        { "status": "pass", "blocking": [], "advisories": [] },
+    "pass-subworkflow-callee.workflow.json":{ "status": "pass", "blocking": [], "advisories": [] },
+    "pass-credential-field-exempt.workflow.json":{ "status": "pass", "blocking": [], "advisories": ["security-scan:egress:external-domain"] },
+    "pass-subworkflow-caller.workflow.json":{ "status": "pass", "blocking": [], "advisories": [], "with": ["pass-subworkflow-callee.workflow.json"] },
+
+    "advisory-webhook-no-auth.workflow.json":      { "status": "pass", "blocking": [], "advisories": ["security-scan:webhook:no-auth"] },
+    "advisory-agent-no-guardrails.workflow.json":  { "status": "pass", "blocking": [], "advisories": ["security-scan:ai:agent-no-guardrails"] },
+    "advisory-code-replaceable.workflow.json":     { "status": "pass", "blocking": [], "advisories": ["native-first:code-node-replaceable"] },
+    "advisory-external-trigger.workflow.json":     { "status": "pass", "blocking": [], "advisories": ["activation:trigger:external-registration"] },
+    "advisory-hidden-legacy-node.workflow.json":   { "status": "pass", "blocking": [], "advisories": ["node-catalog:node:hidden-legacy"] },
+    "advisory-credential-field-missing.workflow.json": { "status": "pass", "blocking": [], "advisories": ["credentials:credentials:missing-field"] },
+    "advisory-unknown-subworkflow.workflow.json":  { "status": "pass", "blocking": [], "advisories": ["workflow-refs:workflow:unknown-subworkflow-reference"] },
+    "advisory-egress-impact-changelog.workflow.json": { "status": "pass", "blocking": [], "advisories": ["security-scan:egress:external-domain", "security-scan:impact:high-impact-node", "security-scan:notes:missing-change-log"] },
+
+    "fail-json-invalid.workflow.json":        { "status": "fail", "blocking": ["JSON_INVALID"] },
+    "fail-structure.workflow.json":           { "status": "fail", "blocking": ["STRUCTURE_INVALID"] },
+    "fail-secret.workflow.json":              { "status": "fail", "blocking": ["SECRET_DETECTED"] },
+    "fail-malicious-code.workflow.json":      { "status": "fail", "blocking": ["MALICIOUS_CODE"] },
+    "fail-credential-plaintext.workflow.json":{ "status": "fail", "blocking": ["CREDENTIAL_PLAINTEXT"] },
+    "fail-node-not-found.workflow.json":      { "status": "fail", "blocking": ["NODE_NOT_FOUND"] },
+    "fail-hostile-names.workflow.json":       { "status": "fail", "blocking": ["NODE_NOT_FOUND"] },
+    "fail-function-node.workflow.json":       { "status": "fail", "blocking": ["NODE_DEPRECATED"] },
+    "fail-typeversion.workflow.json":         { "status": "fail", "blocking": ["TYPEVERSION_INVALID"] },
+    "fail-credential-missing.workflow.json":  { "status": "fail", "blocking": ["CREDENTIAL_MISSING"] },
+    "fail-stub-credential.workflow.json":     { "status": "fail", "blocking": ["CREDENTIAL_MISSING"] },
+    "fail-webhook-dup-a.workflow.json":       { "status": "fail", "blocking": ["WEBHOOK_PATH_CONFLICT"], "with": ["fail-webhook-dup-b.workflow.json"] },
+    "fail-webhook-dup-b.workflow.json":       { "status": "fail", "blocking": ["WEBHOOK_PATH_CONFLICT"], "with": ["fail-webhook-dup-a.workflow.json"] }
+  },
+  "dynamic": {
+    "pass-webhook-echo.workflow.json":          { "import": "ok", "activate": "ok" },
+    "pass-webhook-branch.workflow.json":        { "import": "ok", "activate": "ok", "overrides": { "2.37.3": { "import": "ok", "activate": "failed" } } },
+    "pass-schedule-http.workflow.json":         { "import": "ok", "activate": "ok" },
+    "pass-manual-set.workflow.json":            { "import": "ok", "activate": "no-trigger" },
+    "advisory-webhook-no-auth.workflow.json":   { "import": "ok", "activate": "ok" },
+    "advisory-agent-no-guardrails.workflow.json": { "import": "ok", "activate": "ok" },
+    "advisory-code-replaceable.workflow.json":  { "import": "ok", "activate": "ok" },
+    "advisory-hidden-legacy-node.workflow.json":{ "import": "ok", "activate": "ok" },
+    "advisory-external-trigger.workflow.json":  { "import": "ok", "activate": "ok", "overrides": { "2.37.3": { "import": "ok", "activate": "unverified" } } },
+    "fail-function-node.workflow.json":         { "import": "failed", "activate": "skipped", "overrides": { "2.37.3": { "import": "ok", "activate": "no-trigger" } } }
+  }
+}

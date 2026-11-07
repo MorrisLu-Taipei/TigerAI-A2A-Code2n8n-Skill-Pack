@@ -1,0 +1,4 @@
+*
+!scripts/ci
+!docs/node-versions
+!services/ci-check/executor/executor-loop.mjs

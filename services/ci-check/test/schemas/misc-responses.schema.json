@@ -1,0 +1,302 @@
+{
+ "$id": "https://spec.example.internal/n8n-check/v1/misc-responses.schema.json",
+ "$defs": {
+  "version": {
+   "type": "string",
+   "pattern": "^\\d+\\.\\d+\\.\\d+$"
+  },
+  "healthz": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status"
+   ],
+   "properties": {
+    "status": {
+     "type": "string",
+     "enum": [
+      "ok",
+      "degraded",
+      "down"
+     ]
+    }
+   }
+  },
+  "staticVersion": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "service",
+    "serviceVersion",
+    "apiVersion",
+    "blockingCatalogVersion",
+    "packVersion",
+    "supportedTargetVersions",
+    "blockingCodes",
+    "limits"
+   ],
+   "properties": {
+    "service": {
+     "const": "static-check"
+    },
+    "serviceVersion": {
+     "type": "string"
+    },
+    "apiVersion": {
+     "const": "v1"
+    },
+    "blockingCatalogVersion": {
+     "type": "integer",
+     "minimum": 1
+    },
+    "packVersion": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "supportedTargetVersions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/version"
+     }
+    },
+    "blockingCodes": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "enum": [
+       "JSON_INVALID",
+       "STRUCTURE_INVALID",
+       "SECRET_DETECTED",
+       "MALICIOUS_CODE",
+       "CREDENTIAL_PLAINTEXT",
+       "NODE_NOT_FOUND",
+       "NODE_DEPRECATED",
+       "TYPEVERSION_INVALID",
+       "CREDENTIAL_MISSING",
+       "WEBHOOK_PATH_CONFLICT"
+      ]
+     },
+     "uniqueItems": true
+    },
+    "limits": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "maxBodyBytes",
+      "maxFiles",
+      "maxFileBytes",
+      "timeoutSeconds",
+      "maxConcurrent"
+     ],
+     "properties": {
+      "maxBodyBytes": {
+       "type": "integer",
+       "minimum": 1
+      },
+      "maxFiles": {
+       "type": "integer",
+       "minimum": 1
+      },
+      "maxFileBytes": {
+       "type": "integer",
+       "minimum": 1
+      },
+      "timeoutSeconds": {
+       "type": "integer",
+       "minimum": 1
+      },
+      "maxConcurrent": {
+       "type": "integer",
+       "minimum": 1
+      }
+     }
+    }
+   }
+  },
+  "dynamicVersion": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "service",
+    "serviceVersion",
+    "apiVersion",
+    "blockingCatalogVersion",
+    "packVersion",
+    "supportedVersions",
+    "blockingCodes",
+    "limits"
+   ],
+   "properties": {
+    "service": {
+     "const": "dynamic-check"
+    },
+    "serviceVersion": {
+     "type": "string"
+    },
+    "apiVersion": {
+     "const": "v1"
+    },
+    "blockingCatalogVersion": {
+     "type": "integer",
+     "minimum": 1
+    },
+    "packVersion": {
+     "type": [
+      "string",
+      "null"
+     ]
+    },
+    "supportedVersions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/version"
+     }
+    },
+    "blockingCodes": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "enum": [
+       "IMPORT_FAILED",
+       "ACTIVATE_FAILED",
+       "WEBHOOK_PATH_CONFLICT",
+       "CREDENTIAL_MISSING"
+      ]
+     },
+     "uniqueItems": true
+    },
+    "limits": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "maxBodyBytes",
+      "maxFiles",
+      "maxFileBytes",
+      "jobTimeoutSecondsMax",
+      "perWorkflowTimeoutSecondsMax",
+      "queueMax",
+      "resultRetentionSeconds"
+     ],
+     "properties": {
+      "maxBodyBytes": {
+       "type": "integer",
+       "minimum": 1
+      },
+      "maxFiles": {
+       "type": "integer",
+       "minimum": 1
+      },
+      "maxFileBytes": {
+       "type": "integer",
+       "minimum": 1
+      },
+      "jobTimeoutSecondsMax": {
+       "type": "integer",
+       "minimum": 1
+      },
+      "perWorkflowTimeoutSecondsMax": {
+       "type": "integer",
+       "minimum": 1
+      },
+      "queueMax": {
+       "type": "integer",
+       "minimum": 1
+      },
+      "resultRetentionSeconds": {
+       "type": "integer",
+       "minimum": 1
+      }
+     }
+    }
+   }
+  },
+  "capacity": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "accepting",
+    "queue",
+    "pools"
+   ],
+   "properties": {
+    "accepting": {
+     "type": "boolean"
+    },
+    "queue": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "length",
+      "max"
+     ],
+     "properties": {
+      "length": {
+       "type": "integer",
+       "minimum": 0
+      },
+      "max": {
+       "type": "integer",
+       "minimum": 1
+      }
+     }
+    },
+    "pools": {
+     "type": "array",
+     "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+       "version",
+       "slotsTotal",
+       "slotsBusy",
+       "slotsFree",
+       "slotsQuarantined"
+      ],
+      "properties": {
+       "version": {
+        "$ref": "#/$defs/version"
+       },
+       "slotsTotal": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "slotsBusy": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "slotsFree": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "slotsQuarantined": {
+        "type": "integer",
+        "minimum": 0
+       },
+       "heartbeatAgeSecondsMax": {
+        "type": [
+         "integer",
+         "null"
+        ],
+        "minimum": 0
+       }
+      }
+     }
+    },
+    "estimatedWaitSeconds": {
+     "type": [
+      "integer",
+      "null"
+     ],
+     "minimum": 0
+    },
+    "sharedDirUsagePercent": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 100
+    }
+   }
+  }
+ }
+}

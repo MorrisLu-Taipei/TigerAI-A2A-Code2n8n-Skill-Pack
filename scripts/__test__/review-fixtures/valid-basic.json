@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "summary": "本次變更新增一個外部 POST 與一個 Code 節點，共提出 3 則建議。",
+  "suggestions": [
+    {
+      "id": "S1",
+      "category": "egress",
+      "node": "Push To CRM",
+      "text": "此節點會連到外部網域 crm.example.invalid，請核准人確認它是否在允許清單內。",
+      "basis": "egress:external-domain",
+      "severity": "info"
+    },
+    {
+      "id": "S2",
+      "category": "native-first",
+      "node": "Rename Fields",
+      "text": "此 Code 節點只做欄位改名，可評估改用 Edit Fields。",
+      "basis": "native-first:code-node",
+      "severity": "info"
+    },
+    {
+      "id": "S3",
+      "category": "change-log",
+      "node": null,
+      "text": "節點有增減，但修改記錄沒有新增列。",
+      "basis": "spec/sticky-note-three-layer.md",
+      "severity": "info"
+    }
+  ],
+  "referencesUsed": [
+    "spec/security-guardrails.md",
+    "spec/native-first.md"
+  ],
+  "notReviewed": [
+    "動態檢查結果未提供"
+  ]
+}

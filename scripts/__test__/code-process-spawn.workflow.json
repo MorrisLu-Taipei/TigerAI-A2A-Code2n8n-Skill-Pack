@@ -1,0 +1,99 @@
+{
+  "name": "test-fixture: real process spawning must trigger process-spawn",
+  "nodes": [
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const out = require('child_process').exec('ls');\nreturn [{ json: { out } }];"
+      },
+      "id": "ps-1",
+      "name": "Require Exec",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const { execSync: run } = require('child_process');\nreturn [{ json: { out: run('ls').toString() } }];"
+      },
+      "id": "ps-2",
+      "name": "Destructured",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const out = cp.exec('ls');\nreturn [{ json: { out } }];"
+      },
+      "id": "ps-3",
+      "name": "Receiver Exec",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const p = Deno.run({ cmd: ['ls'] });\nreturn [{ json: { p } }];"
+      },
+      "id": "ps-4",
+      "name": "Deno Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const p = Bun.spawn(['ls']);\nreturn [{ json: { p } }];"
+      },
+      "id": "ps-5",
+      "name": "Bun Spawn",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const b = process.binding('spawn_sync');\nreturn [{ json: { b } }];"
+      },
+      "id": "ps-6",
+      "name": "Binding",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        0
+      ]
+    }
+  ],
+  "connections": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

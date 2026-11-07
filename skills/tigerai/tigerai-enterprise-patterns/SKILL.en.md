@@ -32,7 +32,7 @@ From the project README. AI-generated workflows must reflect:
 **Solution**: Decompose flow into atomic actions; each = one n8n node; loops use `splitInBatches batchSize=1` for per-iteration UI visibility.
 **AI rules**:
 - File processing per-item → `splitInBatches batchSize=1` (trade speed for transparency)
-- Each atomic node's `notes` field is **mandatory** (maps to which Layer 1 step)
+- Node `notes` are written only for non-obvious settings, explaining why (per `spec/references-disclosure.en.md` Chapter 7); the mapping from nodes to Layer 1 steps lives in the Layer 3 note
 - Disallow stuffing 100 lines into one code node → split into multiple nodes
 
 ### Pillar 2: Universal Worker (location transparency)
@@ -47,14 +47,14 @@ From the project README. AI-generated workflows must reflect:
 **Problem**: AI-written workflows are fragmented and inconsistent.
 **Solution**: Treat SKILL.md as the single source of truth. Read spec / cookbook / patterns before producing.
 **AI rules**:
-- Don't generate from thin air — first compare against this Pack's 7 patterns
+- Don't generate from thin air — first compare against the 14 skeletons in `research/patterns.md` §2 and the anti-patterns in §3
 - Don't quietly modify spec — defer to user
 
 ### Pillar 4: Enterprise Security
-**AI rules**:
-- Webhook defaults to **no secret verification** → Layer 3 must flag "Security risk"
-- Any hardcoded credential → refuse, demand credential reference
-- PII data flow → Layer 3 must flag "Confirm data retention policy"
+**AI recommendations** (all advisory, the user decides; the status goes into the Layer 3 "Recommendations" block, rule IDs in [`spec/security-guardrails.en.md`](../../../spec/security-guardrails.en.md)):
+- Webhook defaults to **no secret verification** → recommend setting authentication (`webhook:no-auth`) and flag "Security risk" in Layer 3
+- Hardcoded credential → recommend a credential reference (`secret:hardcoded`); if the user still chooses to write it in, do so and remind them to rotate it
+- PII data flow → remind "Confirm data retention policy" (`data:pii-minimization`)
 - Default timeouts: HTTP 30s / Worker 300s / Wait ≤ 1 hour
 
 ### Pillar 4.1: Sunset / Deprecation Watch
@@ -67,8 +67,8 @@ External services / APIs / nodes get deprecated. AI must **proactively** warn ab
 |---|---|---|
 | LINE Notify API | Sunset 2026/03/31 | Switch to LINE Messaging API (channel access token) |
 | Twitter API v1.1 | Discontinued 2023; free v2 limited | Evaluate X Premium or alternative channel |
-| `n8n-nodes-base.cron` | Deprecated but functional | Switch to `n8n-nodes-base.scheduleTrigger` |
-| `n8n-nodes-base.function` / `functionItem` | Deprecated | Switch to `n8n-nodes-base.code` |
+| `n8n-nodes-base.cron` | Outdated; marked hidden (not offered for new nodes) in the 2.37.3, 2.44.6 and 2.46.6 node catalogs; a trial API import still created it on all three | Switch to `n8n-nodes-base.scheduleTrigger` |
+| `n8n-nodes-base.function` / `functionItem` | Deprecated; import is rejected from 2.44.6 on (API returns 400), still importable on 2.37.3 | Switch to `n8n-nodes-base.code` (see [`docs/n8n-version-compat.md`](../../../docs/n8n-version-compat.md)) |
 | OpenAI gpt-3.5-turbo | Models deprecate often | Plan model swap (use env var for model ID) |
 | Slack Legacy Tokens | Discontinued | Must use OAuth2 |
 
@@ -135,14 +135,23 @@ After producing enterprise-grade workflow, **must verify each**:
 
 - [ ] Heavy logic in worker, n8n only orchestrates?
 - [ ] Loop is `batchSize=1` (unless explicitly speed-prioritized)?
-- [ ] Every node `notes` filled?
+- [ ] Node `notes` written only for non-obvious settings, explaining why (per [`spec/references-disclosure.en.md`](../../../spec/references-disclosure.en.md) §7)?
 - [ ] Credentials are references (not hardcoded)?
 - [ ] Layer 3 includes "Security risk" / "Data retention"?
 - [ ] Global Error Trigger workflow suggested?
 - [ ] All timeouts set?
 - [ ] All 6 SDD sections findable in Layer 1+3?
+- [ ] Native-first: nothing that an expression, Edit Fields or a native node can do was written as a Code node? Does every Code node that remains carry a "Why Code" line in its `notes` (per [`spec/native-first.en.md`](../../../spec/native-first.en.md))?
+- [ ] The Layer 3 note carries "References", "Recommendations" and "Security scan result", with only a summary in the conversation?
+- [ ] The Layer 3 note has a "Change log" section (first row "Created" for a new workflow, one added row for each change to an existing one; date `YYYY-MM-DD`, change summary, proposed by "User" or "AI", reason; no secrets; rules in [`spec/sticky-note-three-layer.en.md`](../../../spec/sticky-note-three-layer.en.md) §4.4, a missing one only draws a reminder)?
+- [ ] The high-impact actions common in enterprise scenarios (sending mail, writing or deleting database data, HTTP write methods, running commands) and the external domains are reminded by the scanner as `impact:high-impact-node` and `egress:external-domain` (reminder only); are they written into the "Security scan result" so the approver confirms them specially?
 
 Missing one = not enterprise-grade.
+
+### After completion: references, recommendations and scan result
+
+- **Where this happens**: this Skill is the enterprise branch of `sticky-note-to-workflow`, so this is completed in that Skill's Step 8. After applying this Skill's rules (Pillars 1-4, SDD mapping) and before delivery, add whatever was actually read and affected the design to the reference log (the flagship examples count as "local examples", documents under `research/` are listed down to the section, and version information the Sunset check relied on goes under "target n8n version").
+- Write the references, recommendations and scan result into the Layer 3 note and the relevant node notes, and put only a summary in the conversation. Order, format, statuses and honesty rules follow Chapter 4 of [`spec/references-disclosure.en.md`](../../../spec/references-disclosure.en.md) (scan in Chapter 8) and are not repeated here; in enterprise scenarios, running the security scan on the final workflow JSON before delivery is recommended.
 
 ---
 

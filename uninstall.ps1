@@ -18,7 +18,22 @@ $VendorSkills = @(
   'n8n-validation-expert',
   'n8n-node-configuration',
   'n8n-code-javascript',
-  'n8n-code-python'
+  'n8n-code-python',
+  'n8n-agents-official',
+  'n8n-ai-nodes-official',
+  'n8n-binary-and-data-official',
+  'n8n-code-nodes-official',
+  'n8n-credentials-and-security-official',
+  'n8n-data-tables-official',
+  'n8n-debugging-official',
+  'n8n-error-handling-official',
+  'n8n-expressions-official',
+  'n8n-extending-mcp-official',
+  'n8n-loops-official',
+  'n8n-node-configuration-official',
+  'n8n-subworkflows-official',
+  'n8n-workflow-lifecycle-official',
+  'using-n8n-skills-official'
 )
 $TigerAISkills = @(
   'sticky-note-to-workflow',
@@ -28,6 +43,7 @@ $TigerAISkills = @(
   'tigerai-example-finder',
   'code-to-workflow',
   'n8n-security-governance',
+  'n8n-review-mode',
   'n8n-code-to-native'
 )
 $SharedDir = '_tigerai-pack-shared'
@@ -45,7 +61,7 @@ Options:
   -Help                              Show this help.
 
 Behaviour:
-  * Removes the 14 skill folders (6 vendor + 8 TigerAI) and the
+  * Removes the 29 skill folders (21 vendor + 8 TigerAI) and the
     _tigerai-pack-shared\ folder the installer dropped — nothing else.
   * Skill folders not present are silently skipped.
 "@

@@ -1,0 +1,267 @@
+{
+  "name": "reminder egress fixture",
+  "settings": {},
+  "connections": {},
+  "nodes": [
+    {
+      "id": "static-external",
+      "name": "Static external",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "https://api.example.invalid/v1/items?api_key=not-a-real-key"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "wildcard-sub",
+      "name": "Wildcard sub",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "https://eu.svc.example.invalid/x"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "wildcard-bare",
+      "name": "Wildcard bare",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "https://svc.example.invalid/"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "allowed-exact",
+      "name": "Allowed exact",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "https://allowed.example.invalid/ping"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "path-expression",
+      "name": "Path expression",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "=https://path.example.invalid/items/{{ $json.id }}"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "literal-in-expression",
+      "name": "Literal in expression",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "={{ 'https://lit.example.invalid/a' }}"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "dynamic-whole",
+      "name": "Dynamic whole",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "={{ $json.target }}"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "dynamic-host",
+      "name": "Dynamic host",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "=https://{{ $json.host }}/v1"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "fallback-expression",
+      "name": "Fallback expression",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "={{ $json.url ?? 'https://fallback.example.invalid/' }}"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "localhost",
+      "name": "Localhost",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "http://localhost:5678/rest/ping",
+        "sendBody": true,
+        "jsonBody": "{\"link\": \"https://body.example.invalid/ignored\"}",
+        "method": "GET"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "compose-service",
+      "name": "Compose service",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "http://worker:8000/run"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "n8n-self",
+      "name": "N8n self",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "={{ $execution.resumeUrl }}"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "public-ip",
+      "name": "Public ip",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "https://203.0.113.10/health"
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "acked",
+      "name": "Acked",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "https://acked.example.invalid/"
+      },
+      "notes": "Reviewed by owner.\nguardrail-ack: egress:external-domain -- reviewed in ticket",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "nested-option",
+      "name": "Nested option",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "http://localhost:8080/",
+        "options": {
+          "pagination": {
+            "pagination": {
+              "nextURL": "https://next.example.invalid/page2"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "tool-http",
+      "name": "Tool HTTP",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "https://tool.example.invalid/q"
+      }
+    },
+    {
+      "id": "graphql",
+      "name": "Graphql",
+      "type": "n8n-nodes-base.graphql",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "endpoint": "https://gql.example.invalid/graphql"
+      }
+    },
+    {
+      "id": "set-only",
+      "name": "Set only",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "url": "https://not-http-node.example.invalid/"
+      }
+    }
+  ]
+}

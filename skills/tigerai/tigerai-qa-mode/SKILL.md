@@ -83,6 +83,8 @@ AI: [紀錄 @step] 還有下一步嗎？
   >  你希望怎麼拆？」
 - 使用者堅持單一 workflow → AI 服從但 Layer 3 必標「節點數預期 > 25，不利維護」
 
+**原生節點優先（設計階段提醒）**：規劃與複述步驟時，先想 n8n 有沒有原生節點能做（例如彙總用 Summarize、排序加取前幾名用 Sort 與 Limit、合併兩份資料用 Merge），不要預設「這一步寫程式」。這是 AI 內部的規劃原則，**不要**對使用者提 Code 節點、原生節點等術語；使用者描述的步驟若看起來需要自訂程式，用白話問清楚實際要的結果即可。依據與判斷順序見 [`spec/native-first.md`](../../../spec/native-first.md)，閘門與揭露由交棒後的 `sticky-note-to-workflow` 執行。
+
 ---
 
 ### 階段 4：輸出（最多 2 題）
@@ -134,6 +136,14 @@ AI: [紀錄 @step] 還有下一步嗎？
 ```
 
 確認後才呼叫 `sticky-note-to-workflow` Skill 產出 workflow。後者會在內部把這段自然語言轉成嚴謹技術格式（DSL），但**整個過程使用者完全不會看到 DSL**。
+
+### 完成後：參考來源、建議事項與掃描結果
+
+本 Skill 自己不產生 workflow，這一段分成兩部分：
+
+- **在哪個步驟做**：問答過程中，若曾參考任何資料來給選項或建議（例如拿某個 cookbook 範例說明、經使用者同意查了 n8n.io 範本），記進「參考紀錄」；沒有參考就不記，不補。使用者確認草稿、交棒給 `sticky-note-to-workflow` 時，把參考紀錄一併交出。
+- 把參考來源、建議事項與掃描結果寫進 Layer 3 便條與相關節點 notes，對話只放摘要，這一步由 `sticky-note-to-workflow` 的 Step 8 負責；本 Skill 不重複掃描。順序、格式與誠實規則依 [`spec/references-disclosure.md`](../../../spec/references-disclosure.md) 第 4 章。
+- 使用者中途離開（例如「我自己寫」）而沒有產出 workflow 時，不需要這一段。給使用者看的摘要用白話，不講技術術語（維持第 1 章的原則）。
 
 ---
 

@@ -58,12 +58,12 @@ Details: [`skills/tigerai/tigerai-qa-mode/SKILL.md`](skills/tigerai/tigerai-qa-m
 > "example finder mode: find something similar to X" / "範例查詢模式" / "show me examples for X"
 
 AI will:
-1. Search `reference-workflows/` (2,061 public corpus) + `cookbook/` for the top 3–5 matches
+1. Search `cookbook/` and `examples/` first, then use the digested skeleton knowledge in `research/` to judge the approach. If those are not close enough, it asks whether you want it to look up official public templates on n8n.io, and only searches after you agree. It picks the top 3–5 approaches and always names the referenced template (ID, title, URL)
 2. For each match, **explain in plain language**:
    - What this workflow does
    - Which nodes it uses and why
    - How it differs from your need
-3. Ask: "Use one of these as-is? Modify N? Or want me to design a fresh one?"
+3. Ask: "Use one of these as the skeleton? Adjust N places? Or want me to design a fresh one?" (templates are only read and digested; the actual workflow is rebuilt with current node versions, never copied)
 
 Details: [`skills/tigerai/tigerai-example-finder/SKILL.md`](skills/tigerai/tigerai-example-finder/SKILL.md)
 

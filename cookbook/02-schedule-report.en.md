@@ -83,7 +83,7 @@ Error path: each node `continueOnFail=false` + a separate Error Trigger workflow
 ### 🤖 AI implementation notes — Daily sales report
 
 **Node choices**
-- `scheduleTrigger`: newer than the deprecated `cron` node
+- `scheduleTrigger`: newer than the `cron` node (marked hidden in the 2.37.3, 2.44.6 and 2.46.6 node catalogs)
 - `code`: stats logic in one JS block, cleaner than chained `set` + `aggregate`
 - `gmail`: native node handles OAuth refresh
 

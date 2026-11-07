@@ -1,0 +1,20 @@
+{
+  "name": "ci-fixture fail missing node type",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "dc",
+      "name": "Discord Trigger",
+      "type": "n8n-nodes-base.discordTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    }
+  ],
+  "connections": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

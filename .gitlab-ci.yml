@@ -86,7 +86,7 @@ secret-scan:
   script:
     - |
       patterns='sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----'
-      hits=$(git ls-files | grep -v -E '^(reference-workflows/|research/|tests/REPORT)' | xargs -I{} grep -lE "$patterns" "{}" 2>/dev/null || true)
+      hits=$(git ls-files | grep -v -E '^(research/|tests/REPORT)' | xargs -I{} grep -lE "$patterns" "{}" 2>/dev/null || true)
       if [ -n "$hits" ]; then echo "Possible secrets:"; echo "$hits"; exit 1; fi
       echo "OK — clean."
 
@@ -96,6 +96,31 @@ workflow-security-scan:
     - node scripts/security-scan.mjs --glob "examples/**/*.workflow.json" --format markdown
     - node scripts/security-scan.mjs --glob "examples/templates/*.workflow.json"
     - node scripts/security-scan.mjs examples/line-ai-customer-service-onprem/n8n_workflow_export.json --format markdown
+
+workflow-security-scan-tests:
+  stage: scan
+  script:
+    - node scripts/__test__/run-security-scan-tests.mjs
+
+native-first-check-tests:
+  stage: scan
+  script:
+    - node scripts/__test__/run-native-first-tests.mjs
+
+ci-check-scripts-tests:
+  stage: scan
+  script:
+    - node scripts/__test__/run-ci-tests.mjs
+
+portal-bundle-tests:
+  stage: scan
+  script:
+    - node scripts/__test__/run-portal-bundle-tests.mjs
+
+ai-review-tests:
+  stage: scan
+  script:
+    - node scripts/__test__/run-review-tests.mjs
 
 dependency-cve:
   stage: scan

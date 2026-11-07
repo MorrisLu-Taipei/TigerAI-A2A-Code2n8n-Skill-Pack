@@ -62,12 +62,12 @@ AI 會分**5 個階段**循序提問，每階段一次只問 1–3 題：
 > 「show me examples for X」
 
 AI 會：
-1. 從 `reference-workflows/`（2,061 個語料）+ `cookbook/` 搜尋相似度最高的 3–5 個
+1. 先查 `cookbook/` 與 `examples/`，再用 `research/` 已消化的骨架知識判斷做法；若都不夠貼近，會先問你要不要去 n8n.io 查詢官方公開範本，你同意才搜尋。挑出相似度最高的 3–5 個做法，並註明參考了哪一個範本（編號、標題、網址）
 2. 對每個範例**用白話**說明：
    - 這個 workflow 解決什麼問題
    - 用了哪些節點、為什麼
    - 與你的需求有哪些差異
-3. 詢問使用者：「要直接用某個範例改？還是要我幫你產一個全新的？」
+3. 詢問使用者：「要以某個範例為骨架？要調整幾處？還是要我幫你產一個全新的？」（範本只被閱讀與消化；實際 workflow 一律用目前版本的節點重新建構，不會複製）
 
 **詳細邏輯**：見 [`skills/tigerai/tigerai-example-finder/SKILL.md`](skills/tigerai/tigerai-example-finder/SKILL.md)
 

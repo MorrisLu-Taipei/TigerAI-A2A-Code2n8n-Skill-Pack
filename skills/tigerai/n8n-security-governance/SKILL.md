@@ -1,6 +1,6 @@
 ---
 name: n8n-security-governance
-description: Review an AI-coded application or n8n workflow for production security and change-control readiness. Use for security audits, production readiness, enterprise governance, auth/SQL/secret review, SECURITY-CAVEATS.md, version control, rollback, release tagging, CI/CD, or before declaring a Code2n8n port deployable.
+description: Review an AI-coded application or n8n workflow for production security and change-control readiness. Use for security audits, production readiness, enterprise governance, auth/SQL/secret review, SECURITY-CAVEATS.md, version control, rollback, release tagging, CI/CD, advisory security guardrails when building a workflow, or before declaring a Code2n8n port deployable.
 ---
 
 # n8n Security Governance
@@ -18,6 +18,39 @@ Produce all applicable artifacts:
 5. Release traceability: source commit SHA, workflow version/tag, validation result, and rollback target.
 
 Never include real secrets, tokens, passwords, credential values, or sensitive customer data.
+
+## Generation-time guardrails (advisory)
+
+Security starts when the workflow is built, not only when it is scanned afterwards. A "guardrail" here is a recommendation or risk reminder the AI raises on its own initiative. Both generation and review use the rule IDs in [`spec/security-guardrails.md`](../../../spec/security-guardrails.md) (English: [`security-guardrails.en.md`](../../../spec/security-guardrails.en.md)) as the single source; do not restate or rename them here.
+
+How the AI behaves:
+
+- Adopt the safer choice by default and say why in a sentence or two. The user may decline.
+- If the user wants a different approach, follow the user's decision. Explain the risk, offer an alternative, and record the choice. Do not refuse, block, or ask for a justification.
+- Scan output is information and recommendations. Report it as it is and let the user decide what to act on; findings do not stop delivery.
+- Optionally, with the user's agreement, leave one line in the node's notes: `guardrail-ack: <rule ID> -- <the user's explanation, may be omitted>`. The scanner prints it as an `ACK` line instead of a reminder; it has no effect on detection rules such as `secret:*` and `jscode:*`.
+- The recommendations are advice only. The final decision and responsibility rest with the user.
+
+### Guardrail checklist (review and generation)
+
+Go through each rule ID and record one of: adopted, user chose not to adopt, not applicable, cannot be checked automatically yet. Each item is a recommendation; the user decides.
+
+- [ ] `secret:hardcoded`: keep secrets in n8n credentials rather than parameters, headers, URLs, Code, `pinData`, or sticky notes.
+- [ ] `webhook:no-auth`: set Header, Basic, or JWT authentication on Webhooks; add an IP allowlist where feasible; use an unguessable path.
+- [ ] `form:no-auth`: set authentication on externally exposed Form Triggers; note internal-only use in the notes.
+- [ ] `tls:allow-unauthorized-certs`: keep TLS certificate checks on; use https for non-local addresses.
+- [ ] `exec:execute-command`, `exec:ssh`: prefer alternatives to Execute Command and SSH nodes; if used, note why.
+- [ ] `file:rw-access`: prefer alternatives to local file read/write nodes; if used, confine paths and note why.
+- [ ] `header:hardcoded-authorization`: use credentials instead of a literal Authorization header value.
+- [ ] `approval:destructive-needs-gate`: put a human approval step before destructive or money-moving actions (pattern: `examples/templates/human-approval-gate`).
+- [ ] `error:no-handling`: give external calls `onError` handling or an Error Workflow; use backoff for retries; avoid silent failures.
+- [ ] `ai:agent-no-guardrails`: pass an externally facing AI Agent's input and output through the native Guardrails node (`@n8n/n8n-nodes-langchain.guardrails`) instead of a hand-written Code node.
+- [ ] `ai:agent-code-tool`: prefer not to attach arbitrary-code tools to an Agent; use least-privilege tools; suggest human approval for side-effect tools; treat external text as untrusted; limit iterations and cost.
+- [ ] `data:pii-minimization`: keep personal data minimal; avoid real data in `pinData` or sticky notes; keep secrets and personal data out of logs.
+
+### Scan and annotations
+
+Before delivery run `node scripts/security-scan.mjs <workflow.json>` and report the output honestly, as information and recommendations. Rules with no scanner coverage are recorded as "cannot be checked automatically yet", not as passed. Write the references, the recommendations (this checklist's statuses) and the scan result into the Layer 3 note and the relevant node notes, and put only a summary in the conversation; the order and format are defined in [`spec/references-disclosure.md`](../../../spec/references-disclosure.md) Chapter 4 (scan in Chapter 8) and are not repeated here. Guardrails reduce risk; they do not make a workflow secure, and the annotations should not claim otherwise.
 
 ## Security review
 
@@ -213,9 +246,11 @@ Workflows whose risk profile demands monitoring but ship without it must publish
 
 - [ ] Trust boundaries and sensitive data are documented.
 - [ ] Auth, authorization, injection, webhook, secret, file, AI-agent, and audit controls were reviewed.
+- [ ] Each guardrail rule ID in [`spec/security-guardrails.md`](../../../spec/security-guardrails.md) has a status in the "Recommendations" block of the Layer 3 note (adopted / user chose not to adopt / not applicable / cannot be checked automatically yet).
 - [ ] Findings have evidence, severity, status, owner, and target version.
 - [ ] Unresolved risks are disclosed in `SECURITY-CAVEATS.md`.
 - [ ] Workflow sticky-note version and repository changelog were updated.
+- [ ] The Layer 3 note's "Change log" section has a row for this change (recommendation; a missing one only draws `notes:missing-change-log`, see [`spec/sticky-note-three-layer.md`](../../../spec/sticky-note-three-layer.md) §4.4). The scanner's other reminder-only rules, `egress:external-domain` and `impact:high-impact-node`, are reported in the scan result for the approver ([`spec/security-guardrails.md`](../../../spec/security-guardrails.md) 2.13 to 2.15).
 - [ ] Reviewed JSON maps to a Git commit SHA and n8n release tag.
 - [ ] CI validation and rollback evidence exist.
 - [ ] Deployment decision is PASS, CONDITIONAL, or BLOCKED.

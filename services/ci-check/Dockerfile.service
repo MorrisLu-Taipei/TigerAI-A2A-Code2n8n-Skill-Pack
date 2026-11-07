@@ -1,0 +1,28 @@
+# 檢查服務映像（靜態檢查服務與動態檢查前端共用同一個映像）：官方 n8n 映像（內含 node 與 tini）加上 Pack 的服務與檢查腳本。
+# 建置（以 Pack 根目錄為 context，不需要網路，也不安裝任何額外套件；基底映像要先存在本機）：
+#   docker build -f services/ci-check/Dockerfile.service --build-arg N8N_VERSION=2.44.6 -t p0-ci-service:test .
+# 啟動哪一個服務由 command 決定（ENTRYPOINT 固定為 tini + node）：
+#   靜態：  /opt/pack/services/ci-check/static-service.mjs   （HOST=0.0.0.0 PORT=8801 WORK_ROOT=<tmpfs>）
+#   動態前端：/opt/pack/services/ci-check/dynamic-front.mjs   （HOST=0.0.0.0 PORT=8802 DYN_ROOT=<共享目錄>）
+# 映像內程式一律 root 擁有、唯讀；執行時只寫 WORK_ROOT／DYN_ROOT／TMPDIR，請以 --read-only 搭配 tmpfs 或 volume 執行。
+ARG N8N_VERSION=2.44.6
+FROM docker.n8n.io/n8nio/n8n:${N8N_VERSION}
+
+USER root
+COPY --chmod=0644 VERSION /opt/pack/VERSION
+COPY --chmod=0644 docs/node-versions/ /opt/pack/docs/node-versions/
+COPY --chmod=0644 scripts/ci/ /opt/pack/scripts/ci/
+COPY --chmod=0644 scripts/security-scan.mjs scripts/native-first-check.mjs /opt/pack/scripts/
+COPY --chmod=0644 scripts/review/build-input.mjs scripts/review/validate-review.mjs /opt/pack/scripts/review/
+COPY --chmod=0644 services/ci-check/static-service.mjs services/ci-check/dynamic-front.mjs services/ci-check/dynamic-result.mjs services/ci-check/review-api.mjs services/ci-check/shared.mjs /opt/pack/services/ci-check/
+# 目錄需要可進入；檔案只讀，服務（node 使用者）不能改自己的程式
+RUN find /opt/pack -type d -exec chmod 0755 {} + && chown -R root:root /opt/pack
+
+ENV PACK_ROOT=/opt/pack \
+    HOST=0.0.0.0 \
+    NODE_ENV=production
+USER node
+WORKDIR /opt/pack
+EXPOSE 8801 8802
+ENTRYPOINT ["tini", "--", "node"]
+CMD ["/opt/pack/services/ci-check/static-service.mjs"]

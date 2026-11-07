@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "summary": "混合案例：有合格也有不合格的建議。",
+  "suggestions": [
+    {
+      "id": "S1",
+      "category": "maintainability",
+      "node": null,
+      "text": "節點命名可以更一致，方便日後維護。",
+      "basis": "maintainability",
+      "severity": "info"
+    },
+    {
+      "id": "S2",
+      "category": "other",
+      "node": null,
+      "text": "請參考 https://example.invalid/guide 的說明。",
+      "basis": "other",
+      "severity": "info"
+    },
+    {
+      "id": "S3",
+      "category": "blocker",
+      "node": null,
+      "text": "類別不在列舉內。",
+      "basis": "other",
+      "severity": "info"
+    },
+    {
+      "id": "S4",
+      "category": "other",
+      "node": null,
+      "text": "長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長長",
+      "basis": "other",
+      "severity": "info"
+    },
+    {
+      "id": "S5",
+      "category": "maintainability",
+      "node": null,
+      "text": "錯誤處理可以集中到一個 Error Workflow。",
+      "basis": "error:no-handling",
+      "severity": "info"
+    }
+  ],
+  "referencesUsed": [],
+  "notReviewed": []
+}

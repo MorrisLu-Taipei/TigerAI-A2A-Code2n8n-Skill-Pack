@@ -6,13 +6,18 @@ When validation warnings are acceptable and how to handle them.
 
 ## What Are False Positives?
 
-**Definition**: Validation warnings that are technically "issues" but acceptable in your specific use case.
+**Definition**: A validation warning that flags a real trade-off but is acceptable in your specific use case — not something the validator got *wrong*.
 
-**Key insight**: Not all warnings need to be fixed!
+**Key insight**: Not every warning needs a fix, but the reason has changed (n8n-mcp ≥ 2.63.0).
 
-Many warnings are context-dependent:
-- ~40% of warnings are acceptable in specific use cases
-- Using `ai-friendly` profile reduces false positives by 60%
+The validator used to emit a large family of *genuine* false positives — warnings and even hard errors on configurations that run fine in production (template literals inside expressions, optional chaining, omitted-operation defaults, the Webhook → Respond-to-Webhook pattern, IF/Filter legacy shapes, and more). Those have been fixed at the source. The validator no longer flags them at all. A few new ones have surfaced since; they're listed, with strict conditions, under [Known false positives and blind spots](#known-false-positives-and-blind-spots-n8n-mcp-2850).
+
+What remains is not noise-to-suppress but **context-dependent advice**. Every warning you now see falls into one of two buckets:
+
+- **Security and deprecation warnings** — surfaced under *every* profile (`minimal` through `strict`). Treat these as real.
+- **Best-practice advisories** — error-handling suggestions, rate-limit notes, outdated-`typeVersion` suggestions, `cachedResultName` advice, long-chain hints. These surface **only under `ai-friendly` and `strict`**. `minimal` and `runtime` never emit them.
+
+So the practical question is no longer "is this a false positive?" but "does this best-practice advisory apply to *my* workflow?" The per-case guidance below (error handling, retries, rate limiting, unbounded queries, input validation, credentials) is exactly that judgement call.
 
 ---
 
@@ -20,19 +25,19 @@ Many warnings are context-dependent:
 
 ### ✅ Good Practice
 ```
-1. Run validation with 'runtime' profile
+1. Validate with 'runtime' (errors + security/deprecation only)
 2. Fix all ERRORS
-3. Review each WARNING
-4. Decide if acceptable for your use case
-5. Document why you accepted it
+3. Run 'ai-friendly' or 'strict' to surface best-practice advisories
+4. Review each advisory against your use case (this document)
+5. Document why you accepted the ones you skip
 6. Deploy with confidence
 ```
 
 ### ❌ Bad Practice
 ```
-1. Ignore all warnings blindly
-2. Use 'minimal' profile to avoid warnings
-3. Deploy without understanding risks
+1. Ignore security and deprecation warnings
+2. Treat every 'strict' advisory as a mandatory fix (or as noise to blank-ignore)
+3. Deploy without reading the errors
 ```
 
 ---
@@ -41,14 +46,16 @@ Many warnings are context-dependent:
 
 ### 1. Missing Error Handling
 
-**Warning**:
+**Warning** (surfaces under `ai-friendly` / `strict` only):
 ```json
 {
-  "type": "best_practice",
-  "message": "No error handling configured",
-  "suggestion": "Add continueOnFail: true and retryOnFail: true"
+  "type": "warning",
+  "nodeName": "HTTP Request",
+  "message": "HTTP Request node without error handling. Consider adding \"onError: 'continueRegularOutput'\" for non-critical requests or \"retryOnFail: true\" for transient failures."
 }
 ```
+
+This is never a hard error — error-handling *style* does not block execution or activation (n8n-mcp ≥ 2.63.0). Under `minimal` and `runtime` you will not see it at all.
 
 #### When Acceptable
 
@@ -119,18 +126,18 @@ Many warnings are context-dependent:
 }
 ```
 
-**Fix**:
+**Fix** (modern `onError`, set at node level):
 ```javascript
 {
+  "onError": "continueRegularOutput",  // or wire "continueErrorOutput" to a real handler
+  "retryOnFail": true,                 // maxTries defaults to 3 — no need to state it
   "parameters": {
-    "query": "INSERT INTO orders...",
-    "continueOnFail": true,
-    "retryOnFail": true,
-    "maxTries": 3,
-    "waitBetweenTries": 1000
+    "query": "INSERT INTO orders..."
   }
 }
 ```
+
+> Prefer `onError` over the legacy `continueOnFail: true` — the validator flags `continueOnFail` as deprecated and n8n's UI no longer surfaces it cleanly. And note: if you set `onError: 'continueErrorOutput'` you must wire the node's error output (`main[1]`) to a handler, or failed items are silently dropped — the validator warns about exactly that (n8n-mcp ≥ 2.63.0).
 
 **❌ Critical Integrations**
 ```javascript
@@ -528,49 +535,42 @@ Many warnings are context-dependent:
 
 ### Strategy 1: Progressive Strictness
 
-**Development**:
+The profiles are cumulative — each surfaces everything the lower one does, plus more (n8n-mcp ≥ 2.63.0). Move up the ladder as a workflow gets closer to production.
+
+**While editing** — fast, errors only:
 ```javascript
-validate_node({
-  nodeType: "nodes-base.slack",
-  config,
-  profile: "ai-friendly"  // Fewer warnings during development
-})
+validate_node({ nodeType: "nodes-base.slack", config, profile: "runtime" })
+// errors + security/deprecation warnings; no best-practice advisories
 ```
 
-**Pre-Production**:
+**Before deploying** — surface the advisories you may want to act on:
 ```javascript
-validate_node({
-  nodeType: "nodes-base.slack",
-  config,
-  profile: "runtime"  // Balanced validation
-})
+validate_node({ nodeType: "nodes-base.slack", config, profile: "ai-friendly" })
+// adds error-handling suggestions, rate-limit notes, outdated-typeVersion suggestions
 ```
 
-**Production Deployment**:
+**Hardening a critical workflow** — the full lint:
 ```javascript
-validate_node({
-  nodeType: "nodes-base.slack",
-  config,
-  profile: "strict"  // All warnings, review each one
-})
+validate_node({ nodeType: "nodes-base.slack", config, profile: "strict" })
+// everything ai-friendly emits, plus "property won't be used" leftover checks
 ```
 
 ### Strategy 2: Profile by Workflow Type
 
 **Quick Automations**:
-- Profile: `ai-friendly`
-- Accept: Most warnings
-- Fix: Only errors + security warnings
+- Profile: `runtime`
+- See: errors + security/deprecation warnings
+- Fix: errors; skip best-practice advisories you don't need
 
 **Business-Critical Workflows**:
 - Profile: `strict`
-- Accept: Very few warnings
-- Fix: Everything possible
+- See: every advisory
+- Fix: errors, security, and any advisory that applies to a production path
 
 **Integration Testing**:
 - Profile: `minimal`
-- Accept: All warnings (just testing connections)
-- Fix: Only errors that prevent execution
+- See: only errors that would stop execution
+- Fix: those errors; everything else is out of scope while wiring connections
 
 ---
 
@@ -634,67 +634,59 @@ When accepting a warning, document why:
 
 ---
 
-## Known n8n Issues
+## Known false positives and blind spots (n8n-mcp 2.85.0)
 
-### Issue #304: IF Node Metadata Warning
+Verified against a live n8n 2.38.5 instance and reported upstream. When a fix ships, the linked
+issue closes. Re-check before relying on this list.
 
-**Warning**:
-```json
-{
-  "type": "metadata_incomplete",
-  "message": "IF node missing conditions.options metadata",
-  "node": "IF"
-}
-```
+### False positives
 
-**Status**: False positive for IF v2.2+
+| Validator says | Reality | What to do |
+|---|---|---|
+| **ERROR** "Incorrect error output configuration. Nodes "X" appear to be error handlers but are in main[0]…" | A name/type heuristic: fires when `main[0]` fans out and a target is `respondToWebhook`, `emailSend`, or has *error / fail / catch / exception* in its name | **Only when** the message matches exactly **and** you've inspected `connections` and confirmed X is on the success path by design (e.g. Respond to Webhook next to a "Save Order" node): keep the wiring, **don't** move X to `main[1]` or add `continueErrorOutput` (the webhook would answer only on failure), and say in your reply that you're ignoring #1111 and why. Don't run `n8n_autofix_workflow` with default fix types on it; exclude `error-output-config`. Renaming the node clears the name-based variant. Every other `valid: false` error still gets fixed. [n8n-mcp#1111](https://github.com/czlonkowski/n8n-mcp/issues/1111) |
+| Warning "Possible missing $ prefix for variable (e.g., use $json instead of json)" | The check reads inside string literals, e.g. the JMESPath query `"[?json.country=='PL'].json.name"` over `.all()` items, where `json.` is required | Ignore it for words inside quotes. [#1115](https://github.com/czlonkowski/n8n-mcp/issues/1115) |
+| `validate_node` → "Code cannot be empty" (`jsCode`) on a Code node with `language: "pythonNative"` | `validate_node` doesn't recognize `pythonNative`, the only Python option in n8n 2.x | Validate the workflow (`validate_workflow` / `n8n_validate_workflow`) instead. [#1112](https://github.com/czlonkowski/n8n-mcp/issues/1112) |
+| Python "Return value must be a list of dicts" for `return {"count": …}` in Run Once for All Items | Native Python auto-wraps a single dict into one item | Accept, or return `[{"json": {...}}]` to silence it. [#1113](https://github.com/czlonkowski/n8n-mcp/issues/1113) |
 
-**Why it occurs**: Auto-sanitization adds metadata, but validation runs before sanitization
+### Blind spots — validates clean, breaks at runtime
 
-**What to do**: Ignore - metadata is added on save
+- **JS errors inside `{{ }}`** (TypeError on a missing path, `JSON.parse` on bad input, a thrown
+  `Error`) resolve to `null` and the execution stays green. A Filter/IF with such a condition
+  drops every item. See **n8n-expression-syntax** → Debugging.
+- **`$jmespath` mistakes inside expressions**: `country=="PL"` (→ `[]`), a bare number
+  `revenue > 100000`, or `and` instead of `&&` (→ `null`). Only Code-node source is checked.
+  [#1114](https://github.com/czlonkowski/n8n-mcp/issues/1114)
+- **Native Python Code nodes**: legacy `_input`/`_json`/`_node`/`_now`, `item.json.x` dot access,
+  any import not on the instance allowlist, `class`, `type()`/`getattr()`, dunder access,
+  `global` inside a function, and a list returned in each-item mode.
+  [#1113](https://github.com/czlonkowski/n8n-mcp/issues/1113), see **n8n-code-python**.
 
-### Issue #306: Switch Branch Count
+For all three the cure is the same: a real test execution, then look at the output **values**,
+not just the status.
 
-**Warning**:
-```json
-{
-  "type": "configuration_mismatch",
-  "message": "Switch has 3 rules but 4 output connections",
-  "node": "Switch"
-}
-```
+---
 
-**Status**: False positive when using "fallback" mode
+## What the validator no longer flags
 
-**Why it occurs**: Fallback creates extra output
+Earlier versions of this guide listed "known n8n issues" to ignore. Those false positives are gone at the source (n8n-mcp ≥ 2.63.0) — the validator simply does not emit them anymore, so there is nothing to recognize or suppress. If you are on an older server and still see them, upgrading is the fix. Among the classes that no longer fire:
 
-**What to do**: Ignore if using fallback intentionally
+- **Template literals inside expressions** — `` ={{ `https://api/${$json.id}` }} `` is valid; n8n's engine evaluates full modern JS (template literals, optional chaining `?.`) inside `{{ }}`.
+- **Omitted `operation` on multi-resource nodes** (Gmail, Telegram, Slack, Google Drive, Discord, Notion, …) — no longer produces a fabricated "Invalid value for 'operation'" error. The genuine missing *required* field (e.g. a channel) is still flagged.
+- **The Webhook → Respond-to-Webhook pattern** — needs no `onError`; n8n auto-returns a 500 if a node fails before the Respond node.
+- **IF / Filter / Switch v1 legacy shapes** — the native `conditions.{string|number|boolean}` shape validates correctly; `combinator` and `conditions.options` are optional (n8n defaults them); unary operators don't need `singleValue`.
+- **Optional chaining, string-keyed bracket access** (`$json['some-prop']`), fields named `test`/`null`/`undefined`, `this.helpers` usage, regex `$` anchors, and bare-object returns in `runOnceForAllItems` mode.
 
-### Issue #338: Credential Validation in Test Mode
-
-**Warning**:
-```json
-{
-  "type": "credentials_invalid",
-  "message": "Cannot validate credentials without execution context"
-}
-```
-
-**Status**: False positive during static validation
-
-**Why it occurs**: Credentials validated at runtime, not build time
-
-**What to do**: Ignore - credentials are validated when workflow runs
+One precise caveat on template literals: they only evaluate **inside `{{ }}`**. A bare backtick string written as a plain field value (no `{{ }}`) is literal text — n8n evaluates only `{{ }}`, everything else is passed through verbatim.
 
 ---
 
 ## Summary
 
 ### Always Fix
-- ❌ Security warnings
+- ❌ Security warnings (surface under every profile)
 - ❌ Hardcoded credentials
 - ❌ SQL injection risks
-- ❌ Production workflow errors
+- ❌ Any error (`valid: false`). These block activation, except the known false-positive errors listed above: check that table before "fixing" a correct workflow
 
 ### Usually Fix
 - ⚠️ Error handling (production)
@@ -708,12 +700,11 @@ When accepting a warning, document why:
 - ✅ Rate limiting (low volume)
 - ✅ Query limits (small datasets)
 
-### Always Acceptable
-- ✅ Known n8n issues (#304, #306, #338)
-- ✅ Auto-sanitization warnings
-- ✅ Metadata completeness (auto-fixed)
+### Not a fix at all — advice, not defects
+- ✅ Best-practice advisories under `ai-friendly` / `strict` that don't apply to your workflow (weigh them per-case using this document)
+- ✅ Outdated-`typeVersion` suggestions when your version is older-but-supported (that is normal n8n behavior)
 
-**Golden Rule**: If you accept a warning, document WHY.
+**Golden Rule**: If you accept an advisory, document WHY.
 
 **Related Files**:
 - **[SKILL.md](SKILL.md)** - Main validation guide

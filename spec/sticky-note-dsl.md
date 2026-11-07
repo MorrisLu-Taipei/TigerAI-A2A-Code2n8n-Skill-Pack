@@ -166,9 +166,13 @@
 | `error` | `n8n-nodes-base.errorTrigger` | `@trigger: error` (建立全域錯誤處理 workflow) |
 | `telegram` | `n8n-nodes-base.telegramTrigger` | `@trigger: telegram bot 收到訊息` |
 | `slack` | `n8n-nodes-base.slackTrigger` | `@trigger: slack 訊息事件` |
-| `discord` | `n8n-nodes-base.discordTrigger` | `@trigger: discord` |
+| `discord` | `n8n-nodes-base.webhook`（n8n 沒有原生 Discord 觸發節點，見下方註） | `@trigger: discord` |
 | `googleDrive` | `n8n-nodes-base.googleDriveTrigger` | `@trigger: googleDrive 新檔案` |
 | `executeWorkflow` | `n8n-nodes-base.executeWorkflowTrigger` | `@trigger: executeWorkflow` (sub-workflow 入口) |
+
+> **節點是否存在，以 [`docs/node-versions/`](../docs/node-versions/README.md) 為準**：上表的節點 type 在 2.37.3、2.44.6、2.46.6 三版的節點目錄都查得到，只有 `discord` 例外。
+>
+> **Discord 觸發**：這三版的節點目錄都查不到 `n8n-nodes-base.discordTrigger`，n8n 沒有原生的 Discord 觸發節點。AI 遇到 `@trigger: discord` 時，改產 `n8n-nodes-base.webhook`，由使用者的 Discord 機器人或中繼服務把事件轉送到該 Webhook URL，並在 Layer 3 寫明「n8n 沒有原生 Discord 觸發節點，事件需自行轉送」。（在 2.46.6 實際試過：API 可以建立含 `discordTrigger` 的 workflow，但啟用時回 `Unrecognized node type`。）社群套件提供的觸發節點（社群範本裡出現過 `n8n-nodes-discord-trigger`）不在原生目錄，AI 不預設使用，使用者明確要求時須在 Layer 3 標示風險。要「發送」訊息到 Discord，則用 `n8n-nodes-base.discord`（見 §4.3）。
 
 ---
 
@@ -216,7 +220,7 @@
 ### 4.5 檔案
 | 關鍵字 | 推論節點 |
 |---|---|
-| 「存暫存」、「寫檔」 | `writeBinaryFile` / `readWriteFile` |
+| 「存暫存」、「寫檔」 | `readWriteFile`（`writeBinaryFile` 在 2.37.3、2.44.6、2.46.6 的節點目錄都標為隱藏，新 workflow 不用） |
 | 「FastAPI Worker」、「呼叫 worker」 | `httpRequest` (TigerAI 慣例) |
 
 ---
@@ -265,7 +269,7 @@
 3. **Resolve**：依第 3、4 章詞彙表把 value 對應到 node type。
 4. **Disambiguate**：模糊時取詞彙表第一個 match；同時記錄到 Layer 3「節點選型/可能的替代」。
 5. **Generate**：建立 nodes + connections，套 `position.y` 區間（見 `sticky-note-three-layer.md`）。
-6. **Annotate**：填寫 Layer 3 sticky note。
+6. **Annotate**：填寫 Layer 3 sticky note，含「修改記錄」段（新建的第一列寫「建立」，修改既有 workflow 就新增一列，規則見 `sticky-note-three-layer.md` §4.4；缺少只提醒，不阻擋）。
 
 ### 6.1 跨節點變數引用 gotcha（**最常踩坑**）
 
@@ -306,7 +310,7 @@ n8n 的 `$json` 在每個節點都會被**前一節點的輸出覆蓋**。當下
 |---|---|
 | 「寫入 console」、「印 log」 | `noOp` 節點 + Layer 3 註明「n8n 無 console，請看 execution log」 |
 | 「忽略錯誤」、「靜默失敗」 | 在會失敗的節點設 `continueOnFail=true` |
-| 「清理檔案」、「rm -rf」、「刪暫存」 | 用 `executeCommand` 節點（若 host 啟用）或 Layer 3 註明「需另建 cleanup workflow」 |
+| 「清理檔案」、「rm -rf」、「刪暫存」 | 這三版的節點目錄都查不到 `executeCommand`，不要產出。改在 Layer 3 註明「需另建 cleanup 機制」，或用 `httpRequest` 呼叫 Worker 的清理端點；`ssh` 節點存在但屬高風險節點，使用前先依 [`security-guardrails.md`](security-guardrails.md) 評估 |
 | 「等 N 分鐘後重做」 | `wait` 節點 + 後續同樣節點重執行 |
 | 「發送系統通知」（無指定服務） | `slack` 預設；若無 credential → `gmail`；若皆無 → `httpRequest` 任意 webhook |
 | 找不到任何對應 | **拒絕生成** + 在 Layer 3 列出「歧義動作」要使用者澄清 |

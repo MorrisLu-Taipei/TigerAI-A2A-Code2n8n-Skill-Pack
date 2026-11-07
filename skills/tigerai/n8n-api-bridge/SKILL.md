@@ -7,6 +7,10 @@ description: Standard SOP for reading and writing n8n workflows via the n8n REST
 
 > 🌐 [English](SKILL.en.md) | **繁體中文**
 
+> **受限 Agent 模式（Portal）：寫入與啟用停用。**
+> 宿主在系統提示或工作階段上下文放了標記 `[PORTAL-RESTRICTED-AGENT-MODE v1]` 時（格式與規則見 [`spec/agent-restricted-mode.md`](../../../spec/agent-restricted-mode.md)），本 Skill 的 `POST`／`PUT`／`PATCH`／`DELETE`、`activate`／`deactivate` 與直接 SQL **全部停用**；不使用 `N8N_API_URL`／`N8N_API_KEY`，也不自行組 HTTP 請求。讀取（列出、讀 workflow、看 execution）只能經宿主提供的唯讀工具（名稱以宿主為準）；§4.2 的合併寫回、§4.3 的冪等寫回、§7 的範例一律不執行，改為只輸出 workflow JSON，由宿主負責寫入。沒有標記時，本檔全文照舊。
+> 這段文字只是提示；真正的強制是宿主的工具白名單與環境設定（Agent 環境不放 n8n 金鑰、不開通往 n8n 的網路）。
+
 ## 1. 觸發條件
 
 **精確**：
@@ -49,8 +53,7 @@ curl -H "X-N8N-API-KEY: $N8N_API_KEY" "$N8N_API_URL/api/v1/workflows?limit=1"
 | 列 workflow | `GET /api/v1/workflows` |
 | 讀 workflow | `GET /api/v1/workflows/{id}` |
 | 建 workflow | `POST /api/v1/workflows` |
-| 改 workflow（局部）| `PATCH /api/v1/workflows/{id}` |
-| 全量替換 | `PUT /api/v1/workflows/{id}` |
+| 改 workflow | `PUT /api/v1/workflows/{id}`（body 必須含 `name`、`nodes`、`connections`、`settings`；**公開 API 不支援 `PATCH`，回 405**，2.37.3 / 2.44.6 / 2.46.6 實測） |
 | 啟用 | `POST /api/v1/workflows/{id}/activate` |
 | 停用 | `POST /api/v1/workflows/{id}/deactivate` |
 | 刪 | `DELETE /api/v1/workflows/{id}` |
@@ -110,8 +113,9 @@ await updateFull(id, merged);
 | 401 | API key 失效 | 提示使用者重新產 key |
 | 403 | 權限不足 | 提示需要 owner/admin role |
 | 404 | workflow 不存在 | 提示確認 ID |
-| 409 | 衝突（並發修改） | 重讀 + 重 merge + 重寫 |
-| 422 | JSON schema 不合 | 回報具體欄位，由 AI 依錯誤訊息修正後重 PUT |
+| 400 | JSON schema 不合、節點設定缺漏、缺憑證、節點類型已棄用 | 回報具體欄位，由 AI 依錯誤訊息修正後重 PUT（實測不合格的 PUT 回 400，不是 422） |
+| 405 | 呼叫了不支援的方法（例如 `PATCH`） | 改用 `PUT` 全量替換 |
+| 409 | 衝突（並發修改，或 webhook 路徑已被其他啟用中的 workflow 使用） | 重讀 + 重 merge + 重寫；webhook 衝突則改 `path` |
 | 5xx | n8n 端錯誤 | 指數退避 retry 3 次（1s/2s/4s） |
 | timeout | 大 workflow | 增 timeout 至 60s 重試 |
 

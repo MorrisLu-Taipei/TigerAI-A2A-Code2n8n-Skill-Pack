@@ -9,7 +9,7 @@ Complete reference for n8n's built-in JavaScript functions and helpers.
 n8n Code nodes provide powerful built-in functions beyond standard JavaScript. This guide covers:
 
 1. **Sandbox restrictions** - What's blocked and why (READ FIRST)
-2. **$helpers.httpRequest()** - Make HTTP requests
+2. **this.helpers.httpRequest()** - Make HTTP requests (the bare `$helpers` global is undefined in the task runner)
 3. **DateTime (Luxon)** - Advanced date/time operations
 4. **$jmespath()** - Query JSON structures
 5. **$getWorkflowStaticData()** - Persistent storage
@@ -26,8 +26,8 @@ Since n8n v2.0, Code nodes execute inside a **task runner sandbox** (`JsTaskRunn
 
 ```javascript
 // ❌ BLOCKED — throws UnsupportedFunctionError
-await $helpers.httpRequestWithAuthentication.call(this, 'credType', { ... });
-await $helpers.requestWithAuthenticationPaginated.call(this, { ... }, 'credType');
+await this.helpers.httpRequestWithAuthentication.call(this, 'credType', { ... });
+await this.helpers.requestWithAuthenticationPaginated.call(this, { ... }, 'credType');
 ```
 
 n8n's source comment explains why: *"these rely on checking the credentials from the current node type (Code Node), and Code Node doesn't have credentials."* There is **no env var to re-enable them** in the task runner — the deny-list is compiled-in (`packages/@n8n/task-runner/src/runner-types.ts`).
@@ -53,18 +53,20 @@ Built-in modules need `N8N_RUNNERS_ALLOWED_BUILT_IN_MODULES` (or legacy `NODE_FU
 
 ### What's always safe
 
-`$input.*`, `$json`, `$node[…]`, `$helpers.httpRequest()` (without auth), `$jmespath()`, `$getWorkflowStaticData()`, `DateTime` (Luxon), and all standard JavaScript globals (`Math`, `JSON`, `Object`, `Array`, `console`, `Buffer`, `URL`, `URLSearchParams`).
+`$input.*`, `$json`, `$node[…]`, `this.helpers.httpRequest()` (without auth), `$jmespath()`, `$getWorkflowStaticData()`, `DateTime` (Luxon), and all standard JavaScript globals (`Math`, `JSON`, `Object`, `Array`, `console`, `Buffer`, `URL`, `URLSearchParams`).
+
+> **Accessor gotcha**: the bare `$helpers` global is **undefined** in the task-runner sandbox — `$helpers.httpRequest()` throws `ReferenceError: $helpers is not defined`. The working accessor is **`this.helpers.httpRequest()`** (inside a nested async function where `this` is lost, call it as `await fn.call(this, ...)`). The n8n-mcp validator may wrongly suggest `$helpers` — ignore it. And for anything beyond a trivial unauthenticated GET (pagination, retries, credentials), prefer the **HTTP Request node** and keep Code nodes for pure logic.
 
 ---
 
-## 1. $helpers.httpRequest() - HTTP Requests
+## 1. this.helpers.httpRequest() - HTTP Requests
 
-Make HTTP requests directly from Code nodes without using HTTP Request node.
+Call an API from inside Code logic, for example one lookup per step of a recursive algorithm. A plain API call, paging, retries or credentials belong in the HTTP Request node. The accessor is `this.helpers.httpRequest()` — the bare `$helpers` global is undefined in the task-runner sandbox and throws `ReferenceError: $helpers is not defined`. For non-trivial calls (pagination, retries, credentials) prefer the HTTP Request node.
 
 ### Basic Usage
 
 ```javascript
-const response = await $helpers.httpRequest({
+const response = await this.helpers.httpRequest({
   method: 'GET',
   url: 'https://api.example.com/users'
 });
@@ -75,7 +77,7 @@ return [{json: {data: response}}];
 ### Complete Options
 
 ```javascript
-const response = await $helpers.httpRequest({
+const response = await this.helpers.httpRequest({
   method: 'POST',  // GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
   url: 'https://api.example.com/users',
   headers: {
@@ -102,7 +104,7 @@ const response = await $helpers.httpRequest({
 
 ```javascript
 // Simple GET
-const users = await $helpers.httpRequest({
+const users = await this.helpers.httpRequest({
   method: 'GET',
   url: 'https://api.example.com/users'
 });
@@ -112,7 +114,7 @@ return [{json: {users}}];
 
 ```javascript
 // GET with query parameters
-const results = await $helpers.httpRequest({
+const results = await this.helpers.httpRequest({
   method: 'GET',
   url: 'https://api.example.com/search',
   qs: {
@@ -135,7 +137,7 @@ return [{json: results}];
 // $env access is enabled on this instance. See section 0.
 const apiToken = $input.first().json.apiToken;  // passed in from a credential-aware upstream node
 
-const newUser = await $helpers.httpRequest({
+const newUser = await this.helpers.httpRequest({
   method: 'POST',
   url: 'https://api.example.com/users',
   headers: {
@@ -156,7 +158,7 @@ return [{json: newUser}];
 
 ```javascript
 // Update resource
-const updated = await $helpers.httpRequest({
+const updated = await this.helpers.httpRequest({
   method: 'PATCH',
   url: `https://api.example.com/users/${userId}`,
   body: {
@@ -172,7 +174,7 @@ return [{json: updated}];
 
 ```javascript
 // Delete resource
-await $helpers.httpRequest({
+await this.helpers.httpRequest({
   method: 'DELETE',
   url: `https://api.example.com/users/${userId}`,
   headers: {
@@ -189,7 +191,7 @@ return [{json: {deleted: true, userId}}];
 
 ```javascript
 // Bearer Token (token came from a previous node, not $env)
-const response = await $helpers.httpRequest({
+const response = await this.helpers.httpRequest({
   url: 'https://api.example.com/data',
   headers: {
     'Authorization': `Bearer ${$input.first().json.token}`
@@ -199,7 +201,7 @@ const response = await $helpers.httpRequest({
 
 ```javascript
 // API Key in Header (key came from a previous node, not $env)
-const response = await $helpers.httpRequest({
+const response = await this.helpers.httpRequest({
   url: 'https://api.example.com/data',
   headers: {
     'X-API-Key': $input.first().json.apiKey
@@ -211,7 +213,7 @@ const response = await $helpers.httpRequest({
 // Basic Auth (manual)
 const credentials = Buffer.from(`${username}:${password}`).toString('base64');
 
-const response = await $helpers.httpRequest({
+const response = await this.helpers.httpRequest({
   url: 'https://api.example.com/data',
   headers: {
     'Authorization': `Basic ${credentials}`
@@ -224,7 +226,7 @@ const response = await $helpers.httpRequest({
 ```javascript
 // Handle HTTP errors gracefully
 try {
-  const response = await $helpers.httpRequest({
+  const response = await this.helpers.httpRequest({
     method: 'GET',
     url: 'https://api.example.com/users',
     simple: false  // Don't throw on 4xx/5xx
@@ -255,7 +257,7 @@ try {
 
 ```javascript
 // Get full response including headers and status
-const response = await $helpers.httpRequest({
+const response = await this.helpers.httpRequest({
   url: 'https://api.example.com/data',
   resolveWithFullResponse: true
 });
@@ -466,6 +468,28 @@ return [{
 
 Query and transform JSON structures using JMESPath syntax.
 
+> **Consider an expression first.** `$jmespath` works the same inside `{{ }}`, so a query that only
+> feeds one field rarely needs a Code node. See **n8n-expression-syntax** → `$jmespath()`.
+
+### Rules that bite (verified on n8n 2.38)
+
+- **Argument order is `$jmespath(object, query)`**, the reverse of JMESPath's own docs
+  (`search(query, data)`). Reversed, or given a string/`undefined` as the object, it throws
+  `expected two arguments (Object, string) for this function`.
+- **String literals take single quotes** (`tier == 'premium'`), so wrap the query in a JS
+  **double-quoted** string. `"premium"` in double quotes inside the query is a *field name* and
+  silently returns `[]`.
+- **Numbers and booleans take backticks** (`` age >= `18` ``, `` inStock == `true` ``). A bare
+  `18` is a parse error.
+- Use `&&` `||` `!` `==`, not `and` / `or` / `=`.
+- **Over `$input.all()` items**, include the wrapper (`[?json.age >= \`18\`].json.name`) or map
+  first: `$jmespath($input.all().map(i => i.json), '[?age >= \`18\`].name')`.
+- **Parse errors throw in a Code node**, but the message comes out garbled by the task runner:
+  `Cannot assign to read only property 'name' of object 'Error: Invalid token (Number): "18"'`.
+  If you see that, check the query's literals first. (Inside `{{ }}` the same error silently
+  yields `null` instead.)
+- Missing path → `null`; filter with no match → `[]`.
+
 ### Basic Queries
 
 ```javascript
@@ -498,7 +522,7 @@ const emails = $jmespath(data, 'users[*].contact.email');
 const simplified = $jmespath(data, 'users[*].{name: name, email: contact.email}');
 
 // Conditional filtering
-const premium = $jmespath(data, 'users[?subscription.tier == `premium`]');
+const premium = $jmespath(data, "users[?subscription.tier == 'premium']");
 
 return [{json: {top5, emails, simplified, premium}}];
 ```
@@ -719,7 +743,7 @@ return [{
 
 ### crypto Module
 
-> **Gated**: `require('crypto')` only works if `N8N_RUNNERS_ALLOWED_BUILT_IN_MODULES` (or legacy `NODE_FUNCTION_ALLOW_BUILTIN`) includes `crypto` (or is `*`). On default installs it throws "Cannot find module 'crypto'". For hashing you control, prefer doing it before reaching the Code node, or — if you must — verify your instance's config first.
+> **Gated**: `require('crypto')` only works if `N8N_RUNNERS_ALLOWED_BUILT_IN_MODULES` (or legacy `NODE_FUNCTION_ALLOW_BUILTIN`) includes `crypto` (or is `*`). On default installs it throws "Cannot find module 'crypto'". For hashing, HMAC, signing or UUIDs use the **Crypto node** instead (typeVersion 2; HMAC and signing secrets come from a `crypto` credential) — no allowlist needed. Use `require('crypto')` only for what the Crypto node can't do, and only after confirming the instance allows it.
 
 ```javascript
 const crypto = require('crypto');
@@ -790,8 +814,8 @@ return [{
 - ❌ Any other npm package
 
 **Authentication helpers are blocked** in the task runner sandbox (see section 0):
-- ❌ `$helpers.httpRequestWithAuthentication`
-- ❌ `$helpers.requestWithAuthenticationPaginated`
+- ❌ `this.helpers.httpRequestWithAuthentication`
+- ❌ `this.helpers.requestWithAuthenticationPaginated`
 
 **Conditionally blocked** (depends on instance config):
 - ⚠️ `$env.*` — blocked when `N8N_BLOCK_ENV_ACCESS_IN_NODE=true`
@@ -800,24 +824,24 @@ return [{
 **Workarounds**:
 - HTTP with auth → HTTP Request node with credential attached, or sub-workflow pattern
 - Secrets → arrive as data from an upstream HTTP Request / credential-aware node
-- Hashing/crypto → do it in a service the workflow calls, or get your instance config updated
+- Hashing/crypto → the Crypto node (hash, HMAC, sign, UUID), no allowlist needed
 
 ---
 
 ## Summary
 
 **Most Useful Built-ins**:
-1. **$helpers.httpRequest()** - API calls without HTTP Request node
+1. **this.helpers.httpRequest()** - API calls inside Code logic; a plain call belongs in the HTTP Request node (the bare `$helpers` global is undefined)
 2. **DateTime** - Professional date/time handling
 3. **$jmespath()** - Complex JSON queries
 4. **Math, JSON, Object, Array** - Standard JavaScript utilities
 
 **Common Patterns**:
-- API calls: Use $helpers.httpRequest()
+- API calls: Use this.helpers.httpRequest() (or, preferably, the HTTP Request node)
 - Date operations: Use DateTime (Luxon)
-- Data filtering: Use $jmespath() or JavaScript .filter()
+- Data filtering: a Filter node before the Code node; inside Code, $jmespath() or .filter()
 - Persistent data: Use $getWorkflowStaticData()
-- Hashing: Use crypto module
+- Hashing: the Crypto node; `require('crypto')` only if allowlisted
 
 **See Also**:
 - [SKILL.md](SKILL.md) - Overview

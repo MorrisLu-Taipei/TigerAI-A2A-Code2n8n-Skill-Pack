@@ -1,0 +1,136 @@
+{
+  "name": "官網留言轉 Slack",
+  "nodes": [
+    {
+      "id": "s-l1",
+      "name": "使用者需求摘要",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -260
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 560,
+        "height": 200,
+        "content": "### 使用者需求摘要\n官網表單打 webhook，留言貼到 Slack 客服頻道，快速回 200。"
+      }
+    },
+    {
+      "id": "n1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "contact-to-slack-g04",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "webhookId": "00000000-0000-4000-8000-000000000004",
+      "notes": "建議 webhook:no-auth：建議加標頭認證，避免被亂打（尚未能自動檢查）。目前 credentialMap 沒有可用的標頭憑證。"
+    },
+    {
+      "id": "n2",
+      "name": "Build message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "text",
+              "type": "string",
+              "value": "={{ \"新留言：\" + $json.body.message }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        600,
+        0
+      ],
+      "parameters": {
+        "authentication": "accessToken",
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#客服"
+        },
+        "text": "={{ $json.text }}",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "name": "corp-slack-bot"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Slack 失敗時不阻斷回應。"
+    },
+    {
+      "id": "s-l3",
+      "name": "AI 實作說明",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        700
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 560,
+        "height": 520,
+        "content": "### 🤖 AI 實作說明 — 官網留言轉 Slack\n\n**參考來源**\n- 沒有參考外部範本，依需求與 Pack 內建規格設計\n- 骨架與統計知識：research/patterns.md §2 webhook-fire\n- 原廠／社群 Skill：無\n- 目標 n8n 版本：2.44.6（使用者提供）\n- 參考方式：只參考做法，已用目前版本節點重新建構\n\n**建議事項**\n- `webhook:no-auth`：使用者選擇不採用（沒有提供認證憑證，建議日後補上）\n- `error:no-handling`：已採用（Slack 節點失敗時繼續）\n- 不適用：form:no-auth、exec:ssh\n- `native-first:code-node`：已採用（未使用 Code 節點）\n- 以上皆為建議，最終決定在使用者；建議不等於安全\n\n**資安掃描結果**\n- 未執行資安掃描：由宿主檢查\n\n**所需 Credentials**\n- [ ] Slack API：`corp-slack-bot`（節點：Post to Slack）\n\n**已知限制**\n- 參數名稱未經查證\n- 頻道名稱為示意"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Build message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build message": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

@@ -1,0 +1,168 @@
+{
+  "name": "每日營運數字寄信",
+  "nodes": [
+    {
+      "id": "s-l1",
+      "name": "使用者需求摘要",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -260
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 560,
+        "height": 200,
+        "content": "### 使用者需求摘要\n每天九點從內部 API 取昨天的營運數字，整理成表格寄信。"
+      }
+    },
+    {
+      "id": "n1",
+      "name": "Every day 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n2",
+      "name": "Get daily numbers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        300,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.example.invalid/daily",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "internal-api-header"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "notes": "網址是佔位，請改成內部 API 的實際位址。"
+    },
+    {
+      "id": "n3",
+      "name": "Build table",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        600,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "html",
+              "type": "string",
+              "value": "=<table><tr><th>項目</th><th>數字</th></tr>{{ Object.entries($json).map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join(\"\") }}</table>"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Send email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        900,
+        0
+      ],
+      "parameters": {
+        "fromEmail": "reports@example.invalid",
+        "toEmail": "owner@example.invalid",
+        "subject": "昨日營運數字",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "credentials": {
+        "smtp": {
+          "name": "corp-smtp"
+        }
+      }
+    },
+    {
+      "id": "s-l3",
+      "name": "AI 實作說明",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        700
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 560,
+        "height": 520,
+        "content": "### 🤖 AI 實作說明 — 每日營運數字寄信\n\n**參考來源**\n- 沒有參考外部範本，依需求與 Pack 內建規格設計\n- 骨架與統計知識：research/patterns.md §2 schedule\n- 原廠／社群 Skill：無\n- 目標 n8n 版本：2.44.6（使用者提供）\n- 參考方式：只參考做法，已用目前版本節點重新建構\n\n**建議事項**\n- `error:no-handling`：已採用（API 呼叫失敗時繼續並重試）\n- `network:http-cleartext`：不適用（使用 https）\n- 不適用：webhook:no-auth、form:no-auth\n- `native-first:code-node`：已採用（未使用 Code 節點）\n- 以上皆為建議，最終決定在使用者；建議不等於安全\n\n**資安掃描結果**\n- 未執行資安掃描：由宿主檢查\n\n**所需 Credentials**\n- [ ] HTTP Header Auth：`internal-api-header`（節點：Get daily numbers）\n- [ ] SMTP：`corp-smtp`（節點：Send email）\n\n**已知限制**\n- 參數名稱未經查證\n- API 網址與收件人為佔位，需使用者補上\n- API 失敗時信件內容會是空表格，請確認通知需求"
+      }
+    }
+  ],
+  "connections": {
+    "Every day 09:00": {
+      "main": [
+        [
+          {
+            "node": "Get daily numbers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get daily numbers": {
+      "main": [
+        [
+          {
+            "node": "Build table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build table": {
+      "main": [
+        [
+          {
+            "node": "Send email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

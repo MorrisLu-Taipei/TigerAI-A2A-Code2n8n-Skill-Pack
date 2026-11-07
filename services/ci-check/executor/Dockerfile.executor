@@ -1,0 +1,17 @@
+# 動態檢查執行器映像：官方 n8n 映像加上 Pack 的檢查腳本與一個 job 一次的驅動程式。
+# 建置（以 Pack 根目錄為 context，不需要網路，也不安裝任何額外套件）：
+#   docker build -f services/ci-check/executor/Dockerfile.executor --build-arg N8N_VERSION=2.44.6 -t p0-ci-executor:2.44.6 .
+# 執行旗標（--network none、唯讀根檔案系統、tmpfs、cap-drop ALL 等）見 services/ci-check/README.md。
+ARG N8N_VERSION=2.44.6
+FROM docker.n8n.io/n8nio/n8n:${N8N_VERSION}
+
+USER root
+COPY --chmod=0644 scripts/ci/ /opt/ci/scripts/ci/
+COPY --chmod=0644 docs/node-versions/ /opt/ci/docs/node-versions/
+COPY --chmod=0644 services/ci-check/executor/executor-loop.mjs /opt/ci/executor-loop.mjs
+# 目錄需要可進入；檔案只讀，執行器（node 使用者）不能改自己的程式
+RUN find /opt/ci -type d -exec chmod 0755 {} + && chown -R root:root /opt/ci
+
+USER node
+WORKDIR /opt/ci
+ENTRYPOINT ["tini", "--", "node", "/opt/ci/executor-loop.mjs"]

@@ -1,0 +1,32 @@
+{
+  "name": "reminder no layer3",
+  "settings": {},
+  "connections": {},
+  "nodes": [
+    {
+      "id": "user-intent",
+      "name": "User intent",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "color": 4,
+        "content": "## 流程意圖\n@trigger: webhook POST /order"
+      }
+    },
+    {
+      "id": "manual",
+      "name": "Manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    }
+  ]
+}

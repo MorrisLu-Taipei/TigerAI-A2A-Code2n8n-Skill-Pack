@@ -1,4 +1,4 @@
-# Sticky Note Three-Layer Structure Spec v1.0
+# Sticky Note Three-Layer Structure Spec v1.1
 
 > 🌐 **English** | [繁體中文](sticky-note-three-layer.md)
 
@@ -69,7 +69,9 @@ Every Layer 1 sticky must contain at least one DSL block. Minimal parsable examp
 ### 3.1 Rules
 - All non-sticky-note nodes belong to this layer
 - `position.y` between `0` and `500`
-- Each node's `notes` field is **required**: one-line mapping to Layer 1's `@step` or `@trigger`
+- A node's `notes` field is written **only for non-obvious settings**, and says why the node is configured that way (see [`references-disclosure.en.md`](references-disclosure.en.md) Chapter 7); obvious nodes are left empty.
+- **Recommendations about the node are written here too** (security recommendations, native-first, why a Code node was used instead of a native node, and so on): one short line using the rule ID; the form is in §4.4 of [`references-disclosure.en.md`](references-disclosure.en.md). Again, only when a reminder is useful.
+- The mapping from nodes to Layer 1 `@step` / `@trigger` is not carried by per-node `notes`. The Layer 3 note carries it through "Node choices" and "Mapped to user requirements" (see §4.2). When a node's `notes` happens to need to say which `@step` it implements, it may do so in passing.
 - `connections` must be complete with no orphan nodes
 
 ### 3.2 Mapping rules
@@ -102,6 +104,17 @@ Every Layer 1 sticky must contain at least one DSL block. Minimal parsable examp
 ```markdown
 ### 🤖 AI implementation notes — <matching Layer 1 block name>
 
+**References**
+- <one line per category; the form, and the wording for "no external template", are in §4.3 of references-disclosure.en.md>
+
+**Recommendations**
+- `<rule ID>`: <Adopted / User chose not to adopt / Cannot be checked automatically yet> (<one-line note, optional>)
+- Not applicable: `<rule ID>`, `<rule ID>`
+- (when there are no recommendations the whole block reads "Recommendations: none")
+
+**Security scan result**
+- <rule name> @ <node name> (<error/warning/acknowledged>); with no hits write "no rule hits found"; format in §8.3 of references-disclosure.en.md
+
 **Node choices**
 - `<node-type>`: rationale (why not alternatives)
 
@@ -120,13 +133,54 @@ Every Layer 1 sticky must contain at least one DSL block. Minimal parsable examp
 - <e.g., No retry implemented; if API fails, will fail directly>
 
 **Mapped to user requirements**
-- @trigger: ... / @step: ...
+- List every Layer 1 `@trigger` / `@step` / `@on-error` and the node (by node name) that implements it: `@step: ...` -> `<node name>`
+
+**Change log**
+| Date | Change summary | Proposed by | Reason |
+|---|---|---|---|
+| <YYYY-MM-DD> | Created | <User or AI> | <reason> |
 ```
+
+The "References", "Recommendations" and "Security scan result" blocks sit right after the title in a fixed order. Their content rules, status names, the conciseness rules for notes and the JSON-string rules **all follow Chapter 4 of [`references-disclosure.en.md`](references-disclosure.en.md)** and are not repeated here. These three blocks are the **official record** of recommendations and information; the conversation carries only a summary. With several Layer 3 notes, they go in the leftmost one. The "Change log" at the end of the template is a required section; its rules are in §4.4.
 
 ### 4.3 Why mandatory?
 - Users understand what decisions AI made without reading code
 - Future maintainers (not necessarily AI) get a handover doc
 - When something breaks, distinguish "AI misread the requirement" vs "the requirement itself was flawed"
+
+### 4.4 Change log (required section; a missing one only draws a reminder)
+
+The Layer 3 note gains a required section, "**Change log**", placed at the end of the template (with several Layer 3 notes it sits on the same note as "References", "Recommendations" and "Security scan result", that is, the leftmost one). It lets the approver and later maintainers see the history inside the workflow itself; after export a workflow is separated from Git, so the history cannot live in Git alone.
+
+Format: a table or a list, with four items per row.
+
+| Field | Content |
+|---|---|
+| Date | `YYYY-MM-DD` |
+| Change summary | One sentence on what was done; the first row of a new workflow always reads "Created" |
+| Proposed by | "User" or "AI" |
+| Reason | Why the change was made (one sentence) |
+
+Example (a table; a list such as `- 2026-11-07 Created (AI, first version from the requirements)` works too):
+
+```markdown
+**Change log**
+| Date | Change summary | Proposed by | Reason |
+|---|---|---|---|
+| 2026-11-07 | Created | AI | First version from the Layer 1 requirements |
+| 2026-11-08 | Added an error-handling branch | User | Operations must be notified on failure |
+```
+
+Usage rules:
+
+1. **New workflow**: the first row is "Created".
+2. **Changing an existing workflow** (whether the user asked or the AI fixed something on its own): **a row must be added**; only add, never rewrite or delete older rows, newest at the bottom. When the workflow already has a Layer 3 note (§7 item 3), keep the existing change log after an overwrite and add one row.
+3. **No secrets**: no keys, tokens, passwords, internal addresses, personal data or full commands; the summary says what changed, without pasting parameter values.
+4. **Proposed by** is only "User" or "AI"; when the user asked the AI to make the change, write "User".
+5. The date is the day of the change; if unsure of today's date, ask the user instead of inventing one.
+6. **This is a recommendation only**: a missing "Change log" section, or the heading with no row of data, only draws a scanner reminder (`notes:missing-change-log`, severity `info`, see [`security-guardrails.en.md`](security-guardrails.en.md) 2.15); it never blocks and never fails a check. If the user does not want it, follow the user's decision; a `guardrail-ack: notes:missing-change-log` line in node notes records that they know.
+7. **How the scanner recognizes it**: a heading of "修改記錄" (or "修改紀錄"), `Change log` or `Changelog`, with at least one row under it containing a `YYYY-MM-DD` date. With no Layer 3 note at all, this rule does not repeat the reminder.
+8. **Whether the log matches the real change** cannot be judged inside the Pack (it needs a comparison with the previous version); the pipeline compares at pull-request level (the AI reviewer raises suggestions, criterion C7 of [`agent-reviewer-mode.en.md`](agent-reviewer-mode.en.md), still a reminder only). So the AI writes the log honestly and does not add a row that does not match the real change just to quiet the reminder.
 
 ---
 
@@ -172,7 +226,7 @@ When AI parses a workflow, in these cases **must refuse and report**:
 
 1. No color=4 sticky note found → "no requirement input"
 2. Layer 1 DSL parse fails (no `@trigger`) → "requirement format invalid"
-3. color=5 sticky already exists in same workflow → "workflow already AI-processed; overwrite?" (need user confirm)
+3. color=5 sticky already exists in same workflow → "workflow already AI-processed; overwrite?" (need user confirm; on overwrite keep the existing "Change log" and add one row, see §4.4)
 
 ---
 
@@ -206,13 +260,13 @@ When AI parses a workflow, in these cases **must refuse and report**:
   "parameters": {
     "color": 5,
     "width": 400,
-    "height": 280,
-    "content": "### 🤖 AI implementation notes\n\n**Node choices**\n- `webhook`: maps to @trigger\n- `if`: validate amount\n- `googleSheets`: append mode\n\n**Required credentials**\n- [ ] Google Sheets OAuth2\n\n**Test recipe**\n1. POST valid amount → should write\n2. POST amount=-1 → should be blocked by if"
+    "height": 420,
+    "content": "### 🤖 AI implementation notes\n\n**References**\n- No external template was consulted; designed from the requirements and the Pack's built-in spec.\n- Skeleton and statistics knowledge: research/patterns.md §2.1 webhook-api\n- Official/community Skills: none\n- Target n8n version: unspecified (exercised range in docs/n8n-version-compat.md)\n\n**Recommendations**\n- `secret:hardcoded`: Adopted (Google Sheets credentials are referenced through n8n credentials)\n- `webhook:no-auth`: User chose not to adopt\n- `native-first:code-node`: Adopted (no Code nodes used)\n- Not applicable: form:no-auth, exec:ssh\n\n**Security scan result**\n- Rule-based scan (does not mean there are no other risks): 0 hits, 1 acknowledged\n  - `webhook:no-auth` @ Webhook (acknowledged)\n\n**Node choices**\n- `webhook`: maps to @trigger\n- `if`: validate amount\n- `googleSheets`: append mode\n\n**Required credentials**\n- [ ] Google Sheets OAuth2\n\n**Test recipe**\n1. POST valid amount → should write\n2. POST amount=-1 → should be blocked by if\n\n**Change log**\n| Date | Change summary | Proposed by | Reason |\n|---|---|---|---|\n| 2026-11-07 | Created | AI | First version from the Layer 1 requirements |"
   }
 }
 ```
 
 ---
 
-**Version**: v1.0
-**Status**: spec locked. All cookbook / DSL / Skills derive from this file.
+**Version**: v1.1
+**Status**: spec locked. All cookbook / DSL / Skills derive from this file. The v1.1 Layer 3 template adds the "References", "Recommendations" and "Security scan result" blocks, defined in Chapter 4 of [`references-disclosure.en.md`](references-disclosure.en.md). Later addition (ADR-014): the Layer 3 template gains a required "Change log" section (§4.4); a missing one only draws a reminder.

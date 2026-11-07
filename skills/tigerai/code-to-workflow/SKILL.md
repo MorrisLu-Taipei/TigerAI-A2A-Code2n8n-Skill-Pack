@@ -17,6 +17,17 @@ This skill encodes the methodology proven by the three case studies in this pack
 
 Read at least one before using this skill — they are the empirical ground truth behind every step below.
 
+## Restricted Agent mode (Portal)
+
+> Check for the host marker `[PORTAL-RESTRICTED-AGENT-MODE v1]` (system prompt or session context; rules in [`spec/agent-restricted-mode.en.md`](../../../spec/agent-restricted-mode.en.md)). **No marker: this Skill applies as written. Marker present: the adjustments below override the steps they name.** This text is only a hint; real enforcement is the host's tool allowlist, and the Skill's behavior here is "comply with the host's restrictions".
+
+- **Scope**: the Agent only outputs workflow JSON (Layer 3 note and node `notes` included). It does not write files, commit, push, import into n8n, or activate. Input is what the user pastes or what host read-only tools return (names per the host); do not clone or fetch on your own.
+- **Step 1.5 (security audit)**: still runs as analysis. Put the findings in the Layer 3 note and the conversation; do not write a `SECURITY-CAVEATS.md` file.
+- **Step 5 (workflow design)**: unchanged, except credentials. Reference only names from the host's `credentialMap`. No `STUB-` fake credentials and no invented names. A needed credential that is not in the map gets no `credentials` field, and "Administrator must create: type=..., suggested name=..." goes into the node `notes` and the Layer 3 "Credentials to be added".
+- **Step 6 (3-layer funnel)**: Layer 2 (local n8n REST import roundtrip, `_n8n_import_test.mjs`) is **not available**; the Agent has no n8n access and no shell. Use the host's static check tool as the substitute, at most N rounds (set by the host), and say plainly that Layer 2 and Layer 3 are pending. The line "do not declare done until Layer 1 + 2 both pass" means here: do not claim done, passed, or ready; restate the host's result as it is.
+- **Step 7 (documentation outputs) and hard rule 7**: no document files are written; `active` stays `false`. Put the essentials (portability verdict, known gaps, credentials needed) in the Layer 3 note, and offer longer SDD-style text in the conversation only if the user asks.
+- **Closing blocks**: the security scan result is a faithful restatement of the host's check result, or "Security scan not run: <reason>".
+
 ## When to trigger
 
 | The user says... | Means trigger this skill |
@@ -142,6 +153,8 @@ Build the workflow with **n8n native nodes by default**, HTTP Request only when 
 2. APIs with no native n8n node at all (LINE Messaging API, Google Gemini at the moment).
 3. Multi-resource batch operations where the native node would require 5+ chained nodes when 1 HTTP call does the same.
 
+**Native-first applies to Code nodes too.** Before creating nodes, run the gate in Section 6 of [`spec/native-first.en.md`](../../../spec/native-first.en.md): list every step you were about to write as a Code node, run each through expression -> Edit Fields -> native node -> Code, and keep Code only for what remains. This matters most here, because ported source code is full of loops and helper functions that look like Code nodes but are usually Summarize, Aggregate, Merge, Filter, Remove Duplicates or HTTP Request pagination. Every Code node that stays carries a "Why Code" line in its `notes` and short comments in its code.
+
 **Mark every HTTP fallback with a 🟡 sticky note explaining why** — it's the difference between "I lazily reached for HTTP" and "this is the only correct path." The Google Workspace example has 3 sticky-noted HTTP fallbacks; everything else is native.
 
 ### Step 6 — 3-layer validation funnel
@@ -179,6 +192,13 @@ Every Code2n8n port ships with these documents. They are not optional — they a
 | `TODO.md` | What was *not* finished, decision points, scope deferrals | LINE CS cloud has the model TODO |
 
 Every preserved data item (subfolder names, sheet headers, default rows, dropdown choices) **goes into PROVENANCE.md with the upstream line number**, pinned to a specific commit SHA. This is the difference between "we ported it" and "we ported it and can prove it."
+
+## After completion: references, recommendations and scan result
+
+- **Where this happens**: at the end of Step 7, for every workflow the port produced. From Step 1 on, log each source that was actually read and affected the design (a case-study example you modelled the architecture on, `research/` sections, sibling or vendored Skills, n8n.io templates the user agreed to look up). The code being ported is a different thing: it is credited in `CREDITS.md` / `PROVENANCE.md` (Step 7), not here.
+- **Change log**: every workflow's Layer 3 note carries a "Change log" section ([`spec/sticky-note-three-layer.md`](../../../spec/sticky-note-three-layer.md) §4.4; a recommendation, a missing one only draws a scanner reminder). A newly ported workflow starts with one row reading "Created" (proposed by "AI", the reason naming the ported project, no secrets); when you change an existing workflow later, add one row and never rewrite older rows. Date format `YYYY-MM-DD`; never put keys, tokens, passwords, internal addresses or personal data in it. Whether the log matches the real change is compared by the pipeline at pull-request level (later work).
+- Write the references, recommendations and scan result into each workflow's Layer 3 note and the relevant node notes, and put only a summary in the conversation. Order, format, statuses and honesty rules follow Chapter 4 of [`spec/references-disclosure.en.md`](../../../spec/references-disclosure.en.md) (scan in Chapter 8) and are not repeated here.
+- Run `node scripts/security-scan.mjs <workflow.json>` on each final workflow JSON before delivery and put the result in the note; it complements the Step 6 static lint and does not replace it. The 🟡 sticky note for every HTTP fallback (Step 5) stays.
 
 ## Real-world gotchas catalogue
 

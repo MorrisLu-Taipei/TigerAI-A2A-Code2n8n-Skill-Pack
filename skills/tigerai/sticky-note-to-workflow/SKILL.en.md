@@ -7,10 +7,25 @@ description: Core skill that converts a Layer 1 Sticky Note (DSL-formatted user 
 
 > 🌐 **English** | [繁體中文](SKILL.md)
 
+## Restricted Agent mode (Portal)
+
+> First check whether the host placed the marker `[PORTAL-RESTRICTED-AGENT-MODE v1]` (in the system prompt or session context; format and full rules in [`spec/agent-restricted-mode.en.md`](../../../spec/agent-restricted-mode.en.md)). **No marker: this Skill applies as written (single-machine mode). Marker present: the adjustments below apply and override the rest of this file.** This text is only a hint; real enforcement is the host's tool allowlist, and in this mode the Skill's behavior is "comply with the host's restrictions".
+
+| Where | Adjustment in restricted mode |
+|---|---|
+| §2 input (existing workflow ID) | Do not go through `n8n-api-bridge`; read only with read-only tools provided by the host (names per the host); if none, ask the user to paste the JSON |
+| Step 4 (top-level fields) | `active` is always `false` |
+| **Step 4.2** | **Becomes "reference the credentialMap only"**: use only credential names from the host's `credentialMap`, copied character for character; a node writes only `{ "<type>": { "name": "<name>" } }` and **never `credentials.id`** (the host fills in the id server-side from the name, and flags a credential as missing and reports it when no match is found); **`STUB-` fake credentials and any invented name are forbidden**; for a needed credential that is not in the map, the node gets no `credentials` field, and its `notes` and the Layer 3 "Credentials to be added" state "Administrator must create: type=..., suggested name=...". Connection-type triggers are handled the same way, with a reminder that only an administrator activates |
+| Step 6 (Layer 3) | Add a "Credentials to be added" list beside "Required credentials" and tell the user that CI will fail until the credentials exist, which is expected and correct |
+| **Step 7** | **Becomes "do not write to n8n, output JSON only"**: no PUT, no activation; call the host's static check tool instead, apply legitimate fixes for blocking codes, at most N rounds (set by the host, starting at 3); if it still fails, hand the reasons to the user faithfully |
+| Step 8 (closing blocks) | "Security scan result" is a faithful restatement of the host's check result (rule names and node names only); if it did not run, write "Security scan not run: <reason>" |
+| §5 output format, §7 conversation rules | Do not put `passed` in `metadata.validation`; use the host precheck's own wording (for example "no blocking codes", "not prechecked"); never say "passed", "safe", "ready to deploy", "activated" or "imported" |
+| §8 chaining | No write-back through `n8n-api-bridge`; the product goes to the host's draft flow |
+
 ## 1. Trigger conditions
 
 **Explicit triggers**:
-- "build the workflow" / "generate it" / "产 workflow" / "produce workflow"
+- "build the workflow" / "generate it" / "產 workflow" / "produce workflow"
 - User pastes a sticky note draft containing `@trigger:` `@step:` etc. OR plain natural language
 
 **Implicit triggers**:
@@ -68,7 +83,7 @@ Echo in user's original language (don't show DSL).
 - **Failure**: missing `@trigger` or `@step` → if NL path, return to Step 0.1 to retranslate (warn user); if DSL path, refuse and ask for completion
 
 ### Step 2: Pick skeleton
-- Compare against `research/patterns.md` §2 seven Patterns (A–G)
+- Compare against the 14 skeletons in `research/patterns.md` §2 (`webhook-api`, `schedule`, `batch-loop`, ...; names are in that section's overview table); the decision flow is in §5 of that file
 - Highest match wins; ties → simpler one
 - Record "why X over Y" → write to Layer 3 "Node choices"
 
@@ -77,8 +92,16 @@ Echo in user's original language (don't show DSL).
   1. Apply DSL §4 vocabulary mapping
   2. If not found → check `research/node-frequency.md` Top 30 + AI knowledge base
   3. Still not found → DSL §6.2 "downgrade rule"
-- For `@trigger`: apply DSL §3 dictionary (v1.1+ has telegram/slack/discord/googleDrive)
+- For `@trigger`: apply DSL §3 dictionary (v1.1+ has telegram/slack/googleDrive; `discord` has no native trigger node, so the dictionary maps it to Webhook, see the note in DSL §3)
 - For `@branch`: produce `switch` node + multiple outputs; auto-add fallback if missing
+
+### Step 3.5: Native-first
+
+Before creating nodes (Step 4), run the gate in Section 6 of [`spec/native-first.en.md`](../../../spec/native-first.en.md); do not leave it until afterwards:
+
+- List the steps you plan to do with Code, run each through the decision order (expression -> Edit Fields -> native node -> Code), and go native wherever possible; the job-to-node table is in Section 3 of that spec.
+- The DSL §4 vocabulary table maps "aggregate, statistics" and "custom code" to `code`; do not adopt that blindly, run the gate first.
+- For each Code node that remains, write one "Why Code" line in `notes` and add short comments in the code (Section 5 of that spec).
 
 ### Step 4: Generate nodes array
 - Each node fields:
@@ -87,12 +110,14 @@ Echo in user's original language (don't show DSL).
     "id": "<unique>",
     "name": "<ASCII-only-PascalCase>",
     "type": "<typeFromMapping>",
-    "typeVersion": <latest stable>,
+    "typeVersion": <target version's default; latest when default is null>,
     "position": [x, y],
     "parameters": { ... },
-    "notes": "<maps to which Layer 1 @step>"
+    "notes": "<write only for non-obvious settings, explaining why they are set this way; leave obvious nodes empty>"
   }
   ```
+- Always look up `type` and `typeVersion` in the lookup tables of [`docs/node-versions/`](../../../docs/node-versions/README.md) for the target n8n version: a `type` missing from the catalog cannot be used, nodes with `deprecated` or `hidden` set to `true` are not used in new workflows, and the version number is `default` (`latest` when `default` is null); never carry over numbers from another version
+- Write node `notes` per Chapter 7 of [`spec/references-disclosure.en.md`](../../../spec/references-disclosure.en.md); a recommendation about that node (security, native-first) is also written here as one short line (§4.4); the trace back to Layer 1 is carried by the Layer 3 "Mapping to user requirements" block
 - `position.y` strictly enforces three-layer zones: Layer 1 sticky < 0; Layer 2 nodes ∈ [0, 500]; Layer 3 sticky > 600
 - `position.x` increments 220–260px per node by execution order
 
@@ -121,6 +146,8 @@ function safeWebhookNodeName(s) { return s.replace(/[^A-Za-z0-9]/g, ''); }
 - "`webhookId` auto-generated as `<uuid>`; webhook URL is `https://<n8n>/webhook/<configured-path>`"
 - If node was renamed, list before/after for human maintainers
 
+> **Restricted Agent mode (Portal)**: with the marker, this whole step does not apply; it becomes "reference the credentialMap only, write the name and never `credentials.id`, no `STUB-`". See "Restricted Agent mode (Portal)" above.
+
 ### Step 4.2: Activation-friendly design (v0.9.0 R3 enforced)
 
 n8n has two-tier credential validation: activate checks ref exists; execute checks DB. To allow immediate activation (even before user configures real credentials), AI MUST add stub credentials for **non-connection action nodes**:
@@ -144,7 +171,7 @@ n8n has two-tier credential validation: activate checks ref exists; execute chec
 | `n8n-nodes-base.telegram` (action) | `telegramApi` |
 
 **Connection-type triggers (CANNOT use stubs)**:
-- `telegramTrigger`, `emailReadImap`, `slackTrigger`, `discordTrigger`, etc.
+- `telegramTrigger`, `emailReadImap`, `slackTrigger`, etc. (n8n has no native `discordTrigger`; see the note in DSL §3)
 - AI MUST use ⚠️ red-flagged warning in Layer 3: "real credential required in n8n before activate"
 - Stubs cause activate to fail (n8n calls real API to verify token)
 
@@ -170,12 +197,31 @@ Same n8n instance can't have 2 active workflows sharing `webhook + path`. When g
   4. Test recipe (≥ 2 cases: golden + error)
   5. Known limits
   6. Mapping to user requirements (each @trigger / @step / @output / @on-error)
-- Apply anti-pattern check (patterns.md §3) — if any triggers, add to "Known limits"
+  7. **Change log** (last; rules under "Using the change log" below; a missing one only draws a scanner reminder and never blocks)
+- Apply anti-pattern check (`research/patterns.md` §3) — if any triggers, add to "Known limits"
+- Per Chapter 4 of [`spec/references-disclosure.en.md`](../../../spec/references-disclosure.en.md), add the "References", "Recommendations" and "Security scan result" blocks right after the title (see Step 8); these three blocks are the official record of recommendations and information
+
+**Using the change log** (full spec in [`spec/sticky-note-three-layer.en.md`](../../../spec/sticky-note-three-layer.en.md) §4.4; a recommendation, not a requirement):
+
+- Format: a table or a list; each row has a date (`YYYY-MM-DD`), a change summary, who proposed it ("User" or "AI") and the reason.
+- **New workflow**: the first row reads "Created".
+- **Changing an existing workflow** (whether the user asked or the AI fixed something on its own): **add one row** to the change log of the existing Layer 3 note; only add, never rewrite or delete older rows. If an older note has no change log, add the "Change log" section first and then this row; do not invent earlier history.
+- **No secrets**: no keys, tokens, passwords, internal addresses, personal data or full commands; say what changed, without pasting parameter values.
+- The date is the day of the change; ask the user if unsure instead of inventing one. Keep the log honest: do not write something that does not match the real change just to avoid the reminder.
+- The scanner's `notes:missing-change-log` only reminds (severity `info`); if the user does not want it, follow that, optionally with `guardrail-ack: notes:missing-change-log` in node notes. Whether the log matches the real change cannot be judged inside the Pack; the pipeline compares at pull-request level (later work).
+
+> **Restricted Agent mode (Portal)**: with the marker, this step does not write to n8n and only outputs JSON. See "Restricted Agent mode (Portal)" above.
 
 ### Step 7: Validate
 - Via `n8n-api-bridge` Skill, PUT JSON back to n8n (n8n runs built-in schema validation)
 - 422 → AI self-fixes per error message → re-PUT
 - Still fails → report to user with specific issues
+
+### Step 8: After completion: references, recommendations and scan result
+
+- **Log as you go**: from Step 0 on, record every source that was actually read and affected the design in the "reference log" (Step 2 skeleton choice and Step 3 node resolution add the most).
+- **Where this happens**: write it into the Layer 3 note in Step 6; after Step 7 and before delivery, run the security scan on the final workflow JSON and update the note with the result (if the JSON changes again, rescan the final version).
+- Write the references, recommendations and scan result into the Layer 3 note and the relevant node notes, and put only a summary in the conversation. Order, format, statuses and honesty rules follow Chapter 4 of [`spec/references-disclosure.en.md`](../../../spec/references-disclosure.en.md) (scan in Chapter 8) and are not repeated here; the content rules of the recommendations are in [`spec/security-guardrails.en.md`](../../../spec/security-guardrails.en.md) and [`spec/native-first.en.md`](../../../spec/native-first.en.md).
 
 ---
 
@@ -199,7 +245,7 @@ Returns JSON:
   "success": true,
   "workflow": { "name": "...", "nodes": [...], "connections": {...}, "settings": {...} },
   "metadata": {
-    "skeleton_pattern": "B",
+    "skeleton_pattern": "webhook-api",
     "node_count": 11,
     "layer3_warnings": ["missing @on-error; suggested mode B"],
     "downgraded_actions": [],

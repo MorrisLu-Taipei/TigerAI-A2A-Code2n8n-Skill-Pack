@@ -9,6 +9,19 @@ description: End-to-end Code2n8n Path B auto-pilot. Auto-activates when the user
 >
 > 本 SKILL 是 Code2n8n Path B 的 end-to-end pipeline 自動化規格。當使用者丟一個 MIT GitHub 專案進來、要求自動化完成 Path B 的全套流程（從 Inventory 到上架），AI **必須**依本 SKILL 的 12 階段、main/critic 雙 agent 架構執行。
 
+## 受限 Agent 模式（Portal）
+
+> 先看宿主有沒有放標記 `[PORTAL-RESTRICTED-AGENT-MODE v1]`（系統提示或工作階段上下文；規則見 [`spec/agent-restricted-mode.md`](../../../spec/agent-restricted-mode.md)）。**沒有標記：本 Skill 全文照舊。有標記：下列調整優先於本檔其他內容。** 這段文字只是提示，真正的強制在宿主的工具白名單；本 Skill 在此模式下的行為是「符合宿主的限制」。
+
+本管線依賴 git、shell、`live-roundtrip.mjs`、對 n8n 的 import 與 activate，以及 main/critic 雙 agent；受限 Agent 沒有這些能力。因此在受限模式：
+
+- **只支援縮減版**：依使用者貼來的內容或宿主唯讀工具讀到的內容，做 Stage 1–3 的分析與 Stage 5 的 workflow JSON 產出。**完整的 12 階段請在單機模式（沒有標記）執行**，並如實告訴使用者「受限模式下本管線無法完整執行」。不降級成自我審查（§5 第 3 條不變）。
+- **Stage 4（寫程式與檔案）、Stage 6–9（需要 shell、腳本與 n8n）**：不執行；以宿主的靜態檢查工具代替結構檢查，最多 N 輪（宿主設定），並說明 Layer 2 與執行期檢查尚未做。
+- **Stage 10（Activate to n8n）**：**停用**，不 import、不 activate、不產生 `ACTIVATION-LOG.md`；寫入由宿主處理，啟用只由 n8n 管理員執行。
+- **Stage 11（完工報告）**：不寫成檔案，不簽 sign-off；§1.6 的字詞規則照舊，不得宣稱「已通過」「安全」「可部署」「已啟用」。
+- **憑證**：只引用宿主提供的 `credentialMap` 內的名稱；禁止 `STUB-` 假憑證與杜撰名稱；缺的憑證寫進 Layer 3「待補憑證」。
+- **收尾區塊**：資安掃描結果是宿主檢查結果的如實轉述，沒執行就寫「未執行資安掃描：<原因>」。
+
 ## 1. 啟動條件
 
 **自動觸發 — 任一情境即啟動，不需使用者特地說 SKILL 名字**：
@@ -406,6 +419,8 @@ v0.36.0 SEC-017 修補 commit `456c311` 之後，本 SKILL 的 critic gate 會�
 
 - **Main 動作**：套 [`examples/templates/`](../../../examples/templates/) 三個模板（retry-with-backoff / human-approval-gate / handover-trace），加上案例特定 workflow（入口 webhook / scheduler / 對帳 / 月結 / failover）。
 - **Artefact**：`<case-dir>/workflows/*.workflow.json`。
+- **原生節點優先**：產生 workflow 前先依 [`spec/native-first.md`](../../../spec/native-first.md) 第 6 章過一次閘門（列出打算用 Code 的步驟 → 運算式 → Edit Fields → 原生節點 → 才用 Code）。保留的 Code 節點，`notes` 寫「為什麼用 Code」一行並加程式註解；§1.7 的 `[TEST]` 測試注入節點屬正當用途，但仍計入 Code 節點數（理由寫「測試注入，預設停用」）。
+- **Critic gate（原生節點優先）**：每個 Code 節點是否都有 notes 理由？能用 Summarize／Aggregate／Merge／Filter／Crypto／XML／HTTP Request 分頁等原生節點處理的，是否仍被寫成 Code？
 - **Critic gate**：是否套 v0.28.0 HTTP `fullResponse: true`、`$execution.resumeUrl`、`responseNode` 固定 schema、`Asia/Taipei` (或對應 tz)、`Convert to File`？dead-letter 是否實際接線（非 orphan node）？
 
 ### Stage 6 — V&V Layer 1
@@ -478,6 +493,12 @@ v0.36.0 SEC-017 修補 commit `456c311` 之後，本 SKILL 的 critic gate 會�
   - **無禁用詞彙**（依 v0.28.1 A2A directive 禁用詞表 — 中英共 9 種同義詞）。
   - PENDING 行明確標註原因。
 - **Sign-off**：critic 簽 `REVIEW-SIGN-OFF.md`，含 critic agent 識別 + 時間戳。
+
+### 完成後：參考來源、建議事項與掃描結果
+
+- **在哪個步驟做**：本 Skill 是管線型 Skill，這一步在**管線最後一個階段（Stage 11）** 執行；Stage 0–10 邊做邊記「參考紀錄」，不在中途各自寫入。每個子階段實際讀過且影響設計的資料都彙總進同一份紀錄（例如 Stage 2 的 partition 依據、Stage 3 的 SECURITY-REVIEW 參考、Stage 5 產生 workflow 所用的骨架與範例、Stage 10 的目標 n8n 版本），同一來源在不同階段用到就合併成一條。
+- **修改記錄**：每個產出 workflow 的 Layer 3 便條都要有「修改記錄」段（依 [`spec/sticky-note-three-layer.md`](../../../spec/sticky-note-three-layer.md) §4.4，這是建議，缺少只被掃描器提醒）。管線新產生的 workflow 第一列寫「建立」（提出者「AI」，原因寫來源專案與階段，不貼機密）；重跑管線而修改既有 workflow 時，在既有記錄新增一列，不改寫舊列。日期取當天，不得寫入機密。記錄與實際變更是否相符由管線在 PR 層級比對（之後的工作）。
+- 把參考來源、建議事項與掃描結果寫進每個產出 workflow 的 Layer 3 便條與相關節點 notes，對話只放摘要；`COMPLETION-REPORT.md` 只摘要並指向這些註解。順序、格式、狀態與誠實規則依 [`spec/references-disclosure.md`](../../../spec/references-disclosure.md) 第 4 章（掃描見第 8 章），本 Skill 不重複；資安掃描對最終要上架的每個 workflow JSON 執行（Stage 10 之前若又改過 JSON，對最終版重掃）。語言依 §1.5 的語言鎖定規則，與使用者發起時的語言一致。
 
 ---
 
@@ -554,6 +575,8 @@ examples/<repo-name>-n8n/
 - [ ] SECURITY-REVIEW.md 13+ SEC-### 結構化 finding（不少於 5 個）
 - [ ] Stage 10 ACTIVATION-LOG 含所有 workflow id + tag
 - [ ] COMPLETION-REPORT 無禁用詞彙、claim ↔ evidence 對齊
+- [ ] 每個產出的 workflow 的 Layer 3 便條含「參考來源」「建議事項」「資安掃描結果」，COMPLETION-REPORT 與收尾訊息只放摘要並指向註解（依 `spec/references-disclosure.md`）
+- [ ] 每個產出的 workflow 的 Layer 3 便條含「修改記錄」（新建的第一列為「建立」；建議項，缺少只提醒）
 - [ ] REVIEW-SIGN-OFF 含 critic agent 識別與時間戳
 
 任一未過 → critic 不簽 → pipeline 未完成。

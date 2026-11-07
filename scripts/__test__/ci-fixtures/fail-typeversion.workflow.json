@@ -1,0 +1,55 @@
+{
+  "name": "ci-fixture fail typeVersion",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "mt",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1-a",
+              "name": "label",
+              "value": "demo",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "s1",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 9,
+      "position": [
+        240,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

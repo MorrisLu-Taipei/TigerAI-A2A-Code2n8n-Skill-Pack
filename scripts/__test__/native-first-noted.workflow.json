@@ -1,0 +1,110 @@
+{
+  "name": "test-fixture: native-first, Code nodes with and without notes",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "nf-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => ({ json: { customerName: item.json.name, total: item.json.amount } }));"
+      },
+      "id": "nf-noted",
+      "name": "Rename With Note",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "notes": "Why Code: kept on purpose, the downstream system expects this exact shape."
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\nfor (const item of $input.all()) {\n  let score = 0;\n  for (const tag of item.json.tags || []) {\n    if (tag.startsWith('hot')) score += 2; else score += 1;\n  }\n  out.push({ json: { ...item.json, score } });\n}\nreturn out;"
+      },
+      "id": "nf-loop",
+      "name": "Score Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "language": "python",
+        "pythonCode": "return [{'json': {'ok': True}}]"
+      },
+      "id": "nf-py",
+      "name": "Python Step",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": ""
+      },
+      "id": "nf-empty",
+      "name": "Empty Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "label",
+              "value": "demo",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "nf-set",
+      "name": "Edit Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "fixture note",
+        "height": 80,
+        "width": 200
+      },
+      "id": "nf-sticky",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -200
+      ]
+    }
+  ],
+  "connections": {},
+  "settings": {}
+}

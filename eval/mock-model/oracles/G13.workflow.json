@@ -1,0 +1,145 @@
+{
+  "name": "請假規則聊天助手",
+  "nodes": [
+    {
+      "id": "s-l1",
+      "name": "使用者需求摘要",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -260
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 560,
+        "height": 200,
+        "content": "### 使用者需求摘要\n網頁聊天助手，只回答公司請假規則，其他客氣說不在服務範圍。"
+      }
+    },
+    {
+      "id": "n1",
+      "name": "Chat",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "options": {}
+      },
+      "webhookId": "00000000-0000-4000-8000-000000000013",
+      "notes": "建議 webhook:no-auth：公開聊天入口建議限制來源（尚未能自動檢查）。"
+    },
+    {
+      "id": "n2",
+      "name": "Leave policy agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        320,
+        0
+      ],
+      "parameters": {
+        "promptType": "auto",
+        "options": {
+          "systemMessage": "你是公司請假規則小助手，只回答請假相關問題。規則：特休依年資；病假需附證明；事假不給薪。其他問題請客氣說明不在服務範圍。"
+        }
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Chat model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        320,
+        240
+      ],
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "待填"
+        },
+        "options": {}
+      },
+      "credentials": {
+        "openAiApi": {
+          "name": "llm-gateway"
+        }
+      },
+      "notes": "模型名稱依閘道提供的清單填寫。"
+    },
+    {
+      "id": "n4",
+      "name": "Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        520,
+        240
+      ],
+      "parameters": {
+        "sessionIdType": "fromInput",
+        "contextWindowLength": 6
+      }
+    },
+    {
+      "id": "s-l3",
+      "name": "AI 實作說明",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        700
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 560,
+        "height": 520,
+        "content": "### 🤖 AI 實作說明 — 請假規則聊天助手\n\n**參考來源**\n- 沒有參考外部範本，依需求與 Pack 內建規格設計\n- 骨架與統計知識：research/patterns.md §2 chat-agent\n- 原廠／社群 Skill：無\n- 目標 n8n 版本：2.44.6（使用者提供）\n- 參考方式：只參考做法，已用目前版本節點重新建構\n\n**建議事項**\n- `ai:agent-no-guardrails`：尚未能自動檢查（建議在 Agent 前後加 Guardrails）\n- `error:no-handling`：尚未能自動檢查（模型失敗時的回覆未設計）\n- 不適用：exec:ssh、form:no-auth\n- `native-first:code-node`：已採用（未使用 Code 節點）\n- 以上皆為建議，最終決定在使用者；建議不等於安全\n\n**資安掃描結果**\n- 未執行資安掃描：由宿主檢查\n\n**所需 Credentials**\n- [ ] OpenAI API（閘道）：`llm-gateway`（節點：Chat model）\n\n**已知限制**\n- 參數名稱未經查證\n- 請假規則內容是示意文字，需使用者換成正式規則"
+      }
+    }
+  ],
+  "connections": {
+    "Chat": {
+      "main": [
+        [
+          {
+            "node": "Leave policy agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Leave policy agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Leave policy agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

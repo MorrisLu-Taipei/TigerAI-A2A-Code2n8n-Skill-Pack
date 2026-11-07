@@ -7,6 +7,10 @@ description: Standard SOP for reading and writing n8n workflows via the n8n REST
 
 > 🌐 **English** | [繁體中文](SKILL.md)
 
+> **Restricted Agent mode (Portal): writing and activation are disabled.**
+> When the host places the marker `[PORTAL-RESTRICTED-AGENT-MODE v1]` in the system prompt or session context (format and rules in [`spec/agent-restricted-mode.en.md`](../../../spec/agent-restricted-mode.en.md)), every `POST`/`PUT`/`PATCH`/`DELETE`, `activate`/`deactivate` and direct SQL in this Skill is **disabled**; do not use `N8N_API_URL`/`N8N_API_KEY` or build HTTP requests yourself. Reading (listing, reading a workflow, viewing executions) goes only through read-only tools provided by the host (names per the host). The merge write-back of §4.2, the idempotent write-back of §4.3 and the example in §7 are never executed; output the workflow JSON only and let the host write it. Without the marker, this file applies as written.
+> This text is only a hint; real enforcement is the host's tool allowlist and environment (no n8n key in the Agent environment, no network path to n8n).
+
 ## 1. Trigger conditions
 
 **Explicit**:
@@ -49,8 +53,7 @@ This Pack **calls n8n REST API directly**, no MCP server dependency.
 | List workflows | `GET /api/v1/workflows` |
 | Read workflow | `GET /api/v1/workflows/{id}` |
 | Create | `POST /api/v1/workflows` |
-| Update partial | `PATCH /api/v1/workflows/{id}` |
-| Update full | `PUT /api/v1/workflows/{id}` |
+| Update | `PUT /api/v1/workflows/{id}` (body must include `name`, `nodes`, `connections`, `settings`; **the public API does not support `PATCH` and returns 405**, observed on 2.37.3 / 2.44.6 / 2.46.6) |
 | Activate | `POST /api/v1/workflows/{id}/activate` |
 | Deactivate | `POST /api/v1/workflows/{id}/deactivate` |
 | Delete | `DELETE /api/v1/workflows/{id}` |
@@ -110,8 +113,9 @@ Multiple AI calls on same workflow:
 | 401 | API key invalid | Ask user to regenerate |
 | 403 | Permission denied | Ask for owner/admin role |
 | 404 | Workflow not found | Ask to confirm ID |
-| 409 | Conflict (concurrent edit) | Re-read + re-merge + re-write |
-| 422 | JSON schema invalid | Report specific field; AI fixes per error message and re-PUTs |
+| 400 | Invalid JSON schema, missing node settings, missing credential, deprecated node type | Report the specific field; AI fixes per error message and re-PUTs (observed: an invalid PUT returns 400, not 422) |
+| 405 | Unsupported method (e.g. `PATCH`) | Use `PUT` with the full body |
+| 409 | Conflict (concurrent edit, or webhook path already used by another active workflow) | Re-read + re-merge + re-write; for a webhook conflict, change `path` |
 | 5xx | n8n internal | Exponential backoff retry 3× (1s/2s/4s) |
 | timeout | Large workflow | Increase timeout to 60s, retry |
 

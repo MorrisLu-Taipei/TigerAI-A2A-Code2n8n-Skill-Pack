@@ -7,6 +7,21 @@ description: Core skill that converts a Layer 1 Sticky Note (DSL-formatted user 
 
 > 🌐 [English](SKILL.en.md) | **繁體中文**
 
+## 受限 Agent 模式（Portal）
+
+> 先看宿主有沒有放標記 `[PORTAL-RESTRICTED-AGENT-MODE v1]`（放在系統提示或工作階段上下文；格式與全部規則見 [`spec/agent-restricted-mode.md`](../../../spec/agent-restricted-mode.md)）。**沒有標記：本 Skill 全文照舊（單機模式）。有標記：下表調整生效，優先於本檔其他步驟。** 這段文字只是提示，真正的強制在宿主的工具白名單；本 Skill 在此模式下的行為是「符合宿主的限制」。
+
+| 位置 | 受限模式下的調整 |
+|---|---|
+| §2 輸入（既有 workflow ID） | 不經 `n8n-api-bridge`；只能用宿主提供的唯讀工具讀取（名稱以宿主為準），沒有工具就請使用者貼 JSON |
+| Step 4（頂層欄位） | `active` 一律 `false` |
+| **Step 4.2** | **改為「只引用 credentialMap」**：只用宿主提供的 `credentialMap` 內的憑證名稱，逐字照抄；節點只寫 `{ "<type>": { "name": "<名稱>" } }`，**絕不寫 `credentials.id`**（宿主在伺服器端依名稱補 id，補不到就標缺憑證並回報）；**禁止 `STUB-` 假憑證**與任何杜撰的名稱；需要但不在 map 內的憑證，該節點不寫 `credentials`，節點 `notes` 與 Layer 3「待補憑證」寫明「需管理員建立：type=…、建議名稱=…」。連線型觸發節點同樣處理，並提醒啟用只由管理員執行 |
+| Step 6（Layer 3） | 在「所需 Credentials」旁加「待補憑證」清單，並告知使用者：憑證補齊前 CI 會失敗，這是預期且正確的 |
+| **Step 7** | **改為「不寫入 n8n，只輸出 JSON」**：不 PUT、不啟用；改呼叫宿主的靜態檢查工具，依阻擋碼做合法修正，最多 N 輪（宿主設定，起始 3）；仍失敗就把原因如實交給使用者 |
+| Step 8（收尾區塊） | 「資安掃描結果」是宿主檢查結果的如實轉述（只寫規則名稱與節點名稱）；沒執行就寫「未執行資安掃描：<原因>」 |
+| §5 輸出格式、§7 對話準則 | `metadata.validation` 不填 `passed`，改填宿主預檢的原文摘要（例如「無阻擋碼」「未預檢」）；不得說「已通過」「安全」「可部署」「已啟用」「已匯入」 |
+| §8 鏈接 | 不走 `n8n-api-bridge` 的寫回；成品交給宿主的草稿流程 |
+
 ## 1. 觸發條件
 
 **精確觸發詞**：
@@ -69,7 +84,7 @@ LLM 把使用者描述映射到 `@`-tagged 結構（**不展示給使用者**，
 - **失敗條件**：缺 `@trigger` 或 `@step` → 若是自然語言路徑來的、回 Step 0.1 重譯（標警告給使用者）；若是 DSL 路徑、直接拒絕並要求補齊
 
 ### Step 2：選骨架
-- 比對 `research/patterns.md` §2 七大 Pattern (A–G)
+- 比對 `research/patterns.md` §2 的 14 個骨架（`webhook-api`、`schedule`、`batch-loop` 等，名稱見該節一覽表）；決策流程見該檔 §5
 - 命中度高者優先；多個命中時取最簡單的
 - 同時記錄「為何選 X 不選 Y」→ 寫入 Layer 3「節點選型」段
 
@@ -78,8 +93,16 @@ LLM 把使用者描述映射到 `@`-tagged 結構（**不展示給使用者**，
   1. 套 DSL §4 詞彙對應表抽節點 type
   2. 若不在表內 → 查 `research/node-frequency.md` Top 30 + AI 知識庫
   3. 仍找不到 → 走 DSL §6.2「降級對應」
-- 對 `@trigger`：套 DSL §3 字典（v1.1 含 telegram/slack/discord/googleDrive 等）
+- 對 `@trigger`：套 DSL §3 字典（v1.1 含 telegram/slack/googleDrive 等；`discord` 沒有原生觸發節點，字典改對應 Webhook，見 DSL §3 的註）
 - 對 `@branch`：產 `switch` 節點 + 多輸出，缺 fallback 必補
+
+### Step 3.5：原生節點優先
+
+建立節點（Step 4）之前，依 [`spec/native-first.md`](../../../spec/native-first.md) 第 6 章做一次閘門，不要做完才補：
+
+- 列出規劃中打算用 Code 的步驟，逐一過決策順序（運算式 → Edit Fields → 原生節點 → Code），能原生就原生；原生節點的對照見該規格第 3 章。
+- DSL §4 詞彙對應表會把「彙總、統計」與「自訂程式」對到 `code`，不要直接採用，先過閘門。
+- 剩下確實要用的 Code 節點，`notes` 寫一行「為什麼用 Code」，程式碼加簡短註解（該規格第 5 章）。
 
 ### Step 4：產 nodes 陣列
 - 每節點欄位：
@@ -88,14 +111,18 @@ LLM 把使用者描述映射到 `@`-tagged 結構（**不展示給使用者**，
     "id": "<unique>",
     "name": "<ASCII-only-PascalCase>",
     "type": "<typeFromMapping>",
-    "typeVersion": <最新穩定版>,
+    "typeVersion": <目標版本的 default；default 為 null 時取 latest>,
     "position": [x, y],
     "parameters": { ... },
-    "notes": "<對應 Layer 1 的 @step 文字>"
+    "notes": "<只有非顯而易見的設定才寫，內容是「為什麼這樣設定」；顯而易見的節點留空>"
   }
   ```
+- `type` 與 `typeVersion` 一律查目標 n8n 版本的 [`docs/node-versions/`](../../../docs/node-versions/README.md) 查表：查不到的 `type` 不能用，`deprecated` 或 `hidden` 為 `true` 的節點不用於新 workflow，版本號取 `default`（為 null 時取 `latest`），不要沿用別的版本的數字
+- 節點 `notes` 的寫法依 [`spec/references-disclosure.md`](../../../spec/references-disclosure.md) 第 7 章；針對該節點的建議（資安、原生節點優先）也以簡短一行寫在這裡（§4.4）；對應 Layer 1 的追溯由 Layer 3 的「對應使用者需求」段承擔
 - `position.y` 嚴守三層分區：Layer 1 sticky < 0、Layer 2 nodes ∈ [0, 500]、Layer 3 sticky > 600
 - `position.x` 依執行順序遞增 220–260px / 節點
+
+> **受限 Agent 模式（Portal）**：有標記時本步驟整段不適用，改為「只引用 credentialMap、只寫名稱不寫 `credentials.id`、禁止 `STUB-`」，見上方「受限 Agent 模式（Portal）」。
 
 ### Step 4.2：Activate 友善設計（v0.9.0 R3 驗證強制）
 
@@ -120,7 +147,7 @@ n8n 有兩級 credential 驗證：activate 時只查 ref 存在；execute 時查
 | `n8n-nodes-base.telegram`（action）| `telegramApi` |
 
 **連線型 trigger（不能用 stub）**：
-- `telegramTrigger`、`emailReadImap`、`slackTrigger`、`discordTrigger` 等
+- `telegramTrigger`、`emailReadImap`、`slackTrigger` 等（n8n 沒有原生 `discordTrigger`，見 DSL §3 的註）
 - AI 必須在 Layer 3 用 ⚠️ 紅字提示「activate 前需在 n8n 建真實 credential」
 - Stub 會直接讓 activate 失敗（n8n 撥真實 API 驗證 token）
 
@@ -171,12 +198,31 @@ function safeWebhookNodeName(s) { return s.replace(/[^A-Za-z0-9]/g, ''); }
   4. 測試建議（≥ 2 case：golden + error）
   5. 已知限制
   6. 對應使用者需求（@trigger / @step / @output / @on-error 一一對應）
-- 套用反模式檢查（patterns.md §3）— 若觸發任一條，加入「已知限制」
+  7. **修改記錄**（放在最後，規則見下方「修改記錄的使用規則」；缺少只會被掃描器提醒，不阻擋）
+- 套用反模式檢查（`research/patterns.md` §3）— 若觸發任一條，加入「已知限制」
+- 依 [`spec/references-disclosure.md`](../../../spec/references-disclosure.md) 第 4 章，在標題之後加入「參考來源」「建議事項」「資安掃描結果」三個區塊（見 Step 8）；這三個區塊是建議與資訊的正式紀錄
+
+**修改記錄的使用規則**（完整規格見 [`spec/sticky-note-three-layer.md`](../../../spec/sticky-note-three-layer.md) §4.4，這是建議，不是強制）：
+
+- 格式：表格或清單，每列含 日期（`YYYY-MM-DD`）、變更摘要、提出者（「使用者」或「AI」）、原因。
+- **新建 workflow**：第一列寫「建立」。
+- **修改既有 workflow**（使用者要求或 AI 主動修正都算）：在既有 Layer 3 便條的修改記錄**新增一列**；只新增，不改寫、不刪除舊列。沒有修改記錄的舊便條，先補上「修改記錄」段再新增這一列，不要假造更早的歷史。
+- **不得寫入機密**：不寫金鑰、權杖、密碼、內網位址、個資、完整指令；只寫改了什麼，不貼參數值。
+- 日期取修改當天；不確定就問使用者，不自行編造。記錄要如實，不為了避開提醒而寫與實際變更不符的內容。
+- 掃描器的 `notes:missing-change-log` 只提醒（severity `info`）；使用者不想要就照辦，可在節點 notes 寫 `guardrail-ack: notes:missing-change-log`。記錄與實際變更是否相符，Pack 內無法判斷，由管線在 PR 層級比對（之後的工作）。
+
+> **受限 Agent 模式（Portal）**：有標記時本步驟不寫入 n8n，只輸出 JSON，見上方「受限 Agent 模式（Portal）」。
 
 ### Step 7：驗證
 - 透過 `n8n-api-bridge` Skill 把 JSON PUT 回 n8n（n8n 會做內建 schema 驗證）
 - 422 → 依錯誤訊息 AI 自修 → 重新 PUT
 - 仍失敗 → 回報使用者並列出問題
+
+### Step 8：完成後：參考來源、建議事項與掃描結果
+
+- **邊做邊記**：從 Step 0 開始，把實際讀過、且影響設計的資料記進「參考紀錄」（Step 2 選骨架、Step 3 解析節點時最常新增）。
+- **在哪個步驟做**：Step 6 產生 Layer 3 便條時寫入；Step 7 之後、交付前，對最終的 workflow JSON 執行資安掃描，並用結果更新便條（之後又改了 JSON 就對最終版重掃）。
+- 把參考來源、建議事項與掃描結果寫進 Layer 3 便條與相關節點 notes，對話只放摘要。順序、格式、狀態與誠實規則依 [`spec/references-disclosure.md`](../../../spec/references-disclosure.md) 第 4 章（掃描見第 8 章），本 Skill 不重複；建議的內容規則見 [`spec/security-guardrails.md`](../../../spec/security-guardrails.md) 與 [`spec/native-first.md`](../../../spec/native-first.md)。
 
 ---
 
@@ -200,7 +246,7 @@ function safeWebhookNodeName(s) { return s.replace(/[^A-Za-z0-9]/g, ''); }
   "success": true,
   "workflow": { "name": "...", "nodes": [...], "connections": {...}, "settings": {...} },
   "metadata": {
-    "skeleton_pattern": "B",
+    "skeleton_pattern": "webhook-api",
     "node_count": 11,
     "layer3_warnings": ["缺 @on-error 已建議使用模式 B"],
     "downgraded_actions": [],

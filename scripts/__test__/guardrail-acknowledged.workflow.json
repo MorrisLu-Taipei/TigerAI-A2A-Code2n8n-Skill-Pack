@@ -1,0 +1,260 @@
+{
+  "name": "test-fixture: guardrail warnings acknowledged via guardrail-ack (passes --strict)",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "guard-01",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        200
+      ],
+      "notes": "Reviewed by owner.\nguardrail-ack: error:no-handling",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "formTitle": "Contact",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Message",
+              "fieldType": "textarea"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "guard-02",
+      "name": "Public Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        400
+      ],
+      "notes": "Reviewed by owner.\nguardrail-ack: form:no-auth -- public intake form behind reverse proxy rate limit",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "guard-03",
+      "name": "Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        660,
+        0
+      ],
+      "notes": "Reviewed by owner.\nguardrail-ack: ai:agent-no-guardrails -- 輸入已在前一層閘道完成過濾，僅供內部測試",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list"
+        },
+        "options": {}
+      },
+      "id": "guard-04",
+      "name": "Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "name": "calc",
+        "description": "Evaluate an expression",
+        "language": "javaScript",
+        "jsCode": "return query;"
+      },
+      "id": "guard-05",
+      "name": "Code Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        400
+      ],
+      "notes": "Reviewed by owner.\nguardrail-ack: ai:agent-code-tool -- sandboxed arithmetic only, reviewed in ticket",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.example.com/v1/items",
+        "options": {}
+      },
+      "id": "guard-06",
+      "name": "Fetch Items",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "command": "echo hello"
+      },
+      "id": "guard-07",
+      "name": "Run Shell",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        200
+      ],
+      "notes": "Reviewed by owner.\nguardrail-ack: exec:execute-command -- fixed command, no user input reaches it",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "resource": "command",
+        "operation": "execute",
+        "command": "uptime",
+        "cwd": "/"
+      },
+      "id": "guard-08",
+      "name": "Remote Command",
+      "type": "n8n-nodes-base.ssh",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        400
+      ],
+      "notes": "Reviewed by owner.\nguardrail-ack: exec:ssh",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "/tmp/example.txt",
+        "options": {}
+      },
+      "id": "guard-09",
+      "name": "Read File",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        0
+      ],
+      "notes": "Reviewed by owner.\nguardrail-ack: file:rw-access",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "guardrail-acknowledged",
+        "options": {}
+      },
+      "id": "guard-10",
+      "name": "Open Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        200
+      ],
+      "webhookId": "00000000-0000-4000-8000-000000000003",
+      "notes": "Reviewed by owner.\nguardrail-ack: webhook:no-auth -- network-layer allowlist enforces the caller",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Public Form": {
+      "main": [
+        [
+          {
+            "node": "Fetch Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Items": {
+      "main": [
+        [
+          {
+            "node": "Run Shell",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Shell": {
+      "main": [
+        [
+          {
+            "node": "Remote Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remote Command": {
+      "main": [
+        [
+          {
+            "node": "Read File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

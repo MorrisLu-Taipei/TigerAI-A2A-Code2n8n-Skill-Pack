@@ -1,0 +1,13 @@
+*
+!VERSION
+!scripts/ci
+!scripts/security-scan.mjs
+!scripts/native-first-check.mjs
+!scripts/review/build-input.mjs
+!scripts/review/validate-review.mjs
+!docs/node-versions
+!services/ci-check/static-service.mjs
+!services/ci-check/dynamic-front.mjs
+!services/ci-check/dynamic-result.mjs
+!services/ci-check/review-api.mjs
+!services/ci-check/shared.mjs

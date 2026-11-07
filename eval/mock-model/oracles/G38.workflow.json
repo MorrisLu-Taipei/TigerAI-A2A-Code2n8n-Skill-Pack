@@ -1,0 +1,303 @@
+{
+  "name": "非同步影片 API 輪詢",
+  "nodes": [
+    {
+      "id": "s-l1",
+      "name": "使用者需求摘要",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -260
+      ],
+      "parameters": {
+        "color": 4,
+        "width": 560,
+        "height": 200,
+        "content": "### 使用者需求摘要\n呼叫非同步影片 API，每 30 秒查進度，最多 10 分鐘，逾時通知。"
+      }
+    },
+    {
+      "id": "n1",
+      "name": "Manual start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "n2",
+      "name": "Create job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.example.invalid/jobs",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendBody": true,
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "video-api-header"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "網址為佔位。"
+    },
+    {
+      "id": "n3",
+      "name": "Wait 30s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        520,
+        0
+      ],
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "webhookId": "00000000-0000-4000-8000-000000000038"
+    },
+    {
+      "id": "n4",
+      "name": "Check status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        780,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.example.invalid/jobs/{{ $(\"Create job\").item.json.id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "video-api-header"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "n5",
+      "name": "Is finished",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1040,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "done",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n6",
+      "name": "Timed out",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1300,
+        120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c2",
+              "leftValue": "={{ $runIndex }}",
+              "rightValue": 19,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "notes": "每輪等 30 秒，第 20 次檢查約 10 分鐘，超過就走失敗通知。"
+    },
+    {
+      "id": "n7",
+      "name": "Alert failure",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        1560,
+        240
+      ],
+      "parameters": {
+        "authentication": "accessToken",
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#通知"
+        },
+        "text": "影片產生逾時，請檢查。",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "name": "corp-slack-bot"
+        }
+      }
+    },
+    {
+      "id": "n8",
+      "name": "Finished",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1300,
+        -120
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "s-l3",
+      "name": "AI 實作說明",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        700
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 560,
+        "height": 520,
+        "content": "### 🤖 AI 實作說明 — 非同步影片 API 輪詢\n\n**參考來源**\n- 沒有參考外部範本，依需求與 Pack 內建規格設計\n- 骨架與統計知識：research/patterns.md §2 wait\n- 原廠／社群 Skill：無\n- 目標 n8n 版本：2.44.6（使用者提供）\n- 參考方式：只參考做法，已用目前版本節點重新建構\n\n**建議事項**\n- `error:no-handling`：已採用（HTTP 節點失敗時繼續，逾時走通知分支）\n- 不適用：webhook:no-auth、form:no-auth、exec:ssh\n- `native-first:code-node`：已採用（未使用 Code 節點）\n- 以上皆為建議，最終決定在使用者；建議不等於安全\n\n**資安掃描結果**\n- 未執行資安掃描：由宿主檢查\n\n**所需 Credentials**\n- [ ] HTTP Header Auth：`video-api-header`（節點：Create job、Check status）\n- [ ] Slack API：`corp-slack-bot`（節點：Alert failure）\n\n**已知限制**\n- 參數名稱未經查證\n- 長時間等待時，n8n 重啟後狀態如何保留尚未確認\n- 網址與回應欄位名稱為佔位"
+      }
+    }
+  ],
+  "connections": {
+    "Manual start": {
+      "main": [
+        [
+          {
+            "node": "Create job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create job": {
+      "main": [
+        [
+          {
+            "node": "Wait 30s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 30s": {
+      "main": [
+        [
+          {
+            "node": "Check status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check status": {
+      "main": [
+        [
+          {
+            "node": "Is finished",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is finished": {
+      "main": [
+        [
+          {
+            "node": "Finished",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Timed out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Timed out": {
+      "main": [
+        [
+          {
+            "node": "Alert failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 30s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

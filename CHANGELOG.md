@@ -1,5 +1,40 @@
 # Changelog
 
+## 未發布
+
+- **修正 `validate-review.mjs` 的二次方時間（潛在 ReDoS）**：實測 60,000 字元的最壞輸入最久約 4.8 秒（修正前 200,000 字元要數十秒），根因是六處對長字串會二次方回溯或重複掃描的比對：網址的主機加路徑（巢狀量詞）、Markdown 連結（行內與參考式）、HTML 標籤、行首角色前綴（`^\s*` 跨空行）、鍵值對機密與 JWT（每個起點都掃完整段），以及 NFKC 對連續組合記號的標準排序（128,000 個約 4 秒）。前六者改成單趟掃描（語意與原正規表示式一致，原樣式保留在註解與匯出的 `FORBIDDEN`、`SECRET_SHAPES`），`maskSecrets` 同步修正；連續超過 32 個的組合記號在比對用副本截斷（只影響掃描，不影響輸出）。修正後最壞輸入在 200,000 字元內 30 毫秒左右、1,000,000 字元約 0.1 秒。整份輸出 256 KB 上限與 `/v1/review/validate` 的 32,768 字元上限保留，改為第二道防線。行為不變：`run-review-tests.mjs` 新增 §14（17 項），含效能回歸（最壞輸入 200,000 字元於 3 秒內）與修正前後差異測試（保留凍結的舊版 `scripts/__test__/legacy/validate-review.legacy.mjs`，對超過 10 萬筆輸入逐筆比對輸出）；既有測試項數不變（review 636 → 653，其餘 security-scan 179、native-first 82、ci 393、portal 135、eval 971、services 1241 不變）。
+
+- **AI 審查者模式（只給建議，不阻擋）**：新增 `spec/agent-reviewer-mode.md`／`.en.md`（受限審查模式 v1，受限 Agent 模式的兄弟）與 Skill `skills/tigerai/n8n-review-mode`（中英，含系統提示、輸入分隔格式、輸出規則、禁用詞、提示注入防護與正反例）。審查者唯讀、不核准、不合併、不宣稱已通過；輸出是固定 schema 的 JSON（`severity` 只有 `info`、最多 20 則）；workflow 內容一律是不可信資料（帶 nonce 的分隔區塊）；審查準則引用現有規格，並新增「修改記錄與實際變更是否相符」的前後版本比對（原本寫「之後由管線比對」的部分）。新增 `scripts/review/validate-review.mjs`（輸出檢查與 Markdown 呈現：丟棄不合格建議並列原因代碼 `REVIEW_BAD_SCHEMA`、`REVIEW_TOO_LONG`、`REVIEW_FORBIDDEN_WORD`、`REVIEW_URL`、`REVIEW_HTML`、`REVIEW_SECRET_PATTERN`、`REVIEW_TOO_MANY`、`REVIEW_OUTPUT_INVALID`；中英文放行用語與忽略規則的文字整份丟棄並標記疑似遭提示注入；**退出碼永遠是 0，沒有 strict 選項**）、`scripts/review/build-input.mjs`（輸入組裝與遮罩的參考實作）、離線的審查者假模型 `eval/mock-model/review-server.mjs`（只綁 127.0.0.1，含「被注入而放行」的模擬），以及 `docs/ai-review-in-pr.md`（宿主如何接進 PR 與工單）。模型不可用、逾時、輸出無效一律顯示「AI 審查未執行」，不擋流程。目前沒有接任何真實模型，逾時、重試與 token 預算只是建議值，標示【待基準線】；閘道日誌政策標示【待 Portal 決定】。
+- 測試：新增 `scripts/__test__/run-review-tests.mjs`（夾具在 `scripts/__test__/review-fixtures/`），已接上 `.gitlab-ci.yml` 與 `.github/workflows/security-gate.yml`；既有測試（security-scan 179、native-first 82、ci 393、portal 135、eval 970）項數不變。
+
+- **新增三條只提醒的規則（ADR-014）**：`scripts/security-scan.mjs` 新增 `egress:external-domain`（HTTP 類節點的網址參數連到非內網網域，列出網域並提醒核准人確認；網址由運算式組出時提醒「無法靜態判斷」）、`impact:high-impact-node`（寄信、寫入或刪除資料庫、HTTP 寫入方法、執行系統指令的節點）、`notes:missing-change-log`（Layer 3 說明便條沒有填寫「修改記錄」）。三條的 severity 為 `info`：輸出為 `INFO` 行，彙總另計 `reminder`，**預設與 `--strict` 都不會讓退出碼變成失敗**，CI 只進建議項、沒有新增任何阻擋碼；可用 `guardrail-ack: <規則編號>` 確認。外連網域可提供選用的允許清單：`--egress-allow <逗號分隔網域>`、`--egress-allow-file <檔案>` 或環境變數 `SKILLPACK_EGRESS_ALLOW`（`*.example.com` 涵蓋子網域；沒給清單就只列出、不判斷），`scripts/ci/check-workflows.mjs` 同樣接受前兩個旗標。
+- **Layer 3 便條新增「修改記錄」段**：`spec/sticky-note-three-layer.md`／`.en.md` 新增 §4.4，模板與範例加上必備段落（日期、變更摘要、提出者、原因；新建第一列「建立」，修改既有 workflow 新增一列，不得含機密；缺少只提醒）。`sticky-note-to-workflow`、`code2n8n-pipeline`、`code-to-workflow`、`tigerai-enterprise-patterns`、`n8n-code-to-native`、`n8n-security-governance` 同步加入使用規則。記錄與實際變更是否相符，需與前一版比對，Pack 內不判斷，之後由管線在 PR 層級比對。
+- 文件：`spec/security-guardrails.md`／`.en.md` 新增 2.13 至 2.15，`spec/references-disclosure` 與 `docs/ci-for-n8n-workflows.md` 補充提醒類層級與建議代碼。
+- 測試：新增夾具與檢查（`run-security-scan-tests.mjs` 63 → 179 項，`run-ci-tests.mjs` 368 → 393 項）；`pass-schedule-http`、`pass-credential-field-exempt` 兩個夾具的預期建議項加上 `security-scan:egress:external-domain`（它們含對外 HTTP 呼叫）。
+
+## v1.1.0 — 2026-11-06
+
+- **Portal 內建支援**：含 Portal 受限 Agent 模式規格；新增 `scripts/portal/flatten-bundle.mjs`、`check-bundle.mjs` 與範例白名單（把 Skill 攤平成一層、附授權聲明與來源記錄、檢查內容與 Pack 逐位元組相同），測試 `scripts/__test__/run-portal-bundle-tests.mjs` 已接上 CI，更新程序見 `docs/portal-bundle-sync.md`。
+- `skills/_vendor/` 的 6 個 Skill 從上游 n8n-skills v1.9.0 同步到 v1.37.1（commit e037563，2026-10-24）。覆蓋前確認舊檔與 v1.9.0 逐位元組相同，沒有本地修改。
+- 新增 `skills/_vendor/upstream-pins.json`（記錄上游版本、收錄與排除名單、實測過的 n8n 版本）與 `scripts/check-upstream.mjs`（對照釘選版與上游最新版，不在 CI 內執行）；重寫 `skills/_vendor/SOURCE.md` 與同步步驟。
+- 修三支範本（`handover-trace`、`human-approval-gate`、`retry-with-backoff`）的棄用節點：`n8n-nodes-base.function` 改為 `n8n-nodes-base.code`（typeVersion 2）。n8n 2.44.6 以上會拒絕匯入 Function 節點。
+- `plugin.json`：n8n 版本資訊改為 2.37.3 / 2.44.6 / 2.46.6，對應報告改為 `tests/REPORT-4.md`，新增 `upstream` 欄位。
+- `reference-workflows/` 已移除（改為統計與即時查詢），`plugin.json` 的 `shared_resources` 同步拿掉該項。
+- 收錄 n8n 官方 Skill（[n8n-io/skills](https://github.com/n8n-io/skills)，Apache-2.0，Copyright 2026 n8n GmbH）15 個 `*-official` Skill 到 `skills/_vendor/`，釘選 commit 27b6b9f（plugin 1.3.0，2026-10-17）。上游檔案原樣收錄、未修改；只收 `skills/`，不收 hooks、opencode 與各平台外掛檔。
+- 授權：每個官方 Skill 資料夾新增一份 `LICENSE`（Apache-2.0 全文與版權聲明複本），`skills/_vendor/` 另放 `LICENSE-n8n-io-skills-APACHE-2.0`；`THIRD_PARTY_NOTICES.md` 新增第 6 節（含 §4 義務對照與商標聲明），README 加上定位說明與商標聲明。
+- 新增 `docs/mcp-to-rest-map.md`：官方 Skill 提到的 58 個 MCP 工具對照 REST 呼叫（17 個有對應、10 個部分對應、31 個沒有對應），含給 AI 的使用規則。
+- `plugin.json`、`install.sh`、`install.ps1`、`uninstall.sh`、`uninstall.ps1` 加入 15 個新 Skill（vendor 21 個）；`upstream-pins.json`、`SOURCE.md` 登錄 n8n-io/skills，`scripts/check-upstream.mjs` 改讀釘選的 1.3.0。
+- **參考來源與建議寫進註解**：新增 `spec/references-disclosure.md`（中英），統一收尾區塊：參考來源、建議事項、資安掃描結果，以 Layer 3 說明便條為正式紀錄，針對特定節點的建議寫在該節點 `notes`，對話只放摘要。`sticky-note-three-layer`、`sticky-note-to-workflow`、`tigerai-qa-mode`、`code-to-workflow`、`code2n8n-pipeline`、`tigerai-enterprise-patterns`、`n8n-code-to-native`、`n8n-security-governance`、`tigerai-example-finder` 同步接上。節點 `notes` 改為只在非顯而易見處寫並說明原因，與 n8n 官方建議對齊。
+- **資安護欄（建議式）**：新增 `spec/security-guardrails.md`（中英）與 13 條規則編號；護欄只是建議，不強制。`scripts/security-scan.mjs` 新增 `form:no-auth`、`tls:allow-unauthorized-certs`、`exec:*`、`file:rw-access`、`header:hardcoded-authorization`、`ai:agent-no-guardrails`、`ai:agent-code-tool`、`error:no-handling` 等規則（護欄類一律 warning），節點 notes 可寫 `guardrail-ack: <規則編號>` 表示已知悉，`--strict` 為選用；修正 `jscode:process-spawn` 對正規表達式 `.exec(` 的誤報，補掃 toolCode 與 LangChain Code 節點，pinData 納入機密掃描，機密樣式輸出遮蔽。新增測試夾具與 `run-security-scan-tests.mjs`，並接上 CI。
+- **原生節點優先**：新增 `spec/native-first.md`（中英）與 `scripts/native-first-check.mjs`（建議式，只要檔案可讀退出碼就是 0，不印程式碼內容），產生 Code 節點 N／M 與「可能可改用原生節點」的建議；新增測試與 CI。
+- **節點版本查表**：新增 `scripts/dump-node-versions.mjs` 與 `docs/node-versions/`（2.37.3、2.44.6、2.46.6 的節點目錄、README、版本差異），規格中的 typeVersion 改以查表為準。盤點後修正 DSL 把 `@trigger: discord` 對應到不存在的 `discordTrigger`（改為 Webhook）等文件中的節點引用。
+- **研究文件**：以 13,947 個 n8n.io 公開範本重寫 `research/node-frequency.md`、`patterns.md`，新增 `n8n-templates-method.md`、`n8n-templates-security.md`、`n8n-templates-code-vs-native.md`（中英）。repo 只放彙整統計與少量代表範本編號，不含範本檔。
+- **授權統一**：新增 `LICENSES.md` 集中清單；每個 Skill 資料夾（社群 6、官方 15、TigerAI 10）都附授權檔；`plugin.json` 的 `license` 改為 `MIT AND Apache-2.0`。
+- **範例修正**：`examples/templates/` 三支範本修正實際錯誤（IF `between`、迴圈狀態、核准連結簽章、Merge 覆蓋、Wait 逾時）；`examples/einvoice-n8n/workflows/einvoice-void-with-approval.workflow.json` 修正核准連結的簽章接法（`?` 改 `&`）、IF v1 的無效運算 `equals` 改 `equal`，並把通知文字中字面的 `\n` 改成真正換行。
+- **實測紀錄**：新增 `tests/REPORT-4.md`、`docs/n8n-version-compat.md`、`docs/n8n-upgrade-rollback-sop.md`；`n8n-api-bridge` 更正 `PATCH` 為 405、不合格 `PUT` 為 400。
+
+---
+
 ## v1.0.9 — v1.0 release banner 完全移除；"What's new + Thanks" 留作唯一 v1.0 說明
 
 User directive：「這裡就好阿 其他都不要有說明了」（"What's new" 那段就夠，其他 v1.0 解釋都不要）。
