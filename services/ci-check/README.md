@@ -64,7 +64,7 @@ STATIC_API_TOKEN_CURRENT=<至少 32 字元的亂數> node services/ci-check/stat
 **`POST /v1/review/validate`**：請求 `{ output, allowedReferences?, nodeNames?, notRun?, requestId? }`。`output` 是模型的原始回覆；`notRun` 為 `unavailable` 或 `timeout` 時不讀 `output`，直接回該未執行結果（宿主在模型不可用、逾時時用同一套呈現）。回應 `{ requestId, service, serviceVersion, apiVersion, packVersion, result, markdown, durationMs }`：`result` 是 `validate-review.mjs` 的結果物件（`status` 為 `ok` 或 `not-run`、`injectionSuspected`、`suggestions`、`dropped` 等），`markdown` 是含橫幅『AI 建議，僅供參考，不能取代人工審核』與『參考了哪些資料』的呈現。
 
 - **通過認證後一律回 200**：輸出無效、疑似遭提示注入、請求本身有問題（壞 JSON、欄位錯、Content-Type 錯、本文過大）都只是 `result` 的內容（`status: "not-run"`），不會回錯誤碼。唯一例外是存取控制：沒有或錯的 token 仍回 401、來源不在白名單回 403、連續認證失敗被封鎖回 429。
-- `output` 超過 32,768 字元一律視為無效（`output-too-large`）：`validate-review.mjs` 有幾條正規表示式對長字串是二次方時間（實測 60,000 字元約 3 秒），先在這裡設上限避免單一請求拖住服務；3,000 tokens 的輸出遠小於此值。
+- `output` 超過 32,768 字元一律視為無效（`output-too-large`）：`validate-review.mjs` 的驗證本身已是線性時間（曾有幾條正規表示式對長字串是二次方，60,000 字元約 3 秒，已改成單趟掃描），這個上限是第二道防線，讓單一請求的工作量有明確上界；3,000 tokens 的輸出遠小於此值。
 - 被丟棄的內容只留原因代碼，不出現在回應與記錄；記錄不含 workflow 內容、PR 標題、模型輸出。
 - 這個端點不是閘門：沒有任何選項能讓它的結果影響檢查狀態，宿主也不應該這麼用。
 

@@ -12,6 +12,8 @@
 // 沒有任何閘門選項，也不會有；審查結果不得影響任何檢查的退出碼或阻擋碼。
 // 不合格的建議會被丟棄並列出原因代碼，丟棄的內容本身不會被輸出（可能是被注入的文字或機密）。
 // 禁用詞的判斷是保守的字串比對：命中就丟棄，不看前後是否有否定詞。它只能擋住常見寫法，不是完整的語意判斷。
+// 驗證是線性時間：會對長字串造成二次方回溯的樣式（網址主機加路徑、Markdown 連結、HTML 標籤、行首角色前綴、
+// 鍵值對機密、JWT）改成單趟掃描，其餘樣式都是有界回溯；『整份輸出長度上限』（LIMITS.inputBytes）只是第二道防線。
 
 import { existsSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -89,7 +91,23 @@ const toTrad = s => s.replace(/[\u4e00-\u9fff]/g, c => S2T.get(c) ?? c).replace(
 // 去掉空白與常見標點，用來抓「核 准 通 過」「a-p-p-r-o-v-e-d」這類拆字寫法
 const SQUEEZE = /[\s\-_.*·・、,，。:：;；'"`~|/\\]+/g;
 
-const normalize = s => toTrad(String(s).normalize('NFKC').replace(INVISIBLE, '')).toLowerCase();
+// NFKC 的標準排序（canonical reordering）對『連續很多個組合記號』是二次方時間（ICU 的插入排序；實測 128,000 個約 4 秒）。
+// 比對用的副本把連續超過 MARK_RUN_CAP 個的（可見）組合記號截斷，只影響掃描、不影響輸出的文字：
+// 所有樣式的原子都是 ASCII 或中日韓字元，組合記號對它們一律是「非空白、非單字」的字元，有界的量詞上限最大是 12，
+// 32 個遠大於它；會被 INVISIBLE 移除的記號不算在內（它們本來就是起始字元，不構成排序的連續段）。
+const MARK_RUN_CAP = 32;
+const LONG_MARK_RUN = new RegExp(`(?:(?!${INVISIBLE.source})\\p{M}){${MARK_RUN_CAP + 1},}`, 'gu');
+function capMarkRuns(s) {
+  return s.replace(LONG_MARK_RUN, run => {
+    let out = '';
+    let n = 0;
+    for (const ch of run) { out += ch; if (++n === MARK_RUN_CAP) break; }
+    return out;
+  });
+}
+// 掃描用的單趟正規化：NFKC 並移除不可見字元（機密、網址、HTML 比對用），再轉繁體小寫（禁用詞比對用）
+const stripForScan = s => capMarkRuns(String(s)).normalize('NFKC').replace(INVISIBLE, '');
+const toNorm = stripped => toTrad(stripped).toLowerCase();
 const squeeze = s => s.replace(SQUEEZE, '');
 
 // ---- 禁用詞 ------------------------------------------------------------------
@@ -133,25 +151,183 @@ export const FORBIDDEN = [
   R('zh-override-role', 'override', /(?:你現在是|你現在扮演|從現在起你|從現在開始你|改為扮演|切換(?:成|為)|進入)[^，。\n]{0,12}(?:模式|角色)|開發者模式|管理員模式|越獄|你(?:現在)?(?:是|為|扮演)(?:管理員|審核者|核准人|核准者)/, { sq: true }),
   R('en-override-ignore', 'override', /\b(?:ignore|disregard|forget|override|bypass)\s+(?:all\s+|any\s+|the\s+|your\s+|these\s+|those\s+)*(?:previous\s+|prior\s+|above\s+|earlier\s+|preceding\s+|system\s+|safety\s+|existing\s+|original\s+)*(?:instructions?|rules?|prompts?|guidelines?|constraints?|restrictions?)\b/),
   R('en-override-role', 'override', /\byou\s+are\s+now\b|\bnew\s+(?:instructions?|rules?|role)\b|\b(?:act|behave)\s+as\s+(?:an?\s+)?(?:admin|administrator|approver|reviewer|root)\b|\b(?:developer|admin|god)\s+mode\b|\bjailbreak/),
-  R('en-override-prefix', 'override', /^\s*(?:system|assistant|developer)\s*:/m),
+  // re 是規則的定義；實際比對用 fast（單趟掃描，等價但不會因長串空白與換行變成二次方）
+  R('en-override-prefix', 'override', /^\s*(?:system|assistant|developer)\s*:/m, { fast: hasOverridePrefix }),
 ];
 
 // ---- URL、HTML、機密 ---------------------------------------------------------
 
+// 每條規則是 [名稱, 比對器]；比對器是 RegExp，或是和某個 RegExp 等價的函式（該 RegExp 會對長字串二次方回溯，
+// 對照寫在註解，等價性由 run-review-tests.mjs 的差異測試保證）
 const URL_RULES = [
   ['scheme', /[a-z][a-z0-9+.-]{1,20}:\/\//i],
   ['www', /(?:^|[^a-z0-9])www\d?\.[a-z0-9-]+/i],
   ['protocol-relative', /(?:^|[\s(<\["'])\/\/[a-z0-9.-]+\.[a-z]{2,}/i],
   ['scheme-less-uri', /\b(?:mailto|javascript|vbscript|file):|\bdata:[a-z]+\/[a-z0-9.+-]+/i],
-  ['markdown-link', /!?\[[^\]\n]*\]\([^)\n]*\)|^\s*\[[^\]\n]+\]:\s*\S+/m],
-  ['host-with-path', /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\/\S*/i],
+  ['markdown-link', hasMarkdownLink],   // 等價於 /!?\[[^\]\n]*\]\([^)\n]*\)|^\s*\[[^\]\n]+\]:\s*\S+/im
+  ['host-with-path', hasHostWithPath],  // 等價於 /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\/\S*/i
 ];
 const HTML_RULES = [
-  ['tag', /<\/?[a-z!][^>]*>/i],
+  ['tag', hasHtmlTag],                  // 等價於 /<\/?[a-z!][^>]*>/i
   ['entity', /&(?:#\d+|#x[0-9a-f]+|[a-z][a-z0-9]{1,31});/i],
 ];
 
+// ---- 線性時間的比對器 -----------------------------------------------------------------
+// 下列樣式若直接寫成正規表示式，會因為巢狀量詞或每個起點都往後掃完整段而對長字串變成二次方時間。
+// 這裡改成單趟掃描（或帶記憶的掃描），語意與註解中的正規表示式完全一致。
+
+const ch = (s, i) => s.charCodeAt(i);
+const isDigitC = c => c >= 48 && c <= 57;
+const isLetterC = c => (c >= 97 && c <= 122) || (c >= 65 && c <= 90);
+const isAlnumC = c => isDigitC(c) || isLetterC(c);
+const isWordC = c => isAlnumC(c) || c === 95;
+const isLabelC = c => isAlnumC(c) || c === 45;                 // [a-z0-9-]（i 旗標）
+const isLineTermC = c => c === 10 || c === 13 || c === 0x2028 || c === 0x2029;
+const WS_CH = /\s/;
+const isWsC = c => WS_CH.test(String.fromCharCode(c));         // 與 \s 完全一致（含全形空白、BOM）
+
+// 位置 i 之前（只經過空白）是否回到某一行的開頭：等價於 /^\s*(?=X)/m 在 X 開始於 i 時成立
+function atLineStartAfterWs(s, i) {
+  for (let j = i - 1; j >= 0; j--) {
+    const c = ch(s, j);
+    if (isLineTermC(c)) return true;
+    if (!isWsC(c)) return false;
+  }
+  return true;
+}
+
+// 往後找第一個落在 stops 內的字元，記住上一次的結果（查詢位置只會遞增），讓整體是線性
+function makeNextStop(s, stops) {
+  let qFrom = -1;
+  let qAt = -1;
+  let none = Infinity;
+  return from => {
+    if (from >= none) return -1;
+    if (qFrom !== -1 && from >= qFrom && from <= qAt) return qAt;
+    for (let j = from; j < s.length; j++) {
+      if (stops.includes(ch(s, j))) { qFrom = from; qAt = j; return j; }
+    }
+    none = from;
+    return -1;
+  };
+}
+
+// /^\s*(?:system|assistant|developer)\s*:/m
+const ROLE_PREFIX = /(?:system|assistant|developer)\s*:/g;
+function hasOverridePrefix(s) {
+  ROLE_PREFIX.lastIndex = 0;
+  for (let m = ROLE_PREFIX.exec(s); m; m = ROLE_PREFIX.exec(s)) if (atLineStartAfterWs(s, m.index)) return true;
+  return false;
+}
+
+// /<\/?[a-z!][^>]*>/i：最左邊的起點離結尾最遠，只要它之後還有 '>' 就成立
+const TAG_OPEN = /<\/?[a-z!]/i;
+function hasHtmlTag(s) {
+  const m = TAG_OPEN.exec(s);
+  return m !== null && s.indexOf('>', m.index + m[0].length) !== -1;
+}
+
+// /!?\[[^\]\n]*\]\([^)\n]*\)|^\s*\[[^\]\n]+\]:\s*\S+/im
+function hasMarkdownLink(s) {
+  // 行內連結：每個 '](' 往左找同一行、不跨 ']' 的 '['，往右找同一行的 ')'
+  const nextClose = makeNextStop(s, [41, 10]);
+  for (let at = s.indexOf(']('); at !== -1; at = s.indexOf('](', at + 1)) {
+    let open = false;
+    for (let k = at - 1; k >= 0; k--) {
+      const c = ch(s, k);
+      if (c === 91) { open = true; break; }
+      if (c === 93 || c === 10) break;
+    }
+    if (!open) continue;
+    const end = nextClose(at + 2);
+    if (end !== -1 && ch(s, end) === 41) return true;
+  }
+  // 參考式定義：行首（可隔著空白與空行）的 [標籤]: 後面還有任何非空白字元
+  let lastNonWs = -2;
+  const nextBracket = makeNextStop(s, [93, 10]);
+  for (let at = s.indexOf('['); at !== -1; at = s.indexOf('[', at + 1)) {
+    if (!atLineStartAfterWs(s, at)) continue;
+    const close = nextBracket(at + 1);
+    if (close === -1 || close === at + 1 || ch(s, close) !== 93 || ch(s, close + 1) !== 58) continue;
+    if (lastNonWs === -2) { lastNonWs = s.length - 1; while (lastNonWs >= 0 && isWsC(ch(s, lastNonWs))) lastNonWs--; }
+    if (lastNonWs > close + 1) return true;
+  }
+  return false;
+}
+
+// /\b(?:[a-z0-9-]+\.)+[a-z]{2,}\/\S*/i：從每個 '/' 往左看（字母段、'.'、標籤鏈），各段互不重疊
+function hasHostWithPath(s) {
+  for (let slash = s.indexOf('/'); slash !== -1; slash = s.indexOf('/', slash + 1)) {
+    let a = slash;
+    while (a > 0 && isLetterC(ch(s, a - 1))) a--;
+    if (slash - a < 2 || a < 2 || ch(s, a - 1) !== 46) continue;
+    const dot = a - 1;
+    if (!isLabelC(ch(s, dot - 1))) continue;
+    // 標籤鏈 [rs, dot)：由非空標籤以單一 '.' 相連
+    let rs = dot;
+    for (let j = dot - 1; j >= 0; j--) {
+      const c = ch(s, j);
+      if (isLabelC(c)) rs = j;
+      else if (c === 46 && j > 0 && isLabelC(ch(s, j - 1))) continue;
+      else break;
+    }
+    // 起點需落在標籤字元上，且前一個字元與它之間有 \b
+    for (let i = rs; i < dot; i++) {
+      const c = ch(s, i);
+      if (c === 46) continue;
+      if ((i === 0 ? false : isWordC(ch(s, i - 1))) !== isWordC(c)) return true;
+    }
+  }
+  return false;
+}
+
+// 以「從位置 i 起，字元類別連續到哪裡結束」的陣列，讓重疊的起點共用同一段掃描
+function runEnds(s, inClass) {
+  const ends = new Int32Array(s.length + 1);
+  ends[s.length] = s.length;
+  for (let i = s.length - 1; i >= 0; i--) ends[i] = inClass(ch(s, i)) ? ends[i + 1] : i;
+  return ends;
+}
+
+// /\beyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}/ 的下一個命中 {start, end}
+const JWT_START = /\beyJ/g;
+const isB64UrlC = c => isAlnumC(c) || c === 95 || c === 45;
+function findJwt(s, from = 0, memo = {}) {
+  JWT_START.lastIndex = from;
+  for (let m = JWT_START.exec(s); m; m = JWT_START.exec(s)) {
+    const ends = (memo.ends ??= runEnds(s, isB64UrlC));
+    const e1 = ends[m.index + 3];
+    if (e1 - (m.index + 3) < 20 || ch(s, e1) !== 46) continue;
+    const e2 = ends[e1 + 1];
+    if (e2 - (e1 + 1) < 20 || ch(s, e2) !== 46) continue;
+    const e3 = ends[e2 + 1];
+    if (e3 - (e2 + 1) >= 10) return { start: m.index, end: e3 };
+  }
+  return null;
+}
+
+// /\b(?:password|…|authorization)\b\s*[:=]\s*["']?(?=[A-Za-z0-9_\-+/=.]*\d)[A-Za-z0-9_\-+/=.]{8,}/i 的下一個命中
+const KV_PREFIX = /\b(?:password|passwd|pwd|secret|token|api[_-]?key|apikey|access[_-]?key|client[_-]?secret|authorization)\b\s*[:=]\s*["']?/gi;
+const isKvValueC = c => isAlnumC(c) || c === 95 || c === 45 || c === 43 || c === 47 || c === 61 || c === 46;
+function findKeyValue(s, from = 0, memo = {}) {
+  KV_PREFIX.lastIndex = from;
+  for (let m = KV_PREFIX.exec(s); m; m = KV_PREFIX.exec(s)) {
+    if (!memo.ends) {
+      memo.ends = runEnds(s, isKvValueC);
+      memo.digits = new Int32Array(s.length + 1);
+      for (let i = 0; i < s.length; i++) memo.digits[i + 1] = memo.digits[i] + (isDigitC(ch(s, i)) ? 1 : 0);
+    }
+    const { ends, digits } = memo;
+    const r = m.index + m[0].length;
+    const e = ends[r];
+    if (e - r >= 8 && digits[e] - digits[r] > 0) return { start: m.index, end: e };
+    KV_PREFIX.lastIndex = m.index + 1;
+  }
+  return null;
+}
+
 // 機密樣式：與 scripts/security-scan.mjs 的樣式一致，另加 Bearer、鍵值對與長字串
+// （key-value、jwt-literal 在掃描與遮罩時改用上面的 findKeyValue、findJwt；這裡的 RegExp 是它們的定義）
 export const SECRET_SHAPES = [
   ['openai-key', /\bsk-[A-Za-z0-9]{20,}/],
   ['aws-access-key', /\bAKIA[0-9A-Z]{16}\b/],
@@ -165,32 +341,50 @@ export const SECRET_SHAPES = [
   ['key-value', /\b(?:password|passwd|pwd|secret|token|api[_-]?key|apikey|access[_-]?key|client[_-]?secret|authorization)\b\s*[:=]\s*["']?(?=[A-Za-z0-9_\-+/=.]*\d)[A-Za-z0-9_\-+/=.]{8,}/i],
   ['long-token', /(?<![A-Za-z0-9+/_-])(?=[A-Za-z0-9+/_-]*\d)(?=[A-Za-z0-9+/_-]*[A-Za-z])[A-Za-z0-9+/_-]{40,}={0,2}(?![A-Za-z0-9+/_-])/],
 ];
+const SECRET_FINDERS = new Map([['jwt-literal', findJwt], ['key-value', findKeyValue]]);
 
 // 給宿主在「送進模型之前」遮罩機密樣式用（規格 §9）
 export function maskSecrets(text) {
   let s = String(text);
   for (const [name, re] of SECRET_SHAPES) {
+    const find = SECRET_FINDERS.get(name);
+    if (find) {
+      let out = '';
+      let pos = 0;
+      const memo = {};   // 同一個字串的掃描結果在多次命中間共用，整體仍是線性
+      for (let m = find(s, 0, memo); m; m = find(s, pos, memo)) {
+        const hit = s.slice(m.start, m.end);
+        out += s.slice(pos, m.start) + (name === 'key-value' ? `${hit.slice(0, hit.search(/[:=]/) + 1)} [REDACTED]` : '[REDACTED]');
+        pos = m.end;
+      }
+      s = out + s.slice(pos);
+      continue;
+    }
     const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : `${re.flags}g`);
-    s = name === 'key-value'
-      ? s.replace(g, m => `${m.slice(0, m.search(/[:=]/) + 1)} [REDACTED]`)
-      : s.replace(g, '[REDACTED]');
+    s = s.replace(g, '[REDACTED]');
   }
   return s;
 }
+
+const matches = (rule, text) => (rule.fast ? rule.fast(text) : rule.re.test(text));
+const runMatcher = (m, text) => (typeof m === 'function' ? m(text) : m.test(text));
 
 // 掃一段文字，回傳命中清單；不回傳命中的原文
 export function scanText(input) {
   const out = [];
   const raw = String(input);
   if (BAD_CHARS.test(raw)) out.push({ code: 'REVIEW_BAD_SCHEMA', detail: 'control-or-format-char' });
-  const stripped = raw.normalize('NFKC').replace(INVISIBLE, '');
-  for (const [name, re] of SECRET_SHAPES) if (re.test(stripped)) out.push({ code: 'REVIEW_SECRET_PATTERN', detail: name });
-  for (const [name, re] of URL_RULES) if (re.test(stripped)) out.push({ code: 'REVIEW_URL', detail: name });
-  for (const [name, re] of HTML_RULES) if (re.test(stripped)) out.push({ code: 'REVIEW_HTML', detail: name });
-  const norm = normalize(raw);
+  const stripped = stripForScan(raw);
+  for (const [name, re] of SECRET_SHAPES) {
+    const find = SECRET_FINDERS.get(name);
+    if (find ? find(stripped, 0) : re.test(stripped)) out.push({ code: 'REVIEW_SECRET_PATTERN', detail: name });
+  }
+  for (const [name, m] of URL_RULES) if (runMatcher(m, stripped)) out.push({ code: 'REVIEW_URL', detail: name });
+  for (const [name, m] of HTML_RULES) if (runMatcher(m, stripped)) out.push({ code: 'REVIEW_HTML', detail: name });
+  const norm = toNorm(stripped);
   const sq = squeeze(norm);
   for (const r of FORBIDDEN) {
-    if (r.re.test(norm) || (r.sq && r.re.test(sq)) || (r.sqRe && r.sqRe.test(sq))) {
+    if (matches(r, norm) || (r.sq && matches(r, sq)) || (r.sqRe && r.sqRe.test(sq))) {
       out.push({ code: 'REVIEW_FORBIDDEN_WORD', detail: r.id, cls: r.cls });
     }
   }

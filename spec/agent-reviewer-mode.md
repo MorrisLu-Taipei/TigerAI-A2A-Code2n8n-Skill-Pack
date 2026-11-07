@@ -283,7 +283,7 @@
 
 宿主對模型的**原始回覆**執行 [`../scripts/review/validate-review.mjs`](../scripts/review/validate-review.mjs)（`--format json` 取結構化結果、`--format markdown` 取要貼的註解）。步驟：
 
-1. **解析**：輸出大小上限 256 KB；允許整份被單一程式碼區塊包住；其餘必須是單一 JSON 物件。
+1. **解析**：輸出大小上限 256 KB；允許整份被單一程式碼區塊包住；其餘必須是單一 JSON 物件。驗證本身是線性時間（沒有會對長字串二次方回溯的樣式），輸出長度上限只是第二道防線，不是唯一的防線。
 2. **頂層結構**：恰好五個欄位（`version`、`summary`、`suggestions`、`referencesUsed`、`notReviewed`），`version` 為 `1`，後三者為陣列。不合格 → 整份無效。
 3. **`summary`**：長度與內容檢查；**有任何問題 → 整份無效**（摘要是呈現的第一行，不容許帶問題）。
 4. **逐筆建議**：結構、列舉、長度、內容、重複 id；`node` 與 `referencesUsed` 可選擇性對照宿主給的清單（`--workflow`、`--allowed-refs`）。**不合格的那一筆丟棄**，同一筆同一種原因只記一次。

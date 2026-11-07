@@ -38,7 +38,7 @@ export const fullSystemPrompt = () => `${REVIEW_SYSTEM_PROMPT}\n\n宿主提供�
 
 // 送進模型的資料字元數預算（約 24,000 tokens 的量級）；超過時先不送 workflow_before，仍超過就不送模型（不靜默截斷）
 export const DEFAULT_MAX_INPUT_CHARS = 150000;
-// validate 只收這麼長的模型輸出：validate-review.mjs 的部分正規表示式對長字串是二次方時間，3,000 tokens 的輸出遠小於此值
+// validate 只收這麼長的模型輸出：validate-review.mjs 本身已是線性時間，這個上限是第二道防線（讓單一請求的工作量有明確上界），3,000 tokens 的輸出遠小於此值
 export const MAX_OUTPUT_CHARS = 32768;
 
 const bad = (path, why) => new ApiError('INVALID_REQUEST', { details: { path, ...(why ? { why } : {}) } });

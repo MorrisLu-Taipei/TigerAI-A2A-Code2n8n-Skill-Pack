@@ -287,7 +287,7 @@ The exact Chinese phrasings are in the Traditional Chinese edition [`agent-revie
 
 The host runs [`../scripts/review/validate-review.mjs`](../scripts/review/validate-review.mjs) on the model's **raw reply** (`--format json` for the structured result, `--format markdown` for the comment to post). Steps:
 
-1. **Parse**: output size limit 256 KB; the whole reply may be wrapped in a single code block; otherwise it must be a single JSON object.
+1. **Parse**: output size limit 256 KB; the whole reply may be wrapped in a single code block; otherwise it must be a single JSON object. The validation runs in linear time (no pattern backtracks quadratically on long strings), and the output size limit is only a second line of defense, not the only one.
 2. **Top-level structure**: exactly five fields (`version`, `summary`, `suggestions`, `referencesUsed`, `notReviewed`), `version` is `1`, the last three are arrays. Otherwise the whole output is invalid.
 3. **`summary`**: length and content check; **any problem makes the whole output invalid** (the summary is the first line shown and must carry no problem).
 4. **Each suggestion**: structure, enumeration, length, content, duplicate id; `node` and `referencesUsed` may optionally be checked against lists the host provides (`--workflow`, `--allowed-refs`). **A non-conforming suggestion is dropped**, and one reason per kind is recorded for it.
