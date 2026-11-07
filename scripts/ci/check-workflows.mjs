@@ -14,7 +14,8 @@
 //   trigger:external-registration（觸發節點需要對外註冊，無法在無網路環境測試啟用）、
 //   credentials:missing-field（節點類型在目錄中有「無條件需要」的憑證，但節點沒有 credentials 欄位；可能誤報，見 docs/ci-for-n8n-workflows.md）、
 //   egress:external-domain（外連網域提醒，可用 --egress-allow 提供允許清單）、impact:high-impact-node（高影響動作提醒）、
-//   notes:missing-change-log（Layer 3 說明便條缺修改記錄）；這三條是 scripts/security-scan.mjs 的護欄建議，一律只提醒。
+//   notes:missing-change-log（Layer 3 說明便條缺修改記錄）、env:staging-connection-needed（用了 $vars 變數或 $secrets 外部密鑰，
+//   這類依賴授權版與真實資料的功能請到 STAGING 做連接測試）；這四條是 scripts/security-scan.mjs 的護欄建議，一律只提醒。
 // 退出碼：0 無阻擋項；1 有阻擋項；2 使用錯誤或內部工具失敗。
 // 輸出與日誌只寫規則名稱、檔名、節點名，不印任何疑似機密的原文。
 
@@ -339,9 +340,10 @@ const SCAN_MESSAGES = {
   'egress:external-domain': '節點會連到外部網域，請核准人確認是否在允許清單內',
   'impact:high-impact-node': '高影響動作（寄信、寫入或刪除資料庫、HTTP 寫入方法、執行系統指令），請核准人在工單上特別確認',
   'notes:missing-change-log': 'Layer 3 說明便條沒有填寫「修改記錄」',
+  'env:staging-connection-needed': '使用 $vars 變數或 $secrets 外部密鑰，這類功能依賴授權版與真實資料，請在 STAGING 做連接測試',
 };
-// 這三條的說明文字本身帶有節點的具體內容（網域清單、動作種類、缺漏狀況），直接用掃描器的說明
-const SAMPLE_AS_MESSAGE = new Set(['egress:external-domain', 'impact:high-impact-node', 'notes:missing-change-log']);
+// 這四條的說明文字本身帶有節點的具體內容（網域清單、動作種類、缺漏狀況），直接用掃描器的說明
+const SAMPLE_AS_MESSAGE = new Set(['egress:external-domain', 'impact:high-impact-node', 'notes:missing-change-log', 'env:staging-connection-needed']);
 
 function scanNodeOf(where, nodeNames) {
   if (typeof where !== 'string' || !where.startsWith('node:')) return null;

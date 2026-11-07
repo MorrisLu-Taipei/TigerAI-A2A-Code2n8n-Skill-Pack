@@ -170,6 +170,16 @@ try {
   const rmix = check(stage([remF, 'fail-function-node.workflow.json']));
   expect(rmix.report.blocking.length === 1 && rmix.report.blocking[0].code === 'NODE_DEPRECATED', '三條提醒與 fail 同批：阻擋項不因此增加');
 
+  // ---- STAGING 連接測試提醒（$vars／$secrets；建議，不阻擋） ---------------------------------------------------
+  const stgF = 'advisory-staging-connection.workflow.json';
+  const stg = check(stage([stgF]));
+  const sa = stg.report.advisories.filter(a => a.rule === 'env:staging-connection-needed');
+  expect(stg.code === 0 && stg.report.status === 'pass' && stg.report.blocking.length === 0, 'env:staging-connection-needed：應為 pass、沒有阻擋項');
+  expect(sa.length === 2 && sa.map(a => a.node).sort().join('|') === 'Call local|Read config' && sa.every(a => a.source === 'security-scan' && a.file === stgF), 'env:staging-connection-needed：只有用到 $vars／$secrets 的兩個節點各一則，便條不算');
+  expect(sa.every(a => /STAGING/.test(a.message) && /授權版與真實資料/.test(a.message)) && /\$vars/.test(sa.find(a => a.node === 'Read config').message) && /\$secrets/.test(sa.find(a => a.node === 'Call local').message), 'env:staging-connection-needed：訊息要說明原因並指出功能');
+  expect(stg.comment.includes('env:staging-connection-needed') && !stg.comment.includes('### 阻擋項'), 'env:staging-connection-needed：PR 註解的建議區應列出且沒有阻擋區塊');
+  expect(check(stage([stgF, 'fail-function-node.workflow.json'])).report.blocking.length === 1, 'env:staging-connection-needed 與 fail 同批：阻擋項不因此增加');
+
   // ---- sub-workflow 引用 ------------------------------------------------------------------------
   const sub = stage(['advisory-unknown-subworkflow.workflow.json']);
   const sub1 = check(sub);

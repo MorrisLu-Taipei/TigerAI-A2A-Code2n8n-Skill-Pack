@@ -23,6 +23,7 @@
     "advisory-credential-field-missing.workflow.json": { "status": "pass", "blocking": [], "advisories": ["credentials:credentials:missing-field"] },
     "advisory-unknown-subworkflow.workflow.json":  { "status": "pass", "blocking": [], "advisories": ["workflow-refs:workflow:unknown-subworkflow-reference"] },
     "advisory-egress-impact-changelog.workflow.json": { "status": "pass", "blocking": [], "advisories": ["security-scan:egress:external-domain", "security-scan:impact:high-impact-node", "security-scan:notes:missing-change-log"] },
+    "advisory-staging-connection.workflow.json": { "status": "pass", "blocking": [], "advisories": ["security-scan:env:staging-connection-needed"] },
 
     "fail-json-invalid.workflow.json":        { "status": "fail", "blocking": ["JSON_INVALID"] },
     "fail-structure.workflow.json":           { "status": "fail", "blocking": ["STRUCTURE_INVALID"] },

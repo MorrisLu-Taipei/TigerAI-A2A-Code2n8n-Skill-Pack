@@ -17,6 +17,7 @@
 //   egress:external-domain     external domains in HTTP-style URL parameters (+ "cannot judge statically" for dynamic URLs)
 //   impact:high-impact-node    nodes that send mail, write/delete database rows, call HTTP write methods, run commands
 //   notes:missing-change-log   a Layer 3 sticky note without a filled-in change log section
+//   env:staging-connection-needed   executed expressions / Code that use $vars (Variables) or $secrets (external secrets)
 // Optional egress allow-list (no list = just list the domains, no judgement; `*.example.com` matches sub-domains only):
 //   --egress-allow <a.example.invalid,*.b.example.invalid>   --egress-allow-file <file>   env SKILLPACK_EGRESS_ALLOW
 //
@@ -156,7 +157,7 @@ const ACKABLE_RULES = new Set([
   'form:no-auth', 'tls:allow-unauthorized-certs', 'exec:execute-command', 'exec:ssh', 'file:rw-access',
   'header:hardcoded-authorization', 'ai:agent-code-tool', 'ai:agent-no-guardrails', 'error:no-handling',
   'webhook:no-auth', 'network:http-cleartext',
-  'egress:external-domain', 'impact:high-impact-node', 'notes:missing-change-log',
+  'egress:external-domain', 'impact:high-impact-node', 'notes:missing-change-log', 'env:staging-connection-needed',
 ]);
 const NODE = Symbol('node');
 const WF_LEVEL = Symbol('workflowLevel');
@@ -350,6 +351,101 @@ function changeLogState(content) {
   return state;
 }
 
+// ---- STAGING connection reminder ($vars / $secrets) ------------------------------------------------------------
+// DEV has no license and only fake data (ADR-018): Variables, External Secrets, project sharing and advanced permissions
+// depend on a licensed edition and real data, so they are connection-tested on STAGING. Project sharing and permissions
+// are NOT in the workflow JSON, so only $vars / $secrets can be detected here; the rest is a human check on STAGING.
+// Only what n8n actually executes is read: an `=`-prefixed parameter is an expression and only its {{ ... }} parts are
+// evaluated (the rest is plain text); Code-node source is code. Everything else (notes, sticky notes, node names, plain
+// strings, text outside {{ }}) is never evaluated, so a mention there is not a use.
+const STAGING_FEATURES = [
+  { id: 'variables', label: '變數（$vars）' },
+  { id: 'externalSecrets', label: '外部密鑰（$secrets）' },
+];
+const STAGING_TOKEN_RE = /\$(vars|secrets)(?![\w$])/g;
+const CODE_PARAM_KEYS = new Set(['jsCode', 'pythonCode', 'functionCode']);
+
+// Drops comments, keeps string contents. lineMarker: '//' for JavaScript, '#' for Python.
+function stripCodeComments(src, lineMarker) {
+  let out = '';
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '"' || c === "'" || c === '`') {
+      let j = i + 1;
+      while (j < src.length && src[j] !== c) j += src[j] === '\\' ? 2 : 1;
+      out += src.slice(i, j + 1);
+      i = j + 1;
+    } else if ((lineMarker === '//' && c === '/' && src[i + 1] === '/') || (lineMarker === '#' && c === '#')) {
+      while (i < src.length && src[i] !== '\n') i++;
+    } else if (lineMarker === '//' && c === '/' && src[i + 1] === '*') {
+      const end = src.indexOf('*/', i + 2);
+      i = end < 0 ? src.length : end + 2;
+      out += ' ';
+    } else {
+      out += c;
+      i++;
+    }
+  }
+  return out;
+}
+
+// Feature ids ('variables' / 'externalSecrets') used as a global name in `code` (property access like `x.$vars` is not one).
+function stagingFeaturesIn(code, lineMarker) {
+  const found = new Set();
+  const text = stripCodeComments(code, lineMarker);
+  for (const m of text.matchAll(STAGING_TOKEN_RE)) {
+    const prev = text[m.index - 1];
+    if (prev !== undefined && /[\w$]/.test(prev)) continue;
+    if (prev === '.' && !text.startsWith('...', m.index - 3)) continue;
+    found.add(m[1] === 'vars' ? 'variables' : 'externalSecrets');
+  }
+  return found;
+}
+
+// The {{ ... }} parts of an expression string. A part ends at the first `}}` outside string literals and nested braces.
+function expressionSegments(str) {
+  const out = [];
+  let i = str.indexOf('{{');
+  while (i >= 0) {
+    let j = i + 2, depth = 0;
+    for (; j < str.length; j++) {
+      const c = str[j];
+      if (c === '"' || c === "'" || c === '`') {
+        j++;
+        while (j < str.length && str[j] !== c) j += str[j] === '\\' ? 2 : 1;
+      } else if (c === '{') depth++;
+      else if (c === '}' && depth > 0) depth--;
+      else if (c === '}' && str[j + 1] === '}') break;
+    }
+    out.push(str.slice(i + 2, j));
+    i = str.indexOf('{{', j + 2);
+  }
+  return out;
+}
+
+function collectStagingFeatures(node) {
+  const found = new Set();
+  if (node?.type === 'n8n-nodes-base.stickyNote') return found;
+  const isCodeNode = CODE_NODE_TYPES.has(node?.type);
+  const visit = (val, key, depth) => {
+    if (depth > 12 || val == null) return;
+    if (typeof val === 'string') {
+      if (isCodeNode && CODE_PARAM_KEYS.has(key)) {
+        for (const f of stagingFeaturesIn(val, key === 'pythonCode' ? '#' : '//')) found.add(f);
+      } else if (val.startsWith('=')) {
+        for (const seg of expressionSegments(val)) for (const f of stagingFeaturesIn(seg, '//')) found.add(f);
+      } else if (isCodeNode && key === 'code') {
+        for (const f of stagingFeaturesIn(val, '//')) found.add(f); // LangChain Code node: parameters.code.<execute|supplyData>.code
+      }
+    } else if (typeof val === 'object') {
+      for (const [k, v] of Object.entries(val)) visit(v, k, depth + 1);
+    }
+  };
+  visit(node?.parameters ?? {}, '', 0);
+  return found;
+}
+
 function scanReminders(nodes, findings) {
   const add = (rule, n, sample, wfLevel = false) => {
     const f = { rule, severity: REMINDER_SEVERITY, where: wfLevel ? 'workflow' : `node:${n?.name ?? '(unnamed)'}`, sample };
@@ -382,6 +478,12 @@ function scanReminders(nodes, findings) {
       }
       if (dynamic) parts.push('網址由運算式組出，無法靜態判斷目的地；請核准人人工確認實際會連到哪些網域');
       if (parts.length > 0) add('egress:external-domain', n, parts.join('；'));
+    }
+
+    const staging = collectStagingFeatures(n);
+    if (staging.size > 0) {
+      const used = STAGING_FEATURES.filter(f => staging.has(f.id)).map(f => f.label).join('、');
+      add('env:staging-connection-needed', n, `此節點使用${used}：這類功能依賴授權版與真實資料；DEV 不放授權且只用假資料，請在 STAGING 做連接測試（變數值、外部密鑰、專案共用與進階權限），不要在 DEV 期待完整行為。`);
     }
   }
   // A Layer 3 note without a filled-in change log. No Layer 3 note at all: nothing is said here (no extra noise).

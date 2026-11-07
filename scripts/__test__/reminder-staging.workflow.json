@@ -1,0 +1,367 @@
+{
+  "name": "reminder-staging",
+  "nodes": [
+    {
+      "id": "stg00",
+      "name": "Manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "stg01",
+      "name": "Set vars",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        200,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "base",
+              "value": "={{ $vars.apiBase }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "stg02",
+      "name": "Http secret",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:5678/healthz",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Demo",
+              "value": "={{ $secrets.vault.demoKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "stg03",
+      "name": "Code vars",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const base = $vars.apiBase;\nreturn [{ json: { base } }];"
+      }
+    },
+    {
+      "id": "stg04",
+      "name": "Both features",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        800,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "label",
+              "value": "=env {{ $vars.stage }} / {{ $secrets.vault.demoKey }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "stg05",
+      "name": "Nested option",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1000,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": []
+        },
+        "options": {
+          "nested": {
+            "deep": [
+              {
+                "x": "={{ $vars['region'] }}"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "stg06",
+      "name": "Python vars",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "value = $vars.apiBase\nreturn [{'json': {'value': value}}]"
+      }
+    },
+    {
+      "id": "stg07",
+      "name": "Uses $vars in name",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1400,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "a",
+              "value": "plain text",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "說明：之後會改用 $vars 與 $secrets 取得設定"
+    },
+    {
+      "id": "stg08",
+      "name": "Plain words",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1600,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "a",
+              "value": "vars",
+              "type": "string"
+            },
+            {
+              "id": "a1",
+              "name": "b",
+              "value": "my vars here",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "c",
+              "value": "$varsX",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "d",
+              "value": "={{ $varsX }}",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "e",
+              "value": "={{ $json.vars }}",
+              "type": "string"
+            },
+            {
+              "id": "a5",
+              "name": "f",
+              "value": "={{ $json.secrets.value }}",
+              "type": "string"
+            },
+            {
+              "id": "a6",
+              "name": "g",
+              "value": "={{ mysecrets + 1 }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "stg09",
+      "name": "Literal not expression",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1800,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "a",
+              "value": "$vars.x is not evaluated without a leading =",
+              "type": "string"
+            },
+            {
+              "id": "a1",
+              "name": "b",
+              "value": "{{ $vars.x }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "stg10",
+      "name": "Text outside braces",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2000,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "a",
+              "value": "=請參考 $vars 與 $secrets 的說明：{{ $json.name }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "stg11",
+      "name": "Code comments only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// TODO: read config from $vars later\n/* $secrets.vault.key is not used yet */\nconst url = 'https://x.example.invalid/#/a'; // $vars\nreturn $input.all();\n"
+      }
+    },
+    {
+      "id": "stg12",
+      "name": "Property access",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const o = { a: 1 };\nreturn [{ json: { a: o.$vars, b: $json.$secrets, c: o?.$secrets } }];"
+      }
+    },
+    {
+      "id": "stg13",
+      "name": "Sticky text",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2600,
+        0
+      ],
+      "parameters": {
+        "content": "## 備忘\n這裡寫 $vars.x 與 $secrets.vault.key，只是說明。",
+        "color": 4
+      }
+    },
+    {
+      "id": "stg14",
+      "name": "Sticky expression-like",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2800,
+        0
+      ],
+      "parameters": {
+        "content": "={{ $vars.x }}",
+        "color": 3
+      }
+    },
+    {
+      "id": "stg15",
+      "name": "Acked vars",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3000,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a0",
+              "name": "base",
+              "value": "={{ $vars.apiBase }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "guardrail-ack: env:staging-connection-needed -- STAGING 階段再做連接測試"
+    },
+    {
+      "id": "stg16",
+      "name": "Python comments only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3200,
+        0
+      ],
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# $vars and $secrets do not exist in native Python\nreturn _items"
+      }
+    }
+  ],
+  "connections": {},
+  "settings": {}
+}

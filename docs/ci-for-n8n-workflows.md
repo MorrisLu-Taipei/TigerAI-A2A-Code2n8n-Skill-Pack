@@ -40,7 +40,7 @@ AI 審查（只給建議、不阻擋）排在這些檢查之後，另外貼一�
 | 來源 | 內容 |
 |---|---|
 | `security-scan` | 護欄規則的 warning，例如 `webhook:no-auth`、`ai:agent-no-guardrails`、`error:no-handling`；規則說明見 [`spec/security-guardrails.md`](../spec/security-guardrails.md) |
-| `security-scan`（提醒類） | 三條只提醒的規則（ADR-014，**都是建議代碼，不是阻擋碼**，沒有新增任何阻擋碼）：`egress:external-domain`（HTTP 類節點的網址參數連到非內網網域，列出網域並提醒核准人確認是否在允許清單內；網址由運算式組出時提醒「無法靜態判斷」）、`impact:high-impact-node`（寄信、寫入或刪除資料庫、HTTP 寫入方法、執行系統指令的節點，提醒核准人在工單上特別確認）、`notes:missing-change-log`（Layer 3 說明便條沒有「修改記錄」段，或有標題卻沒有任何一列資料）。說明文字直接帶具體內容（網域、動作種類），PR 註解的「說明」欄可以直接給核准人看。可在節點 notes 用 `guardrail-ack: <規則編號>` 確認。規則細節見 [`spec/security-guardrails.md`](../spec/security-guardrails.md) 2.13 至 2.15 |
+| `security-scan`（提醒類） | 四條只提醒的規則（ADR-014，**都是建議代碼，不是阻擋碼**，沒有新增任何阻擋碼）：`egress:external-domain`（HTTP 類節點的網址參數連到非內網網域，列出網域並提醒核准人確認是否在允許清單內；網址由運算式組出時提醒「無法靜態判斷」）、`impact:high-impact-node`（寄信、寫入或刪除資料庫、HTTP 寫入方法、執行系統指令的節點，提醒核准人在工單上特別確認）、`notes:missing-change-log`（Layer 3 說明便條沒有「修改記錄」段，或有標題卻沒有任何一列資料）、`env:staging-connection-needed`（節點的運算式或 Code 用到 `$vars` 變數或 `$secrets` 外部密鑰；這類依賴授權版與真實資料的功能，DEV 不放授權且只用假資料，請到 STAGING 做連接測試；專案共用與進階權限不在 workflow JSON 內，掃描器看不到，一樣請在 STAGING 驗證）。說明文字直接帶具體內容（網域、動作種類），PR 註解的「說明」欄可以直接給核准人看。可在節點 notes 用 `guardrail-ack: <規則編號>` 確認。規則細節見 [`spec/security-guardrails.md`](../spec/security-guardrails.md) 2.13 至 2.15 |
 | `native-first` | 可能可以用原生節點取代的 Code 節點，見 [`spec/native-first.md`](../spec/native-first.md)；是樣式比對，可能有誤 |
 | `node-catalog` | 規則 `node:hidden-legacy`：目錄標示 `hidden: true` 但未 `deprecated` 的舊節點。訊息為「此節點在節點面板中已隱藏，屬舊節點，建議評估新版替代」；本 Pack 在 2.44.6、2.46.6 實測這類節點仍可匯入，是否阻擋以實測為準，不以 hidden 旗標為準 |
 | `workflow-refs` | 規則 `workflow:unknown-subworkflow-reference`：Execute Workflow 節點的 `workflowId` 在同一批檔案與 `--existing-workflow-ids` 清單中都找不到。可能指向目標環境既有的 workflow，所以只提醒 |

@@ -134,7 +134,7 @@ expect(!ai.some(f => f.where === 'node:Tool Code Python'), 'ai-code: Python tool
 expect(!ai.some(f => f.where === 'node:LangChain Benign'), 'ai-code: benign LangChain Code must stay silent');
 expect(scan(fx('ai-code-nodes.workflow.json')).code === 1, 'ai-code: expected exit 1');
 
-// ---- ADR-014 reminder-only rules: egress:external-domain, impact:high-impact-node, notes:missing-change-log ----
+// ---- ADR-014 reminder-only rules: egress:external-domain, impact:high-impact-node, notes:missing-change-log, env:staging-connection-needed ----
 // They are severity "info": visible, acknowledgeable, but never a failure (not even with --strict).
 {
   const json = (file, ...flags) => JSON.parse(scan(file, '--format', 'json', ...flags).out);
@@ -286,6 +286,90 @@ expect(scan(fx('ai-code-nodes.workflow.json')).code === 1, 'ai-code: expected ex
     expect(hitsOf(ackJ, 'notes:missing-change-log').length === 0 && ackJ.results[0].acknowledged.some(a => a.rule === 'notes:missing-change-log'), 'change log: guardrail-ack on a node acknowledges the workflow-level reminder');
     const stray = scan(put('stray-ack', wfOf([{ id: 'x', name: 'Plain', type: 'n8n-nodes-base.set', typeVersion: 3, position: [0, 0], parameters: {}, notes: 'guardrail-ack: egress:external-domain' }]))).out;
     expect(/^NOTE .*\[egress:external-domain\].*ack ignored: rule id mismatch or no such finding/m.test(stray), 'ack: a stray ack for a new rule produces a NOTE');
+
+    // -- STAGING connection reminder: $vars / $secrets (ADR-018: DEV has no license and only fake data) --------------------
+    const stgFile = fx('reminder-staging.workflow.json');
+    const stg = json(stgFile);
+    const stgRule = 'env:staging-connection-needed';
+    const stgSample = node => hitsOf(stg, stgRule).find(f => f.where === `node:${node}`)?.sample ?? '';
+    expect(same(nodesOf(stg, stgRule), ['Set vars', 'Http secret', 'Code vars', 'Both features', 'Nested option', 'Python vars']), `staging fixture: wrong node set (${nodesOf(stg, stgRule)})`);
+    expect(hitsOf(stg, stgRule).every(f => f.severity === 'info') && hitsOf(stg, stgRule).length === new Set(nodesOf(stg, stgRule)).size, 'staging: severity info and at most one reminder per node');
+    expect(/變數（\$vars）/.test(stgSample('Set vars')) && !/\$secrets/.test(stgSample('Set vars')), 'staging: an expression with $vars names Variables only');
+    expect(/外部密鑰（\$secrets）/.test(stgSample('Http secret')) && !/\$vars/.test(stgSample('Http secret')), 'staging: an HTTP parameter with $secrets names External Secrets only');
+    expect(/變數（\$vars）/.test(stgSample('Code vars')), 'staging: a Code node using $vars is reminded');
+    expect(/變數（\$vars）、外部密鑰（\$secrets）/.test(stgSample('Both features')) && hitsOf(stg, stgRule).filter(f => f.where === 'node:Both features').length === 1, 'staging: two features in one node give one reminder naming both');
+    expect(/變數（\$vars）/.test(stgSample('Nested option')) && /變數（\$vars）/.test(stgSample('Python vars')), 'staging: nested parameters and pythonCode are read too');
+    for (const n of ['Set vars', 'Both features']) {
+      const t = stgSample(n);
+      expect(/依賴授權版與真實資料/.test(t) && /DEV 不放授權且只用假資料/.test(t) && /請在 STAGING 做連接測試/.test(t) && /變數值、外部密鑰、專案共用與進階權限/.test(t), `staging: ${n} reminder explains why and what to do on STAGING`);
+    }
+    for (const n of ['Uses $vars in name', 'Plain words', 'Literal not expression', 'Text outside braces', 'Code comments only', 'Property access', 'Sticky text', 'Sticky expression-like', 'Python comments only', 'Manual'])
+      expect(!nodesOf(stg, stgRule).includes(n), `staging: ${n} must not be reminded (not an executed use of $vars / $secrets)`);
+    expect(stg.results[0].acknowledged.some(a => a.rule === stgRule && a.where === 'node:Acked vars' && /STAGING/.test(a.note)) && !nodesOf(stg, stgRule).includes('Acked vars'), 'staging: guardrail-ack acknowledges it');
+    expect(scan(stgFile).code === 0 && scan(stgFile, '--strict').code === 0, 'staging: never fails, not even with --strict');
+    expect(/^INFO +.*\[env:staging-connection-needed\]/m.test(scan(stgFile).out) && !/^(?:WARNING|ERROR) .*\[env:/m.test(scan(stgFile).out), 'staging: text output labels it INFO');
+    expect(stg.summary.warnings === 0 && stg.summary.errors === 0 && stg.summary.reminders === hitsOf(stg, stgRule).length, 'staging: summary counts reminders only');
+    // coexistence with the other reminder rules and with older warnings, on one node
+    const mixedNode = { ...httpNode('Mixed', 'https://mix.example.invalid/x'), parameters: { url: 'https://mix.example.invalid/x', method: 'POST', sendHeaders: true, headerParameters: { parameters: [{ name: 'X-Env', value: '={{ $vars.stage }}' }] } } };
+    const mx = json(put('staging-mixed', wfOf([mixedNode])));
+    expect(['egress:external-domain', 'impact:high-impact-node', stgRule].every(r => nodesOf(mx, r).includes('Mixed')), 'staging: coexists with egress and high-impact reminders on the same node');
+    expect(scan(put('staging-mixed2', wfOf([mixedNode])), '--strict').code === 0, 'staging: a node with only info reminders passes --strict');
+    // ack scope: an ack for another rule does not silence it; an ack for this rule does not silence others
+    const ackOther = json(put('staging-ack-other', wfOf([{ ...mixedNode, notes: 'guardrail-ack: egress:external-domain' }])));
+    expect(nodesOf(ackOther, stgRule).includes('Mixed') && !nodesOf(ackOther, 'egress:external-domain').includes('Mixed'), 'staging: an ack for another rule does not silence this one');
+    const ackSelf = json(put('staging-ack-self', wfOf([{ ...mixedNode, notes: 'guardrail-ack: env:staging-connection-needed' }])));
+    expect(!nodesOf(ackSelf, stgRule).includes('Mixed') && nodesOf(ackSelf, 'impact:high-impact-node').includes('Mixed'), 'staging: acking it leaves the other reminders in place');
+    // single-case boundaries (each workflow has exactly one node)
+    const setNode = value => ({ id: 's', name: 'S', type: 'n8n-nodes-base.set', typeVersion: 3.4, position: [0, 0], parameters: { value } });
+    const codeNode = (jsCode, extra = {}) => ({ id: 'c', name: 'C', type: 'n8n-nodes-base.code', typeVersion: 2, position: [0, 0], parameters: { jsCode, ...extra } });
+    const cases = [
+      ['={{ $vars.a }}', setNode('={{ $vars.a }}'), true],
+      ['={{$vars.a}}', setNode('={{$vars.a}}'), true],
+      ['bracket access', setNode("={{ $vars['a'] }}"), true],
+      ['inside a function call', setNode('={{ JSON.stringify($vars) }}'), true],
+      ['spread', setNode('={{ ({ ...$vars }) }}'), true],
+      ['text before and after', setNode('=prefix {{ $json.a }} mid {{ $secrets.vault.k }} end'), true],
+      ['nested braces inside the expression', setNode('={{ ({ a: { b: 1 } }).a.b }} {{ $vars.x }}'), true],
+      ['quoted }} inside the expression', setNode('={{ "}}" + $vars.x }}'), true],
+      ['template literal in Code', codeNode('return [{ json: { v: `${$vars.a}` } }];'), true],
+      ['comment then real use', codeNode('// not here\nconst x = $secrets.v.k; // $vars'), true],
+      ['no leading =', setNode('{{ $vars.a }}'), false],
+      ['$varsX', setNode('={{ $varsX }}'), false],
+      ['$vars_', setNode('={{ $vars_a }}'), false],
+      ['x$vars', setNode('={{ x$vars }}'), false],
+      ['$json.vars', setNode('={{ $json.vars }}'), false],
+      ['property named $vars', setNode('={{ $json.$vars }}'), false],
+      ['optional chain property', setNode('={{ $json?.$secrets }}'), false],
+      ['text outside braces', setNode('=$vars {{ $json.a }} $secrets'), false],
+      ['unclosed braces only before', setNode('=$vars.a }} {{ $json.b }}'), false],
+      ['line comment in Code', codeNode('// $vars\nreturn [];'), false],
+      ['block comment in Code', codeNode('/* $secrets.a.b\n$vars */ return [];'), false],
+      ['plain words', setNode('=vars and secrets {{ $json.vars }} {{ $json.secrets }}'), false],
+      ['empty', setNode(''), false],
+      ['non-string values', { id: 'n', name: 'N', type: 'n8n-nodes-base.set', typeVersion: 3.4, position: [0, 0], parameters: { a: 1, b: true, c: null, d: [1, 2], e: {} } }, false],
+    ];
+    for (const [label, node, want] of cases) {
+      const got = hitsOf(json(put(`stg-${label.replace(/\W+/g, '-')}`, wfOf([node]))), stgRule).length;
+      expect(got === (want ? 1 : 0), `staging (${label}): expected ${want ? 'one reminder' : 'no reminder'}, got ${got}`);
+    }
+    // notes / name / sticky note text never count, even when they look like an expression
+    const textOnly = json(put('staging-text-only', wfOf([
+      { ...setNode('plain'), name: '={{ $vars.a }}', notes: '={{ $vars.a }} $secrets.x' },
+      sticky('st', 4, '={{ $vars.a }}'),
+    ])));
+    expect(nodesOf(textOnly, stgRule).length === 0, 'staging: node name, notes and sticky note content are never executed');
+    // every Code-like node type is read; pinData is not
+    const typeCases = [
+      ['n8n-nodes-base.function', { functionCode: 'return items.map(i => ({ json: { v: $vars.a } }));' }],
+      ['@n8n/n8n-nodes-langchain.toolCode', { jsCode: 'return $vars.a;' }],
+      ['@n8n/n8n-nodes-langchain.code', { code: { execute: { code: 'return $secrets.v.k;' } } }],
+    ];
+    for (const [t, parameters] of typeCases) {
+      const r = json(put(`stg-type-${t.split('.').pop()}`, wfOf([{ id: 'k', name: 'K', type: t, typeVersion: 1, position: [0, 0], parameters }])));
+      expect(nodesOf(r, stgRule).includes('K'), `staging: ${t} code is read`);
+    }
+    const pinOnly = json(put('staging-pin', { ...wfOf([setNode('plain')]), pinData: { S: [{ json: { v: '$vars.a' } }] } }));
+    expect(nodesOf(pinOnly, stgRule).length === 0, 'staging: pinData is data, not executed');
 
     // -- output formats ------------------------------------------------------------------------------------------------
     const md = scan(missFile, '--format', 'markdown').out;

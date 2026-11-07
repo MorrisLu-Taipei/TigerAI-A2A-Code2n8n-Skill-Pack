@@ -56,13 +56,14 @@ n8n 本身已提供原生的 Guardrails 節點（type：`@n8n/n8n-nodes-langchai
 | `ai:agent-code-tool` | Agent 預設不接可執行任意程式的工具 | 有（局部）：`ai:agent-code-tool`（建議提醒） |
 | `data:pii-minimization` | 個資最小化 | 尚無掃描規則，靠 AI 與人工檢查（`pinData` 內的機密樣式由 `secret:*` 涵蓋） |
 
-**提醒類規則（ADR-014 新增，三條，只提醒）**：除了上面的 13 項建議，掃描器另有三條「提醒類」規則。它們不是要 AI 在建的時候去採用的做法，而是把「核准人該特別看一眼的地方」標出來；詳細說明見 2.13 至 2.15。
+**提醒類規則（ADR-014 新增，四條，只提醒）**：除了上面的 13 項建議，掃描器另有四條「提醒類」規則。它們不是要 AI 在建的時候去採用的做法，而是把「核准人該特別看一眼的地方」標出來；詳細說明見 2.13 至 2.16。
 
 | 規則編號 | 一句話提醒 | 掃描規則 |
 |---|---|---|
 | `egress:external-domain` | 列出會連到的外部網域，請核准人確認是否在允許清單內 | 有：`egress:external-domain`（提醒，severity 為 `info`） |
 | `impact:high-impact-node` | 標出寄信、寫入或刪除資料庫、HTTP 寫入方法、執行系統指令的節點 | 有：`impact:high-impact-node`（提醒，severity 為 `info`） |
 | `notes:missing-change-log` | Layer 3 說明便條要有「修改記錄」段 | 有：`notes:missing-change-log`（提醒，severity 為 `info`） |
+| `env:staging-connection-needed` | 用到變數（`$vars`）或外部密鑰（`$secrets`）的節點，請在 STAGING 做連接測試 | 有：`env:staging-connection-needed`（提醒，severity 為 `info`；只偵測 `$vars`、`$secrets`） |
 
 提醒類規則的共通行為：**只提醒，不強制**。severity 標為 `info`，掃描輸出以 `INFO` 行呈現、彙總行另計 `reminder` 數量；不計入 `warning`，**預設與 `--strict` 都不會讓退出碼變成失敗**，在 CI 只進「建議項」，不新增任何阻擋碼。使用者已知悉時，用同一個 `guardrail-ack: <規則編號>` 標記確認（第 3 章），掃描器改輸出 `ACK` 行。提醒類規則不要求逐條寫進 Layer 3 便條的「建議事項」；掃描有命中時，照第 5 章寫進「資安掃描結果」區塊，狀態寫「提醒」。
 
@@ -271,6 +272,20 @@ n8n 本身已提供原生的 Guardrails 節點（type：`@n8n/n8n-nodes-langchai
 - **使用者不採用時**：照使用者的決定處理；在任一節點的 notes（建議在觸發節點）寫 `guardrail-ack: notes:missing-change-log -- 說明`。
 - **掃描規則**：`notes:missing-change-log`（提醒，workflow 層級）。
 
+### 2.16 `env:staging-connection-needed`：依賴授權版與真實資料的功能，請到 STAGING 連接測試（只提醒）
+
+- **觸發情境**：節點會被執行的參數用到 `$vars`（Variables，變數）或 `$secrets`（External Secrets，外部密鑰）。只看會被 n8n 執行的內容：以 `=` 開頭的運算式參數（只讀其中 `{{ ... }}` 內的部分，`{{ }}` 以外的文字不算）、Code 節點與 Function 節點的程式碼（`jsCode`、`pythonCode`、`functionCode`）、LangChain Code 節點與 Code 工具的程式碼。節點的所有 `parameters`（含巢狀物件與陣列，例如 Edit Fields、HTTP Request 的標頭與查詢參數）都會讀。每個節點最多一則提醒，說明裡列出命中的功能（變數、外部密鑰）。
+- **不算的情況**：便條（sticky note）內容、節點名稱、節點 `notes`、沒有 `=` 開頭的一般字串、`{{ }}` 以外的說明文字、程式碼裡的 `//`、`/* */`、`#` 註解、`$varsX` 或 `my$vars` 這類只是名稱相近的寫法、`$json.vars` 這類一般欄位、`x.$vars` 這類屬性存取、`pinData`。
+- **建議做法**：
+  1. DEV 不放授權、只用假資料（ADR-018）；變數、外部密鑰、專案共用與進階權限依賴授權版與真實資料，DEV 的 Community 環境無法呈現完整行為，所以這些功能**到 STAGING 才做連接測試**，不要在 DEV 期待完整行為。
+  2. 在 STAGING 驗證：變數值是否存在且正確、外部密鑰能否取得、workflow 與憑證的專案共用範圍、進階權限（角色與可見範圍）是否如預期。
+  3. 在 Layer 3 便條的「已知限制」或交接說明寫明「這些項目需在 STAGING 連接測試」，讓下一個人知道還沒驗證。
+  4. 密鑰類資料仍建議用憑證，不要靠 `$vars` 轉手機密（見 2.7）。
+- **為什麼**：這幾類功能依賴授權版與真實資料；DEV 沒有授權也只有假資料，在 DEV 看起來通過（或看起來失敗），都不代表 STAGING 與正式環境的行為。提前標出來，避免把 DEV 的結果當成已驗證。
+- **掃描器看不到的部分**：**專案共用與進階權限不在 workflow JSON 內**，無法靜態偵測，只能靠人在 STAGING 驗證；沒有提醒也不代表沒有用到這些功能。掃描器目前只偵測 `$vars` 與 `$secrets`；程式碼裡把名稱拆開組合出來的寫法、字串當成程式碼執行的寫法也看不到。
+- **使用者不採用時**：照使用者的決定處理；已知悉的節點，在該節點 notes 寫 `guardrail-ack: env:staging-connection-needed -- 說明`（例如「STAGING 階段再測」），掃描器改輸出 `ACK`。
+- **掃描規則**：`env:staging-connection-needed`（提醒，節點層級，severity 為 `info`）。預設與 `--strict` 都不會讓退出碼變成失敗；在 CI 只進「建議項」，不新增任何阻擋碼。輸出只寫功能名稱，不寫變數名稱或密鑰路徑。
+
 ---
 
 ## 3. 使用者已知悉（acknowledge）
@@ -306,7 +321,7 @@ guardrail-ack: webhook:no-auth
 > **與掃描器的關係**（對應 `scripts/security-scan.mjs` 目前的行為）：
 >
 > - **輸出 ACK 行**：節點 notes 中符合 `guardrail-ack: <規則編號>`（行首可有空白，可附 ` -- 說明`，說明可省略、沒有最短長度）的行，會被掃描器讀取；對應的提醒改以 `ACK` 行輸出（含規則編號、節點名稱與說明），**不計入提醒數**，彙總行另列已知悉的數量。
-> - **只對護欄類建議提醒有效**：節點層級的規則（例如 `webhook:no-auth`、`form:no-auth`、`exec:*`、`file:rw-access`、`egress:external-domain`、`impact:high-impact-node`）要寫在**該節點**的 notes；整個 workflow 層級的規則（`error:no-handling`、`ai:agent-no-guardrails`、`notes:missing-change-log`）寫在任一節點的 notes 都可以，建議寫在觸發節點。提醒類規則（severity `info`）同樣可以用 `guardrail-ack:` 確認。
+> - **只對護欄類建議提醒有效**：節點層級的規則（例如 `webhook:no-auth`、`form:no-auth`、`exec:*`、`file:rw-access`、`egress:external-domain`、`impact:high-impact-node`、`env:staging-connection-needed`）要寫在**該節點**的 notes；整個 workflow 層級的規則（`error:no-handling`、`ai:agent-no-guardrails`、`notes:missing-change-log`）寫在任一節點的 notes 都可以，建議寫在觸發節點。提醒類規則（severity `info`）同樣可以用 `guardrail-ack:` 確認。
 > - **對偵測類 error 無效**：`secret:*`、`jscode:*`、`credential:plaintext` 等偵測類規則不是建議，寫 `guardrail-ack:` 不會讓它消失；掃描器會輸出 `NOTE` 行說明「這個已知悉被忽略」。規則編號寫錯、或根本沒有對應的提醒時，也會有 `NOTE` 行。
 > - **`--strict` 是選用旗標**：加上之後，未被知悉的建議提醒（`warning`）也會讓退出碼為 1；提醒類規則（`info`）**不計入**，永遠不會讓退出碼為 1。Pack 的 Skill 流程**不使用，也不要求使用**；使用者或 CI 想要更嚴格時才用。
 > - 掃描器沒有對應規則的項目（例如 `approval:destructive-needs-gate`、`data:pii-minimization`），這一行只是紀錄，掃描器不會處理。
@@ -353,7 +368,7 @@ node scripts/security-scan.mjs <workflow.json>
 ### 4.2 怎麼看結果
 
 - 掃描輸出是**資訊與建議**。AI 把結果如實告訴使用者，說明每一項代表什麼風險，並提出建議的處理方式；**由使用者決定要不要處理**。
-- 掃描輸出有三種層級：`ERROR`（偵測類）、`WARNING`（護欄類建議）、`INFO`（提醒類：`egress:external-domain`、`impact:high-impact-node`、`notes:missing-change-log`）。`INFO` 要照實寫進「資安掃描結果」區塊（狀態寫「提醒」），特別是外連網域與高影響動作，目的就是讓核准人看到。
+- 掃描輸出有三種層級：`ERROR`（偵測類）、`WARNING`（護欄類建議）、`INFO`（提醒類：`egress:external-domain`、`impact:high-impact-node`、`notes:missing-change-log`、`env:staging-connection-needed`）。`INFO` 要照實寫進「資安掃描結果」區塊（狀態寫「提醒」），特別是外連網域與高影響動作，目的就是讓核准人看到。
 - 掃描有命中，不因此拒絕交付。退出碼為 1 只表示有偵測類的提醒（例如疑似機密樣式），不代表不能交付。
 - 使用者決定處理的，修改後對最終那一份 JSON 重掃，結果以最後一次為準；使用者決定不處理的，照實記入 Layer 3 便條的「建議事項」區塊（第 5 章）。
 - 之後只要又改了 JSON（包含把建議事項寫進便條、加上已知悉行），就對最終那一份重掃。
@@ -437,4 +452,4 @@ AI 為了讓使用者馬上看到結果，把 API 金鑰直接填進 HTTP Reques
 ---
 
 **版本**：v1.1
-**狀態**：規範草案。第 2 章「掃描規則」欄與第 3.2 節對掃描器的描述，隨 `scripts/security-scan.mjs` 的調整更新；與掃描器實際輸出不一致時，以掃描器為準。2.13 至 2.15 為 ADR-014 後新增的提醒類規則（只提醒、不強制）。
+**狀態**：規範草案。第 2 章「掃描規則」欄與第 3.2 節對掃描器的描述，隨 `scripts/security-scan.mjs` 的調整更新；與掃描器實際輸出不一致時，以掃描器為準。2.13 至 2.16 為 ADR-014 後新增的提醒類規則（只提醒、不強制）。

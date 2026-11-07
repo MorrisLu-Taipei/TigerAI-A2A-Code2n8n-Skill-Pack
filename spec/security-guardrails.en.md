@@ -56,13 +56,14 @@ The rule IDs below are fixed and are not renamed. The scanner, the "Recommendati
 | `ai:agent-code-tool` | Prefer not to give an Agent tools that run arbitrary code | Yes (partial): `ai:agent-code-tool` (recommendation reminder) |
 | `data:pii-minimization` | Minimize personal data | No scan rule yet; relies on AI and human checks (secret-shaped content in `pinData` is covered by `secret:*`) |
 
-**Reminder rules (added by ADR-014; three; reminder only)**: besides the 13 recommendations above, the scanner has three "reminder" rules. They are not practices the AI should adopt while building; they point at "places the approver should look at once". Details are in 2.13 to 2.15.
+**Reminder rules (added by ADR-014; four; reminder only)**: besides the 13 recommendations above, the scanner has four "reminder" rules. They are not practices the AI should adopt while building; they point at "places the approver should look at once". Details are in 2.13 to 2.16.
 
 | Rule ID | Reminder in one line | Scan rule |
 |---|---|---|
 | `egress:external-domain` | List the external domains the workflow talks to; the approver checks them against the allow-list | Yes: `egress:external-domain` (reminder, severity `info`) |
 | `impact:high-impact-node` | Mark nodes that send mail, write or delete database rows, use HTTP write methods, or run system commands | Yes: `impact:high-impact-node` (reminder, severity `info`) |
 | `notes:missing-change-log` | The Layer 3 sticky note carries a "Change log" section | Yes: `notes:missing-change-log` (reminder, severity `info`) |
+| `env:staging-connection-needed` | A node that uses Variables (`$vars`) or external secrets (`$secrets`): connection-test it on STAGING | Yes: `env:staging-connection-needed` (reminder, severity `info`; detects `$vars` and `$secrets` only) |
 
 Behavior shared by the reminder rules: **reminder only, never enforced**. The severity is `info`; the scan prints an `INFO` line and the summary line counts them separately as `reminder`; they do not count toward `warning`, **neither a default run nor `--strict` ever fails because of them**, and in CI they land in the advisory list only, with no blocking code added. When the user already knows, the same `guardrail-ack: <rule ID>` line acknowledges them (Chapter 3) and the scanner prints an `ACK` line instead. The reminder rules do not need a line each in the "Recommendations" block of the Layer 3 note; when the scan reports them, write them into the "Security scan result" block as in Chapter 5, with the status "reminder".
 
@@ -271,6 +272,20 @@ The part common to all rules, "what the AI does if the user does not adopt it": 
 - **If the user does not adopt it**: follow the user's decision; write `guardrail-ack: notes:missing-change-log -- note` in the notes of any node (the trigger node is recommended).
 - **Scan rule**: `notes:missing-change-log` (reminder, workflow level).
 
+### 2.16 `env:staging-connection-needed`: features that depend on a licensed edition and real data are connection-tested on STAGING (reminder only)
+
+- **Situation**: an executed parameter of a node uses `$vars` (Variables) or `$secrets` (External Secrets). Only what n8n actually executes is read: expression parameters that start with `=` (only the parts inside `{{ ... }}`; text outside `{{ }}` does not count), the code of Code and Function nodes (`jsCode`, `pythonCode`, `functionCode`), and the code of the LangChain Code node and Code tool. All of a node's `parameters` are read, including nested objects and arrays (for example Edit Fields, or the headers and query parameters of HTTP Request). At most one reminder per node, naming the features found (Variables, External Secrets).
+- **What does not count**: sticky-note content, node names, node `notes`, plain strings without a leading `=`, explanatory text outside `{{ }}`, `//`, `/* */` and `#` comments in code, look-alikes such as `$varsX` or `my$vars`, ordinary fields such as `$json.vars`, property access such as `x.$vars`, and `pinData`.
+- **Recommended practice**:
+  1. DEV has no license and uses fake data only (ADR-018). Variables, external secrets, project sharing and advanced permissions depend on a licensed edition and real data, so the Community DEV environment cannot show their full behavior: **connection-test them on STAGING** and do not expect full behavior on DEV.
+  2. Verify on STAGING: the variable values exist and are right, the external secrets can be fetched, the project sharing scope of the workflow and its credentials, and the advanced permissions (roles and visibility) behave as intended.
+  3. Say in the "Known limits" of the Layer 3 note or in the hand-over text that "these items need a connection test on STAGING", so the next person knows they are not verified yet.
+  4. Secret data should still go through credentials, not through `$vars` (see 2.7).
+- **Why**: these features depend on a licensed edition and real data; DEV has no license and only fake data, so a pass (or a failure) on DEV says nothing about STAGING or production. Marking them early keeps a DEV result from being taken as verified.
+- **What the scanner cannot see**: **project sharing and advanced permissions are not in the workflow JSON**, so they cannot be detected statically and only a person can verify them on STAGING; no reminder does not mean they are not in use. The scanner currently detects only `$vars` and `$secrets`; names built up piece by piece in code, or strings executed as code, are not seen either.
+- **If the user does not adopt it**: follow the user's decision; for a node the user knows about, write `guardrail-ack: env:staging-connection-needed -- note` (for example "test on STAGING later") in that node's notes, and the scanner prints `ACK` instead.
+- **Scan rule**: `env:staging-connection-needed` (reminder, node level, severity `info`). Neither the default run nor `--strict` makes the exit code a failure; in CI it is an advisory only and adds no blocking code. The output names the feature only, never a variable name or a secret path.
+
 ---
 
 ## 3. User acknowledgement
@@ -306,7 +321,7 @@ guardrail-ack: webhook:no-auth
 > **Relation to the scanner** (matches what `scripts/security-scan.mjs` does today):
 >
 > - **It prints an ACK line**: a line in a node's notes of the form `guardrail-ack: <rule ID>` (leading whitespace allowed, optionally followed by ` -- note`; the note may be omitted and has no minimum length) is read by the scanner. The matching reminder is printed as an `ACK` line (rule ID, node name and note) instead, **does not count toward the reminders**, and the summary line reports the number acknowledged.
-> - **It works only for guardrail-rule recommendation reminders**: node-level rules (for example `webhook:no-auth`, `form:no-auth`, `exec:*`, `file:rw-access`, `egress:external-domain`, `impact:high-impact-node`) must be written in **that node's** notes; workflow-level rules (`error:no-handling`, `ai:agent-no-guardrails`, `notes:missing-change-log`) can go in any node's notes, with the trigger node recommended. The reminder rules (severity `info`) can be acknowledged with `guardrail-ack:` too.
+> - **It works only for guardrail-rule recommendation reminders**: node-level rules (for example `webhook:no-auth`, `form:no-auth`, `exec:*`, `file:rw-access`, `egress:external-domain`, `impact:high-impact-node`, `env:staging-connection-needed`) must be written in **that node's** notes; workflow-level rules (`error:no-handling`, `ai:agent-no-guardrails`, `notes:missing-change-log`) can go in any node's notes, with the trigger node recommended. The reminder rules (severity `info`) can be acknowledged with `guardrail-ack:` too.
 > - **It has no effect on detection-rule errors**: `secret:*`, `jscode:*`, `credential:plaintext` and similar detection rules are not recommendations, and `guardrail-ack:` does not make them go away; the scanner prints a `NOTE` line saying the acknowledgement was ignored. A mistyped rule ID, or one with no matching reminder, also produces a `NOTE` line.
 > - **`--strict` is an optional flag**: with it, un-acknowledged recommendation reminders (`warning`) also make the exit code 1; the reminder rules (`info`) are **not counted** and never make it 1. The Pack's Skill flow **does not use it and does not ask for it**; it is for a user or CI that wants stricter behavior.
 > - For items with no scanner rule (for example `approval:destructive-needs-gate`, `data:pii-minimization`), the line is a record only and the scanner does nothing with it.
@@ -353,7 +368,7 @@ The default mode is the advisory mode. The scanner also has an optional `--stric
 ### 4.2 How to read the result
 
 - Scan output is **information and recommendations**. The AI reports the results to the user as they are, explains what risk each item represents, and suggests how to handle it; **the user decides whether to act**.
-- Scan output has three levels: `ERROR` (detection rules), `WARNING` (guardrail recommendations) and `INFO` (reminder rules: `egress:external-domain`, `impact:high-impact-node`, `notes:missing-change-log`). Write `INFO` lines into the "Security scan result" block as they are (status "reminder"); the external domains and high-impact actions are there precisely so the approver sees them.
+- Scan output has three levels: `ERROR` (detection rules), `WARNING` (guardrail recommendations) and `INFO` (reminder rules: `egress:external-domain`, `impact:high-impact-node`, `notes:missing-change-log`, `env:staging-connection-needed`). Write `INFO` lines into the "Security scan result" block as they are (status "reminder"); the external domains and high-impact actions are there precisely so the approver sees them.
 - Findings do not cause delivery to be refused. Exit code 1 only means there are detection-rule reminders (for example a suspected secret pattern); it does not mean delivery cannot proceed.
 - Where the user decides to act, rescan the final JSON after the change; the last result is the one that counts. Where the user decides not to act, record it honestly in the "Recommendations" block of the Layer 3 note (Section 5).
 - After any further change to the JSON (including writing the recommendations into a sticky note or adding acknowledgement lines), rescan the final file.
@@ -437,4 +452,4 @@ To show the user a result quickly, the AI pastes an API key directly into the Au
 ---
 
 **Version**: v1.1
-**Status**: draft spec. The "Scan rule" column in Section 2 and the description of the scanner in Section 3.2 will be updated as `scripts/security-scan.mjs` changes; where they differ from the scanner's actual output, the scanner prevails. Sections 2.13 to 2.15 are reminder rules added after ADR-014 (reminder only, never enforced).
+**Status**: draft spec. The "Scan rule" column in Section 2 and the description of the scanner in Section 3.2 will be updated as `scripts/security-scan.mjs` changes; where they differ from the scanner's actual output, the scanner prevails. Sections 2.13 to 2.16 are reminder rules added after ADR-014 (reminder only, never enforced).
