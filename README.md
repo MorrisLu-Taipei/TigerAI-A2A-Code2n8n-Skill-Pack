@@ -17,6 +17,19 @@
 >
 > The directive gates when you may use the words "validated" / "tested" / "production-ready", what tools you must invoke, what evidence schema you must emit, and what phrases are forbidden until the gate passes. Skipping it produced the v0.27.0 incident captured in [`examples/einvoice-n8n/REFLECTION.md`](examples/einvoice-n8n/REFLECTION.md). Human reviewers use [`docs/code2n8n-vv-checklist.md`](docs/code2n8n-vv-checklist.md) instead.
 
+## 🆕 What's new — v1.1.0 (2026-11-07): deterministic n8n CI, Portal tooling, advisory-only guardrails, AI review mode
+
+This release turns the Pack from "a brain that writes workflows" into a brain **plus the tooling to check and govern what it writes**. Everything below is **advisory unless stated** — guardrails never block, and your own decisions always win.
+
+- **Deterministic CI for n8n workflows** (`scripts/ci/`, [`docs/ci-for-n8n-workflows.md`](docs/ci-for-n8n-workflows.md)): static check plus a no-network dynamic check that imports and activates the workflow in a throw-away n8n; three-state report (pass / incomplete / fail). Only a fixed, documented set of defects blocks (invalid JSON, secrets, malicious code, plaintext credentials, missing or deprecated nodes, missing credentials, webhook path conflicts); everything else is advice.
+- **Three new advisory-only reminders** ([`spec/security-guardrails.md`](spec/security-guardrails.md)): `egress:external-domain` (external domains, optional allow-list), `impact:high-impact-node` (sends mail, writes or deletes data, executes commands), `notes:missing-change-log`. They use the `info` level, never affect `--strict`, and can be acknowledged with `guardrail-ack:`.
+- **Sticky notes now carry a change log** ([`spec/sticky-note-three-layer.md`](spec/sticky-note-three-layer.md) §4.4): date, summary, who, why — no secrets. A missing log only produces a reminder.
+- **Restricted Agent mode and the new Reviewer mode** ([`spec/agent-restricted-mode.md`](spec/agent-restricted-mode.md), [`spec/agent-reviewer-mode.md`](spec/agent-reviewer-mode.md), skill `n8n-review-mode`): the Agent only drafts; the **AI reviewer only gives suggestions — it cannot approve, merge or activate anything**. Its output is schema-checked by `scripts/review/validate-review.mjs` (forbidden approval words, URLs, secret shapes, size limits; output that tries to approve is dropped as a suspected prompt injection; linear-time, exit code always 0). If the model is unavailable the pipeline simply shows "AI review not run" and continues.
+- **Portal tooling** (`scripts/portal/`, `services/ci-check/`): bundle flattening and checks for embedding the Pack in a portal; HTTP wrappers for the static and dynamic checks and for the review endpoints (`/v1/review/build-input`, `/v1/review/validate`), with a no-network executor and no `docker.sock`.
+- **Evaluation suite** (`eval/`, [`docs/eval-golden-scenarios.md`](docs/eval-golden-scenarios.md)): 50 golden scenarios and an offline mock model (private networks only by default) for measuring how well a model writes workflows with the Pack, before choosing one.
+- **Licensing**: the 15 official n8n skills (Apache-2.0) are bundled unmodified, each with its own `LICENSE`; see [`LICENSES.md`](LICENSES.md) and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). The 2,061 reference templates that used to live in `reference-workflows/` were removed; the Pack keeps only statistics and a few cited IDs.
+- **Tests**: security-scan 179, native-first 82, CI 393, portal 135, review 653, eval 971, services 1241 — all passing.
+
 ## 🆕 What's new — v1.0 absorbed paid-tw/einvoice into n8n + thanks
 
 We recently ported the upstream SDK [`paid-tw/einvoice`](https://github.com/paid-tw/einvoice) (Taiwan unified e-invoice SDK, MOF MIG 4.0 spec, 5 providers: Amego / ECPay / ezPay / ezPay cross-border / ezReceipt) into n8n workflows and completed Path B's three legs:

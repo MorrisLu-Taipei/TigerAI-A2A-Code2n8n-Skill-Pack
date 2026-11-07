@@ -17,6 +17,19 @@
 >
 > 指令明確規範：什麼時候才可以說「驗證通過 / 已測試 / 可上線」、要跑哪些工具、要產什麼 evidence schema、哪些詞彙在通過 gate 前是禁用的。跳過這個 gate 就是 v0.27.0 出事的原因，紀錄在 [`examples/einvoice-n8n/REFLECTION.md`](examples/einvoice-n8n/REFLECTION.md)。**人類** reviewer 改讀 [`docs/code2n8n-vv-checklist.md`](docs/code2n8n-vv-checklist.md)。
 
+## 🆕 最新動態 — v1.1.0（2026-11-07）：n8n 確定性 CI、Portal 工具、只提醒的護欄、AI 審查模式
+
+這一版讓 Pack 從「寫 workflow 的大腦」變成「大腦加上檢查與治理它寫出來的東西的工具」。以下**除非特別註明，一律是建議**：護欄永遠不擋你，你的決定永遠優先。
+
+- **n8n workflow 的確定性 CI**（`scripts/ci/`，[`docs/ci-for-n8n-workflows.md`](docs/ci-for-n8n-workflows.md)）：靜態檢查，加上在可丟棄的 n8n 內匯入並啟用的無網路動態檢查；報告分三態（通過／未完成／失敗）。只有固定且有文件的缺陷會擋（JSON 無效、機密、惡意程式碼、明文憑證、節點不存在或已棄用、缺憑證、webhook 路徑衝突），其餘都只是建議。
+- **三條新增的只提醒規則**（[`spec/security-guardrails.md`](spec/security-guardrails.md)）：`egress:external-domain`（外連網域，可選允許清單）、`impact:high-impact-node`（寄信、寫入或刪除資料、執行指令）、`notes:missing-change-log`。屬 `info` 層級，不影響 `--strict`，可用 `guardrail-ack:` 確認。
+- **便條新增『修改記錄』**（[`spec/sticky-note-three-layer.md`](spec/sticky-note-three-layer.md) §4.4）：日期、摘要、由誰、原因，不含機密；缺少時只提醒。
+- **受限 Agent 模式與新的審查模式**（[`spec/agent-restricted-mode.md`](spec/agent-restricted-mode.md)、[`spec/agent-reviewer-mode.md`](spec/agent-reviewer-mode.md)、Skill `n8n-review-mode`）：Agent 只產草稿；**AI 審查者只給建議，不能核准、合併或啟用任何東西**。輸出由 `scripts/review/validate-review.mjs` 驗證（禁用放行用語、URL、機密樣式、長度與數量上限；輸出若試圖放行，整份丟棄並標記疑似提示注入；線性時間、結束碼恆為 0）。模型不可用時，管線只顯示『AI 審查未執行』，照常進行。
+- **Portal 工具**（`scripts/portal/`、`services/ci-check/`）：把 Pack 內建進 Portal 的攤平與檢查腳本；靜態與動態檢查與審查端點（`/v1/review/build-input`、`/v1/review/validate`）的 HTTP 包裝層，無網路執行器、不掛 `docker.sock`。
+- **評測套件**（`eval/`、[`docs/eval-golden-scenarios.md`](docs/eval-golden-scenarios.md)）：50 個黃金情境與離線假模型（預設只連私有網段），用來在選模型之前量測模型搭配 Pack 寫 workflow 的品質。
+- **授權**：15 個 n8n 原廠 Skill（Apache-2.0）原樣收錄，各附 `LICENSE`；見 [`LICENSES.md`](LICENSES.md) 與 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。原本在 `reference-workflows/` 的 2,061 個參考範本已移除，Pack 只保留統計與少量引用編號。
+- **測試**：security-scan 179、native-first 82、CI 393、portal 135、review 653、eval 971、services 1241，全部通過。
+
 ## 🆕 最新動態 — v1.0 把 paid-tw/einvoice 吸收進 n8n + 致謝
 
 最近 Pack 把上游 SDK [`paid-tw/einvoice`](https://github.com/paid-tw/einvoice)（台灣統一電子發票 SDK，財政部 MIG 4.0 規格，5 家供應商：Amego / ECPay / ezPay / ezPay 跨境 / ezReceipt）完整移植成 n8n workflow，並完成 Path B 三段：
