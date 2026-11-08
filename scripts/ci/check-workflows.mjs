@@ -7,7 +7,7 @@
 //        [--egress-allow <逗號分隔網域>] [--egress-allow-file <檔>] [--out <ci-report.json>] [--comment <ci-comment.md>]
 //
 // 阻擋項（使 CI 失敗）：JSON_INVALID、STRUCTURE_INVALID、SECRET_DETECTED、MALICIOUS_CODE、CREDENTIAL_PLAINTEXT、
-//   NODE_NOT_FOUND、NODE_DEPRECATED、TYPEVERSION_INVALID、CREDENTIAL_MISSING、WEBHOOK_PATH_CONFLICT。
+//   NODE_NOT_FOUND、NODE_DEPRECATED、TYPEVERSION_INVALID、NODE_PARAMS_INVALID、CREDENTIAL_MISSING、WEBHOOK_PATH_CONFLICT。
 // 建議項（永遠不使 CI 失敗）：scripts/security-scan.mjs 的護欄警告、scripts/native-first-check.mjs 的原生節點提醒、
 //   node:hidden-legacy（目錄標示 hidden 但未 deprecated 的舊節點，實測仍可匯入啟用）、
 //   workflow:unknown-subworkflow-reference（Execute Workflow 指向的 workflow 在同批與既有清單都找不到）、
@@ -116,6 +116,43 @@ const normMethod = m => String(m).trim().toUpperCase();
 
 // ---- 結構檢查 --------------------------------------------------------------
 
+const paramSet = (p, k) => p[k] !== undefined && p[k] !== null && p[k] !== '';
+
+// 與 Portal 預檢的 NODE_PARAMS_INVALID 同一張表（七類節點）
+// Respond to Webhook 的 respondWith 合法值（取自 n8n 2.44.6 的 RespondToWebhook 節點定義）
+const RESPOND_WITH_VALUES = ['allIncomingItems', 'binary', 'firstIncomingItem', 'json', 'jwt', 'noData', 'redirect', 'text'];
+function paramsProblem(n) {
+  const p = isObj(n.parameters) ? n.parameters : {};
+  const v = Number(n.typeVersion);
+  switch (n.type) {
+    case 'n8n-nodes-base.code':
+      if (!paramSet(p, 'jsCode') && !paramSet(p, 'pythonCode')) return 'Code 節點需要 jsCode 或 pythonCode';
+      if (paramSet(p, 'assignments')) return 'Code 節點不可帶 Set 的 assignments 參數';
+      return null;
+    case 'n8n-nodes-base.set':
+      if (v >= 3) {
+        if (!paramSet(p, 'assignments') && !paramSet(p, 'fields') && !paramSet(p, 'jsonOutput')) return 'Set 節點（v3+）需要 assignments、fields 或 jsonOutput 其中之一';
+        if (paramSet(p, 'jsCode')) return 'Set 節點不可帶 Code 的 jsCode 參數';
+      }
+      return null;
+    case 'n8n-nodes-base.httpRequest':
+      return paramSet(p, 'url') ? null : 'HTTP Request 節點需要 url';
+    case 'n8n-nodes-base.webhook':
+      return paramSet(p, 'path') ? null : 'Webhook 節點需要 path';
+    case 'n8n-nodes-base.if':
+      return paramSet(p, 'conditions') ? null : 'IF 節點需要 conditions';
+    case 'n8n-nodes-base.switch':
+      return v >= 3 && !paramSet(p, 'rules') ? 'Switch 節點（v3+）需要 rules' : null;
+    case 'n8n-nodes-base.respondToWebhook':
+      if (p.respondWith !== undefined && !RESPOND_WITH_VALUES.includes(p.respondWith)) return `Respond to Webhook 的 respondWith 不是合法值：「${String(p.respondWith)}」`;
+      if (p.respondWith === 'redirect' && !paramSet(p, 'redirectURL')) return 'Respond to Webhook 以 redirect 回應時需要 redirectURL';
+      if (['text', 'json', 'html'].includes(p.respondWith) && !paramSet(p, 'responseBody')) return `Respond to Webhook 以 ${p.respondWith} 回應時需要 responseBody`;
+      return null;
+    default:
+      return null;
+  }
+}
+
 function structureProblems(wf) {
   const probs = [];
   const add = (message, node) => probs.push({ message, node: node ?? null });
@@ -209,6 +246,11 @@ for (const f of files) {
         block('TYPEVERSION_INVALID', f.rel, n.name,
           `${n.type} 的 typeVersion ${n.typeVersion} 不在 ${target} 支援的版本內（可用：${entry.versions.join('、')}）`);
       }
+    }
+
+    if (!n.disabled) {
+      const pp = paramsProblem(n);
+      if (pp) block('NODE_PARAMS_INVALID', f.rel, n.name, pp);
     }
 
     if (!n.disabled && isExternalTrigger(n.type)) {

@@ -106,7 +106,7 @@ export async function runStatic() {
     check(noTok.status === 401, '/version 沒有 token 應回 401');
     const ver = await request(s.port, { path: '/version', headers: auth(s.token) });
     checkSchema('misc-responses', ver.json, '#/$defs/staticVersion', '/version');
-    check(sameSet(ver.json?.blockingCodes ?? [], STATIC_BLOCKING_CODES) && ver.json.blockingCodes.length === 10, '/version 的 blockingCodes 應為靜態 10 碼');
+    check(sameSet(ver.json?.blockingCodes ?? [], STATIC_BLOCKING_CODES) && ver.json.blockingCodes.length === 11, '/version 的 blockingCodes 應為靜態 11 碼');
     check(ver.json?.supportedTargetVersions.includes('2.44.6'), '/version 應列出 2.44.6');
 
     check(readdirSync(s.workRoot).length === 0, '處理完成後暫存區應是空的');

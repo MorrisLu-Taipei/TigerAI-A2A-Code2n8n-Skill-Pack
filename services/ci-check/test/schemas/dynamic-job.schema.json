@@ -383,7 +383,9 @@
       "IMPORT_FAILED",
       "ACTIVATE_FAILED",
       "WEBHOOK_PATH_CONFLICT",
-      "CREDENTIAL_MISSING"
+      "CREDENTIAL_MISSING",
+      "EXECUTION_ERROR",
+      "WEBHOOK_5XX"
      ]
     },
     "file": {

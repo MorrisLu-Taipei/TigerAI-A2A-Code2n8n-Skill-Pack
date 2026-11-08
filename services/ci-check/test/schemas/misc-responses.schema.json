@@ -74,6 +74,7 @@
        "NODE_NOT_FOUND",
        "NODE_DEPRECATED",
        "TYPEVERSION_INVALID",
+       "NODE_PARAMS_INVALID",
        "CREDENTIAL_MISSING",
        "WEBHOOK_PATH_CONFLICT"
       ]
@@ -162,7 +163,9 @@
        "IMPORT_FAILED",
        "ACTIVATE_FAILED",
        "WEBHOOK_PATH_CONFLICT",
-       "CREDENTIAL_MISSING"
+       "CREDENTIAL_MISSING",
+       "EXECUTION_ERROR",
+       "WEBHOOK_5XX"
       ]
      },
      "uniqueItems": true

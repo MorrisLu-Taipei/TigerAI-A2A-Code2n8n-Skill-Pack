@@ -71,6 +71,7 @@ function toVersionResult(report, job, nameMap, bootSeconds) {
       file: fileOf(d.file), import: d.import, importStatus: d.importStatus ?? null, activate: d.activate, activateStatus: d.activateStatus ?? null,
       webhook: typeof d.webhook === 'string' && d.webhook !== '' ? d.webhook.split('、').map(x => (x === 'ERR' ? 'ERR' : Number(x))) : null,
       executions: Array.isArray(d.executions) ? d.executions.slice(0, 10) : [],
+      ...(Array.isArray(d.runDetail) ? { runDetail: d.runDetail.slice(0, 100) } : {}),
       ...(d.timeout === true ? { timeout: true } : {}),
     })),
     blocking: cap(report.blocking).map(b => ({ code: b.code, file: fileOf(b.file), node: b.node ?? null, message: b.message })),

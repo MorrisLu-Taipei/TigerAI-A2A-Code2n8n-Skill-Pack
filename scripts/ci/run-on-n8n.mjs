@@ -241,6 +241,29 @@ async function runOneGuarded(f) {
   }
 }
 
+// 每個節點最後一次執行的狀態與錯誤訊息（錯誤文字經 safe 過濾、截短）；沒執行到的節點標 not-run
+function nodeRunDetail(execution, nodes) {
+  const rd = isObj(execution.data?.resultData) ? execution.data.resultData : (isObj(execution.resultData) ? execution.resultData : {});
+  const runData = isObj(rd.runData) ? rd.runData : {};
+  const typeOf = new Map(nodes.filter(isObj).map(n => [n.name, n.type]));
+  const row = (node, status, error) => ({
+    node: safe(String(node)).slice(0, 100), type: safe(String(typeOf.get(node) ?? '')).slice(0, 100), status,
+    error: error ? safe(String(error)).slice(0, 300) : null,
+  });
+  const rows = [];
+  for (const [name, runs] of Object.entries(runData)) {
+    const last = Array.isArray(runs) && runs.length > 0 ? runs[runs.length - 1] : null;
+    const err = last?.error;
+    rows.push(row(name, err ? 'error' : (last ? 'ok' : 'not-run'), err ? (err.message ?? err.description ?? 'error') : null));
+  }
+  if (isObj(rd.error)) {
+    const at = rd.error.node?.name;
+    rows.push(row(at ?? '(execution)', 'error', rd.error.message ?? 'execution error'));
+  }
+  for (const n of nodes) if (isObj(n) && n.name && !(n.name in runData)) rows.push(row(n.name, 'not-run', null));
+  return rows.slice(0, 100);
+}
+
 async function runOne(f, entry) {
   let wf;
   try { wf = JSON.parse(readFileSync(f.abs, 'utf8')); } catch { wf = null; }
@@ -300,10 +323,10 @@ async function runOne(f, entry) {
       }
     }
 
+    const codes = [];
     if (activated) {
       const targets = webhookTargets(wf.nodes);
       if (targets.length > 0) await sleep(1000);
-      const codes = [];
       for (const t of targets) {
         const hasBody = !['GET', 'HEAD'].includes(t.method);
         const r = await http(t.method, `/webhook/${encodeURI(t.path)}`, { auth: 'none', body: hasBody ? {} : undefined, timeout: 30000, headers: t.headers });
@@ -315,9 +338,18 @@ async function runOne(f, entry) {
     const ex = await http('GET', `/api/v1/executions?workflowId=${encodeURIComponent(id)}&limit=10`);
     if (ex.status === 200 && Array.isArray(ex.json?.data)) {
       entry.executions = ex.json.data.map(x => String(x.status));
-      const bad = [...new Set(entry.executions.filter(s => s === 'error' || s === 'crashed'))];
-      if (bad.length > 0) advise('execution-status', f.rel, null, `執行狀態：${bad.join('、')}（使用假憑證時外部呼叫失敗屬預期，只回報不影響結果）`);
+      const newest = ex.json.data[0];
+      if (newest?.id !== undefined) {
+        const det = await http('GET', `/api/v1/executions/${encodeURIComponent(String(newest.id))}?includeData=true`);
+        if (det.status === 200 && isObj(det.json)) entry.runDetail = nodeRunDetail(det.json, wf.nodes);
+      }
     }
+    const failing = (entry.runDetail ?? []).find(r => r.status === 'error') ?? null;
+    const where = failing ? `節點「${failing.node}」：${failing.error ?? '無錯誤訊息'}` : '無節點錯誤訊息';
+    const bad = [...new Set(entry.executions.filter(s => s === 'error' || s === 'crashed'))];
+    if (bad.length > 0) block('EXECUTION_ERROR', f.rel, failing?.node ?? null, `執行狀態：${bad.join('、')}；${where}`);
+    const fiveXX = codes.filter(c => typeof c === 'number' && c >= 500);
+    if (fiveXX.length > 0) block('WEBHOOK_5XX', f.rel, failing?.node ?? null, `webhook 回應 ${fiveXX.join('、')}；${where}`);
   } finally {
     // --hold-active：整批跑完才由 cleanupAll 統一停用與刪除
     if (!opts['hold-active']) {

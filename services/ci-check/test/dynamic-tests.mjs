@@ -116,7 +116,7 @@ export async function runDynamic() {
       // /version、/healthz、/v1/capacity
       const v = await ctx.api('/version');
       checkSchema('misc-responses', v.json, '#/$defs/dynamicVersion', '/version');
-      check(v.json.blockingCodes.length === 4 && v.json.supportedVersions.join() === '2.44.6', '/version：動態 4 碼與已設定的池');
+      check(v.json.blockingCodes.length === 6 && v.json.supportedVersions.join() === '2.44.6', '/version：動態 6 碼與已設定的池');
       const h = await request(ctx.port, { path: '/healthz' });
       check(h.status === 200 && h.json.status === 'ok', 'healthz 應為 ok');
       checkSchema('misc-responses', h.json, '#/$defs/healthz', 'healthz');

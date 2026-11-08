@@ -37,7 +37,8 @@
     "fail-credential-missing.workflow.json":  { "status": "fail", "blocking": ["CREDENTIAL_MISSING"] },
     "fail-stub-credential.workflow.json":     { "status": "fail", "blocking": ["CREDENTIAL_MISSING"] },
     "fail-webhook-dup-a.workflow.json":       { "status": "fail", "blocking": ["WEBHOOK_PATH_CONFLICT"], "with": ["fail-webhook-dup-b.workflow.json"] },
-    "fail-webhook-dup-b.workflow.json":       { "status": "fail", "blocking": ["WEBHOOK_PATH_CONFLICT"], "with": ["fail-webhook-dup-a.workflow.json"] }
+    "fail-webhook-dup-b.workflow.json":       { "status": "fail", "blocking": ["WEBHOOK_PATH_CONFLICT"], "with": ["fail-webhook-dup-a.workflow.json"] },
+    "fail-respond-with-invalid.workflow.json": { "status": "fail", "blocking": ["NODE_PARAMS_INVALID"] }
   },
   "dynamic": {
     "pass-webhook-echo.workflow.json":          { "import": "ok", "activate": "ok" },

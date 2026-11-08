@@ -33,7 +33,7 @@ function expect(cond, msg) { counts[section]++; if (!cond) failures.push(`[${sec
 const sameSet = (a, b) => [...new Set(a)].sort().join('|') === [...new Set(b)].sort().join('|');
 const FAKE_SECRET = ['sk', 'FAKE'.repeat(6)].join('-');
 const ALLOWED_CODES = new Set(['JSON_INVALID', 'STRUCTURE_INVALID', 'SECRET_DETECTED', 'MALICIOUS_CODE', 'CREDENTIAL_PLAINTEXT',
-  'NODE_NOT_FOUND', 'NODE_DEPRECATED', 'TYPEVERSION_INVALID', 'CREDENTIAL_MISSING', 'WEBHOOK_PATH_CONFLICT']);
+  'NODE_NOT_FOUND', 'NODE_DEPRECATED', 'TYPEVERSION_INVALID', 'NODE_PARAMS_INVALID', 'CREDENTIAL_MISSING', 'WEBHOOK_PATH_CONFLICT']);
 
 const tmpRoot = mkdtempSync(join(tmpdir(), 'ci-tests-'));
 let seq = 0;
@@ -346,7 +346,7 @@ try {
         expect(d.activate === exp.activate, `${v} ${file}：啟用應為 ${exp.activate}，實際 ${d.activate}`);
       }
       const codes = rep2.blocking.map(b => b.code);
-      expect(codes.every(c => ['IMPORT_FAILED', 'ACTIVATE_FAILED', 'WEBHOOK_PATH_CONFLICT'].includes(c)), `${v}：動態阻擋碼超出預期`);
+      expect(codes.every(c => ['IMPORT_FAILED', 'ACTIVATE_FAILED', 'WEBHOOK_PATH_CONFLICT', 'EXECUTION_ERROR', 'WEBHOOK_5XX'].includes(c)), `${v}：動態阻擋碼超出預期`);
       expect(rep2.advisories.every(a => a.source === 'n8n-run'), `${v}：動態報告的建議項來源應為 n8n-run`);
     }
     // 逾時：極短的 --workflow-timeout 應只產生建議項 workflow:timeout，不算失敗，且清理完整

@@ -3,7 +3,7 @@
 
 import { cleanText, guardComment, isObj } from './shared.mjs';
 
-export const DYNAMIC_BLOCKING_CODES = ['IMPORT_FAILED', 'ACTIVATE_FAILED', 'WEBHOOK_PATH_CONFLICT', 'CREDENTIAL_MISSING'];
+export const DYNAMIC_BLOCKING_CODES = ['IMPORT_FAILED', 'ACTIVATE_FAILED', 'WEBHOOK_PATH_CONFLICT', 'CREDENTIAL_MISSING', 'EXECUTION_ERROR', 'WEBHOOK_5XX'];
 export const LIMITATION_TEXT = {
   'licensed-features': '授權功能（Source Control、環境、變數、外部密碼庫、角色權限等）未測',
   'real-external-services': '沒有連到任何真實外部服務，使用假憑證',
@@ -68,7 +68,7 @@ export function validateExecutorResult(raw, expect, lib) {
   if (!Array.isArray(r.workflows) || r.workflows.length > expect.paths.length) bad('workflows-count');
   const seen = new Set();
   const workflows = r.workflows.map(w => {
-    onlyKeys(w, ['file', 'import', 'importStatus', 'activate', 'activateStatus', 'webhook', 'executions', 'timeout', 'executionSummary'], 'workflow');
+    onlyKeys(w, ['file', 'import', 'importStatus', 'activate', 'activateStatus', 'webhook', 'executions', 'runDetail', 'timeout', 'executionSummary'], 'workflow');
     const file = fileOf(w.file, 'workflow-file', false);
     if (seen.has(file)) bad('workflow-duplicate');
     seen.add(file);
@@ -80,13 +80,22 @@ export function validateExecutorResult(raw, expect, lib) {
     }
     if (!Array.isArray(w.executions) || w.executions.length > 10) bad('executions-shape');
     const executions = w.executions.map(e => (typeof e === 'string' && /^[A-Za-z0-9_-]{1,32}$/.test(e) ? e : bad('executions-value')));
+    if (w.runDetail !== undefined && (!Array.isArray(w.runDetail) || w.runDetail.length > 100)) bad('run-detail-shape');
+    const runDetail = w.runDetail === undefined ? undefined : w.runDetail.map(d => {
+      onlyKeys(d, ['node', 'type', 'status', 'error'], 'run-detail');
+      if (!['ok', 'error', 'not-run'].includes(d.status)) bad('run-detail-status');
+      return {
+        node: san(d.node, 'run-detail-node', 100), type: san(d.type, 'run-detail-type', 100), status: d.status,
+        error: d.error === null || d.error === undefined ? null : san(d.error, 'run-detail-error', 300),
+      };
+    });
     if (w.timeout !== undefined && typeof w.timeout !== 'boolean') bad('timeout-type');
     const sum = { total: executions.length, success: 0, error: 0, crashed: 0, other: 0 };
     for (const e of executions) { if (e === 'success' || e === 'error' || e === 'crashed') sum[e] += 1; else sum.other += 1; }
     return {
       file, import: w.import, importStatus: intOrNull(w.importStatus ?? null, 'import-status'), activate: w.activate,
       activateStatus: intOrNull(w.activateStatus ?? null, 'activate-status'), webhook, executions,
-      ...(w.timeout === true ? { timeout: true } : {}), executionSummary: sum,
+      ...(runDetail ? { runDetail } : {}), ...(w.timeout === true ? { timeout: true } : {}), executionSummary: sum,
     };
   });
   if (raw.complete && workflows.length !== expect.paths.length) bad('workflows-incomplete');
