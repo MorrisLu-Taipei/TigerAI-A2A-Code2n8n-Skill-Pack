@@ -368,6 +368,14 @@ TigerAI-Code2n8n-Skill-Pack/
 
 ---
 
+## 👤 維護者
+
+- **倉庫擁有者:** [MorrisLu-Taipei](https://github.com/MorrisLu-Taipei)(Morris Lu / TigerAI),決定什麼內容要公開與合併。
+- **日常維護者:** TigerAI **Srv01**——一個 Claude Code 代理 session(`TG-Srv01-SysAdm`),代表擁有者維護。範圍:CI 檢查與腳本(`scripts/ci/`、`services/ci-check/`)、只提醒的資安護欄、第三層便條的寫法慣例,以及文件同步。
+- **作業規則:** 變更先在分支提交並經審查;任何要推送或合併進這個公開倉庫的內容,都需要擁有者明確指示,並先掃描公開內容。護欄一律只是建議(warning),不強制;`skills/_vendor/` 底下是上游原樣副本,不修改。
+
+---
+
 ## 📜 授權
 
 本 repo 的內容分屬三種授權。我們不替任何人的作品改授權，各部分維持原作者選定的授權。

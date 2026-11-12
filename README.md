@@ -421,6 +421,14 @@ Current version: see [`VERSION`](VERSION). All changes: [`CHANGELOG.md`](CHANGEL
 
 ---
 
+## 👤 Maintainers
+
+- **Repository owner:** [MorrisLu-Taipei](https://github.com/MorrisLu-Taipei) (Morris Lu / TigerAI). Decides what is published and merged.
+- **Day-to-day maintainer:** TigerAI **Srv01** — a Claude Code agent session (`TG-Srv01-SysAdm`) acting on the owner's behalf. Scope: CI checks and scripts (`scripts/ci/`, `services/ci-check/`), advisory-only guardrails, the Layer 3 note conventions, and keeping the docs in sync.
+- **Working rules:** changes are committed on a branch and reviewed; anything pushed or merged into this public repository needs the owner's explicit instruction and a prior scan of the public content. Guardrails stay advisory (warnings), never forced; files under `skills/_vendor/` are upstream copies and are not edited.
+
+---
+
 ## 📜 License
 
 This repository contains content under three licenses. We do not relicense anyone's work; each part keeps the license its author chose.
