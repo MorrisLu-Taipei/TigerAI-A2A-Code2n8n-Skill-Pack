@@ -641,8 +641,8 @@ await testMock();
   expect(/不阻擋|不擋/.test(doc) && doc.includes('REVIEW_TIMEOUT'), '文件：說明失敗時不阻擋');
 
   const changelog = read(join(root, 'CHANGELOG.md'));
-  const unreleased = changelog.split(/^## v/m)[0];
-  expect(unreleased.includes('agent-reviewer-mode') && unreleased.includes('validate-review.mjs'), 'CHANGELOG：未發布區有 AI 審查模式');
+  const changelogSections = changelog.split(/^## /m).slice(1);
+  expect(changelogSections.some(section => section.includes('agent-reviewer-mode') && section.includes('validate-review.mjs')), 'CHANGELOG：同一版本區段記錄 AI 審查模式與離線驗證工具');
   expect(read(join(root, '.gitlab-ci.yml')).includes('run-review-tests.mjs'), '.gitlab-ci.yml：接上本測試');
   expect(read(join(root, '.github', 'workflows', 'security-gate.yml')).includes('run-review-tests.mjs'), 'security-gate.yml：接上本測試');
   expect(read(join(root, 'spec', 'agent-restricted-mode.md')).includes('agent-reviewer-mode.md') && read(join(root, 'spec', 'agent-restricted-mode.en.md')).includes('agent-reviewer-mode.en.md'), '受限 Agent 模式規格：連到審查模式');
