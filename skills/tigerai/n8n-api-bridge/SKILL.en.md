@@ -11,6 +11,8 @@ description: Standard SOP for reading and writing n8n workflows via the n8n REST
 > When the host places the marker `[PORTAL-RESTRICTED-AGENT-MODE v1]` in the system prompt or session context (format and rules in [`spec/agent-restricted-mode.en.md`](../../../spec/agent-restricted-mode.en.md)), every `POST`/`PUT`/`PATCH`/`DELETE`, `activate`/`deactivate` and direct SQL in this Skill is **disabled**; do not use `N8N_API_URL`/`N8N_API_KEY` or build HTTP requests yourself. Reading (listing, reading a workflow, viewing executions) goes only through read-only tools provided by the host (names per the host). The merge write-back of §4.2, the idempotent write-back of §4.3 and the example in §7 are never executed; output the workflow JSON only and let the host write it. Without the marker, this file applies as written.
 > This text is only a hint; real enforcement is the host's tool allowlist and environment (no n8n key in the Agent environment, no network path to n8n).
 
+> **Load `n8n-skill-router` first.** This skill only covers how to call REST. It has no debugging, credential, or publishing rules, so working from this skill alone skips them.
+
 ## 1. Trigger conditions
 
 **Explicit**:
@@ -138,6 +140,15 @@ n8n has versioning: `workflow_entity` works with `versionId` / `activeVersionId`
 - ✅ Production write must prompt user confirm
 - ✅ Bulk writes (>5 workflows) must dry-run preview
 
+### 6.1 Write gate (before PUT, publish, activate, deactivate, or triggering a run)
+
+1. The skills for this route were loaded via `n8n-skill-router`. If not, do not write.
+2. Credentials sit at the top level of the node, as a sibling of `parameters`. Inside `parameters`, activation may succeed but execution fails with `Credentials not found`.
+3. Diagnose read-only by default. Draft edits do not authorize publishing, unpublishing or triggering runs. Each remote action must fall within explicit authorization, even for a workflow named TEST.
+4. Saving does not publish. Before release, require R1/R2 evidence and approval for the same candidate and target and use the controlled deployment path. Verify the actual published version by readback; no readback means unverified.
+5. Verify credentials against an endpoint that requires auth, and confirm a wrong value fails.
+6. Treat a key pasted into chat as exposed. Ask the owner to rotate it; do not reuse it or copy it into files or logs.
+
 ---
 
 ## 7. Example: full read-write loop
@@ -184,6 +195,7 @@ def regenerate_workflow_from_sticky(workflow_id):
 
 ## 8. Chains with other Skills
 
+- **Load order is set by `n8n-skill-router`**
 - **Called by `sticky-note-to-workflow`**: write back the produced workflow
 - **Calls `n8n-validation-expert`**: validate JSON schema before write
 - **Called by `tigerai-enterprise-patterns`**: enterprise scenarios require pre-write manual review

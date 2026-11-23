@@ -109,6 +109,9 @@ const NO_PREDEFINED_AUTH = new Set(['none', 'genericCredentialType']);
 const unconditionalCreds = entry =>
   (Array.isArray(entry?.credentials) ? entry.credentials : []).filter(c => c?.required === true && c.conditional !== true).map(c => c.name);
 const hasCredentialField = n => isObj(n.credentials) && Object.keys(n.credentials).length > 0;
+// 憑證參照寫進 parameters：n8n 可能照樣啟用，但執行時找不到憑證
+const isMisplacedCredentials = params => isObj(params) && isObj(params.credentials) && Object.keys(params.credentials).length > 0
+  && Object.values(params.credentials).every(r => isObj(r) && (typeof r.id === 'string' || typeof r.name === 'string'));
 
 const normPath = p => String(p).trim().replace(/^\/+|\/+$/g, '');
 const normMethod = m => String(m).trim().toUpperCase();
@@ -140,6 +143,7 @@ function structureProblems(wf) {
     }
     if (!isObj(n.parameters)) add('缺少 parameters（需為物件）', where);
     if (n.credentials !== undefined && !isObj(n.credentials)) add('credentials 需為物件', where);
+    if (isMisplacedCredentials(n.parameters)) add('credentials 放在 parameters 裡，執行時會報 Credentials not found；請移到節點最外層，與 parameters 同層', where);
   });
 
   if (isObj(wf.connections)) {
@@ -189,6 +193,14 @@ for (const f of files) {
   const probs = structureProblems(wf);
   for (const p of probs.slice(0, 10)) block('STRUCTURE_INVALID', f.rel, p.node, p.message);
   if (probs.length > 10) block('STRUCTURE_INVALID', f.rel, null, `另有 ${probs.length - 10} 項結構問題未列出`);
+
+  // 從 n8n 匯出的檔案才有這兩個欄位：不一致代表改動還沒上線，Webhook 與排程跑的仍是舊的發佈版
+  if (isObj(wf) && typeof wf.versionId === 'string' && typeof wf.activeVersionId === 'string' && wf.versionId !== wf.activeVersionId) {
+    const badPublished = (Array.isArray(wf.activeVersion?.nodes) ? wf.activeVersion.nodes : [])
+      .filter(n => isObj(n) && isMisplacedCredentials(n.parameters)).map(n => String(n.name));
+    advise('activation', 'workflow:draft-not-published', f.rel, badPublished[0] ?? null,
+      `草稿與發佈版不一致，改動尚未上線，需要發佈${badPublished.length ? `；目前發佈版的節點 ${badPublished.join('、')} 憑證放在 parameters 裡，執行會失敗` : ''}`);
+  }
   if (probs.length > 0) continue;
 
   for (const n of wf.nodes) {

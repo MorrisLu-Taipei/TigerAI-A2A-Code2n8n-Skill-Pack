@@ -43,8 +43,11 @@ TIGERAI_SKILLS=(
   n8n-security-governance
   n8n-review-mode
   n8n-code-to-native
+  external-dependency-security
+  code2n8n-pipeline
+  n8n-skill-router
 )
-EXPECTED_COUNT=$(( ${#VENDOR_SKILLS[@]} + ${#TIGERAI_SKILLS[@]} ))   # 29 (21 vendor + 8 TigerAI)
+EXPECTED_COUNT=$(( ${#VENDOR_SKILLS[@]} + ${#TIGERAI_SKILLS[@]} ))   # 33 (21 vendor + 12 TigerAI)
 
 usage() {
   cat <<EOF

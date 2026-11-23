@@ -11,6 +11,8 @@ description: Standard SOP for reading and writing n8n workflows via the n8n REST
 > 宿主在系統提示或工作階段上下文放了標記 `[PORTAL-RESTRICTED-AGENT-MODE v1]` 時（格式與規則見 [`spec/agent-restricted-mode.md`](../../../spec/agent-restricted-mode.md)），本 Skill 的 `POST`／`PUT`／`PATCH`／`DELETE`、`activate`／`deactivate` 與直接 SQL **全部停用**；不使用 `N8N_API_URL`／`N8N_API_KEY`，也不自行組 HTTP 請求。讀取（列出、讀 workflow、看 execution）只能經宿主提供的唯讀工具（名稱以宿主為準）；§4.2 的合併寫回、§4.3 的冪等寫回、§7 的範例一律不執行，改為只輸出 workflow JSON，由宿主負責寫入。沒有標記時，本檔全文照舊。
 > 這段文字只是提示；真正的強制是宿主的工具白名單與環境設定（Agent 環境不放 n8n 金鑰、不開通往 n8n 的網路）。
 
+> **先載入 `n8n-skill-router`。** 本 Skill 只管 REST 怎麼呼叫，不含除錯、憑證、發佈的規則；只讀本 Skill 就動手，那些規則會被跳過。
+
 ## 1. 觸發條件
 
 **精確**：
@@ -138,6 +140,15 @@ n8n 有版本管理：`workflow_entity` 配合 `versionId` / `activeVersionId` /
 - ✅ 對 production instance 寫回前必須提示使用者確認
 - ✅ 大量批次寫回（>5 workflows）必須 dry-run 預覽
 
+### 6.1 寫入閘門（PUT、publish、activate、deactivate、觸發執行之前）
+
+1. 已依 `n8n-skill-router` 載入該路線的 Skill；沒載入就不寫。
+2. 憑證在節點最外層，與 `parameters` 同層。放進 `parameters` 時可能啟用成功，但執行會報 `Credentials not found`。
+3. 診斷預設唯讀；草稿修改不等同於發布、停用或觸發執行的授權。每項遠端動作須在明確核准的範圍內，名稱有 TEST 也一樣。
+4. 存草稿不等於發布。發布前確認 R1／R2 證據及核准共同對應此候選版本和目標；只走受控部署管道。發布後讀回實際發布版比對，無證據不標已發布。
+5. 驗憑證要打一定需要驗證的端點，並確認錯誤的值會失敗。
+6. 已貼到對話的 key 視為已暴露。請持有人輪替，不再使用該 key，也不得將它複製到檔案或日誌。
+
 ---
 
 ## 7. 範例：完整讀寫循環
@@ -182,6 +193,7 @@ def regenerate_workflow_from_sticky(workflow_id):
 
 ## 8. 與其他 Skill 鏈接
 
+- **由 `n8n-skill-router` 決定載入順序**
 - **被 `sticky-note-to-workflow` 呼叫**：寫回產出
 - **呼叫 `n8n-validation-expert`**：寫回前驗證 JSON schema
 - **被 `tigerai-enterprise-patterns` 呼叫**：企業情境下要求寫回前手動審查

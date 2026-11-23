@@ -122,6 +122,11 @@ ai-review-tests:
   script:
     - node scripts/__test__/run-review-tests.mjs
 
+skill-routing-tests:
+  stage: scan
+  script:
+    - node scripts/__test__/run-skill-routing-tests.mjs
+
 dependency-cve:
   stage: scan
   allow_failure: true

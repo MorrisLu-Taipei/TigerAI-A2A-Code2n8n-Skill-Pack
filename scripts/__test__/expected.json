@@ -21,11 +21,13 @@
     "advisory-external-trigger.workflow.json":     { "status": "pass", "blocking": [], "advisories": ["activation:trigger:external-registration"] },
     "advisory-hidden-legacy-node.workflow.json":   { "status": "pass", "blocking": [], "advisories": ["node-catalog:node:hidden-legacy"] },
     "advisory-credential-field-missing.workflow.json": { "status": "pass", "blocking": [], "advisories": ["credentials:credentials:missing-field"] },
+    "advisory-draft-not-published.workflow.json": { "status": "pass", "blocking": [], "advisories": ["activation:workflow:draft-not-published"] },
     "advisory-unknown-subworkflow.workflow.json":  { "status": "pass", "blocking": [], "advisories": ["workflow-refs:workflow:unknown-subworkflow-reference"] },
     "advisory-egress-impact-changelog.workflow.json": { "status": "pass", "blocking": [], "advisories": ["security-scan:egress:external-domain", "security-scan:impact:high-impact-node", "security-scan:notes:missing-change-log"] },
 
     "fail-json-invalid.workflow.json":        { "status": "fail", "blocking": ["JSON_INVALID"] },
     "fail-structure.workflow.json":           { "status": "fail", "blocking": ["STRUCTURE_INVALID"] },
+    "fail-credential-in-parameters.workflow.json": { "status": "fail", "blocking": ["STRUCTURE_INVALID"] },
     "fail-secret.workflow.json":              { "status": "fail", "blocking": ["SECRET_DETECTED"] },
     "fail-malicious-code.workflow.json":      { "status": "fail", "blocking": ["MALICIOUS_CODE"] },
     "fail-credential-plaintext.workflow.json":{ "status": "fail", "blocking": ["CREDENTIAL_PLAINTEXT"] },

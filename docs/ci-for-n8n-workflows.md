@@ -23,7 +23,7 @@ AI 審查（只給建議、不阻擋）排在這些檢查之後，另外貼一�
 | 阻擋碼 | 觸發條件 | 來源 |
 |---|---|---|
 | `JSON_INVALID` | 檔案讀不到或不是合法 JSON | 靜態 |
-| `STRUCTURE_INVALID` | 缺少 `name`、`nodes`、`connections`，或節點缺少 `name`／`type`／`typeVersion`／`position`／`parameters`，或 `connections` 指向不存在的節點 | 靜態 |
+| `STRUCTURE_INVALID` | 缺少 `name`、`nodes`、`connections`，或節點缺少 `name`／`type`／`typeVersion`／`position`／`parameters`，或 `connections` 指向不存在的節點，或憑證參照寫在 `parameters` 裡（應與 `parameters` 同層） | 靜態 |
 | `SECRET_DETECTED` | `security-scan` 的 `secret:*` 規則命中（內容不會顯示） | 靜態 |
 | `MALICIOUS_CODE` | `security-scan` 的 `jscode:*` 偵測類 error 命中 | 靜態 |
 | `CREDENTIAL_PLAINTEXT` | `security-scan` 的 `credential:plaintext`：敏感欄位寫成明文 | 靜態 |

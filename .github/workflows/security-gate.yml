@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      confirm_test_instance:
+        description: Confirm the n8n credentials target a dedicated test instance
+        required: true
+        type: boolean
+        default: false
 
 jobs:
   manifest-consistency:
@@ -149,6 +156,8 @@ jobs:
         run: node scripts/__test__/run-portal-bundle-tests.mjs
       - name: AI review (reviewer mode) output-check tests (advisory tool, exit 0 by design)
         run: node scripts/__test__/run-review-tests.mjs
+      - name: Skill manifest, install scripts and n8n-skill-router stay in sync
+        run: node scripts/__test__/run-skill-routing-tests.mjs
 
   dependency-cve:
     name: case-study npm audit (HIGH+ is a gate, not advisory — SEC-017)
@@ -389,9 +398,9 @@ jobs:
           retention-days: 90
 
   live-roundtrip:
-    name: n8n REST round-trip (optional — needs secrets)
+    name: n8n REST round-trip (manual — dedicated test instance only)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.confirm_test_instance }}
     env:
       N8N_API_URL: ${{ secrets.N8N_API_URL }}
       N8N_API_KEY: ${{ secrets.N8N_API_KEY }}

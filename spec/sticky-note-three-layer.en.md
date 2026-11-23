@@ -184,6 +184,8 @@ Usage rules:
 
 ---
 
+Optionally record the current stage, next step, loaded skills, check evidence references, and blockers in the draft or handoff. Keep it non-sensitive. This is not an approval record; do not write to a live workflow just to add it.
+
 ## 5. Color semantics summary
 
 | color value | Use | Who writes |

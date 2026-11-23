@@ -1,0 +1,295 @@
+{
+  "schemaVersion": 1,
+  "entrypoint": "n8n-skill-router",
+  "enforcement": "The index records routing and exit criteria; it does not enforce writes or publication. A controlled deployment system must enforce authorization.",
+  "stages": [
+    {
+      "id": "P1",
+      "phase": "plan",
+      "skills": [
+        "tigerai-qa-mode",
+        "tigerai-example-finder"
+      ],
+      "exit": "Requirements, acceptance criteria and scope recorded."
+    },
+    {
+      "id": "P2",
+      "phase": "plan",
+      "skills": [
+        "n8n-workflow-patterns",
+        "tigerai-enterprise-patterns",
+        "n8n-subworkflows-official",
+        "n8n-agents-official",
+        "code-to-workflow",
+        "code2n8n-pipeline"
+      ],
+      "exit": "Approach and target environment agreed."
+    },
+    {
+      "id": "E1",
+      "phase": "execute",
+      "skills": [
+        "sticky-note-to-workflow"
+      ],
+      "exit": "Draft skeleton or existing baseline ready; no live changes."
+    },
+    {
+      "id": "E2",
+      "phase": "execute",
+      "skills": [
+        "n8n-node-configuration-official",
+        "n8n-node-configuration",
+        "n8n-expressions-official",
+        "n8n-expression-syntax",
+        "n8n-credentials-and-security-official"
+      ],
+      "exit": "Node configuration validated; credential references at node level, no secrets."
+    },
+    {
+      "id": "E3",
+      "phase": "execute",
+      "skills": [
+        "n8n-loops-official",
+        "n8n-binary-and-data-official",
+        "n8n-data-tables-official",
+        "n8n-ai-nodes-official",
+        "n8n-code-nodes-official",
+        "n8n-code-javascript",
+        "n8n-code-python",
+        "n8n-code-to-native",
+        "n8n-extending-mcp-official"
+      ],
+      "exit": "Only relevant specialist checks applied."
+    },
+    {
+      "id": "E4",
+      "phase": "execute",
+      "skills": [
+        "n8n-error-handling-official"
+      ],
+      "exit": "Expected failure paths and test evidence recorded."
+    },
+    {
+      "id": "R1",
+      "phase": "release",
+      "skills": [
+        "n8n-workflow-lifecycle-official",
+        "n8n-validation-expert"
+      ],
+      "exit": "Static validation passed for the exact candidate and target version."
+    },
+    {
+      "id": "R2",
+      "phase": "release",
+      "skills": [
+        "n8n-security-governance",
+        "n8n-credentials-and-security-official",
+        "n8n-error-handling-official",
+        "external-dependency-security",
+        "n8n-review-mode"
+      ],
+      "exit": "Security review passed for the same candidate; review mode and external-dependency checks apply only when relevant."
+    },
+    {
+      "id": "R3",
+      "phase": "release",
+      "skills": [
+        "n8n-api-bridge",
+        "using-n8n-skills-official"
+      ],
+      "exit": "Separate, verified authorization for this target, action and candidate before any publish."
+    },
+    {
+      "id": "R4",
+      "phase": "release",
+      "skills": [
+        "n8n-debugging-official"
+      ],
+      "exit": "Read back the actual published version; authorized test only, or report unverified."
+    }
+  ],
+  "routes": {
+    "diagnose": {
+      "stages": [
+        "R4"
+      ],
+      "mode": "read-only",
+      "skills": [
+        "n8n-debugging-official"
+      ],
+      "exit": "Read available workflow and execution evidence, report the likely cause or what is missing; do not write or trigger a run.",
+      "next": "modify (only if separately requested)"
+    },
+    "build": {
+      "stages": [
+        "P1",
+        "P2",
+        "E1",
+        "E2",
+        "E3",
+        "E4",
+        "R1",
+        "R2"
+      ],
+      "mode": "draft",
+      "skills": [
+        "n8n-workflow-patterns",
+        "sticky-note-to-workflow",
+        "n8n-node-configuration-official",
+        "n8n-error-handling-official",
+        "n8n-workflow-lifecycle-official",
+        "n8n-validation-expert",
+        "n8n-security-governance"
+      ]
+    },
+    "modify": {
+      "stages": [
+        "E2",
+        "E3",
+        "E4",
+        "R1",
+        "R2"
+      ],
+      "mode": "draft",
+      "skills": [
+        "n8n-workflow-lifecycle-official",
+        "n8n-error-handling-official",
+        "n8n-validation-expert",
+        "n8n-security-governance"
+      ],
+      "entry": "Read back current and published baselines; store an approved, sanitized backup before a separately authorized write."
+    },
+    "convert": {
+      "stages": [
+        "P2",
+        "E1",
+        "E2",
+        "E3",
+        "E4",
+        "R1",
+        "R2"
+      ],
+      "mode": "draft",
+      "skills": [
+        "sticky-note-to-workflow",
+        "n8n-node-configuration-official",
+        "n8n-error-handling-official",
+        "n8n-workflow-lifecycle-official",
+        "n8n-validation-expert",
+        "n8n-security-governance"
+      ],
+      "choose": [
+        "code-to-workflow",
+        "code2n8n-pipeline"
+      ]
+    },
+    "review": {
+      "stages": [
+        "R1",
+        "R2"
+      ],
+      "mode": "read-only",
+      "skills": [
+        "n8n-workflow-lifecycle-official",
+        "n8n-validation-expert",
+        "n8n-security-governance",
+        "n8n-credentials-and-security-official"
+      ]
+    },
+    "publish": {
+      "stages": [
+        "R1",
+        "R2",
+        "R3",
+        "R4"
+      ],
+      "mode": "approval-required",
+      "skills": [
+        "n8n-workflow-lifecycle-official",
+        "n8n-validation-expert",
+        "n8n-security-governance",
+        "n8n-credentials-and-security-official",
+        "n8n-error-handling-official",
+        "n8n-debugging-official"
+      ]
+    }
+  },
+  "adapters": {
+    "rest": [
+      "n8n-api-bridge"
+    ],
+    "mcp": [
+      "using-n8n-skills-official"
+    ]
+  },
+  "signals": {
+    "unclearRequirements": [
+      "tigerai-qa-mode"
+    ],
+    "examples": [
+      "tigerai-example-finder"
+    ],
+    "enterprise": [
+      "tigerai-enterprise-patterns"
+    ],
+    "credentials": [
+      "n8n-credentials-and-security-official"
+    ],
+    "node": [
+      "n8n-node-configuration-official",
+      "n8n-node-configuration"
+    ],
+    "expression": [
+      "n8n-expressions-official",
+      "n8n-expression-syntax"
+    ],
+    "validation": [
+      "n8n-workflow-lifecycle-official",
+      "n8n-validation-expert"
+    ],
+    "unattended": [
+      "n8n-error-handling-official"
+    ],
+    "batches": [
+      "n8n-loops-official"
+    ],
+    "reuse": [
+      "n8n-subworkflows-official"
+    ],
+    "files": [
+      "n8n-binary-and-data-official"
+    ],
+    "persistentState": [
+      "n8n-data-tables-official"
+    ],
+    "aiNodes": [
+      "n8n-ai-nodes-official"
+    ],
+    "agentDesign": [
+      "n8n-agents-official"
+    ],
+    "codeDecision": [
+      "n8n-code-nodes-official"
+    ],
+    "javascript": [
+      "n8n-code-nodes-official",
+      "n8n-code-javascript"
+    ],
+    "python": [
+      "n8n-code-nodes-official",
+      "n8n-code-python"
+    ],
+    "nativeReplacement": [
+      "n8n-code-to-native"
+    ],
+    "mcpExtension": [
+      "n8n-extending-mcp-official"
+    ],
+    "externalDependency": [
+      "external-dependency-security"
+    ],
+    "explicitReviewMode": [
+      "n8n-review-mode"
+    ]
+  }
+}

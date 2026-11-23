@@ -41,6 +41,9 @@ TIGERAI_SKILLS=(
   n8n-security-governance
   n8n-review-mode
   n8n-code-to-native
+  external-dependency-security
+  code2n8n-pipeline
+  n8n-skill-router
 )
 SHARED_DIR="_tigerai-pack-shared"
 

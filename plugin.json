@@ -64,6 +64,7 @@
     { "path": "skills/_vendor/n8n-subworkflows-official", "source": "vendor-official" },
     { "path": "skills/_vendor/n8n-workflow-lifecycle-official", "source": "vendor-official" },
     { "path": "skills/_vendor/using-n8n-skills-official", "source": "vendor-official" },
+    { "path": "skills/tigerai/n8n-skill-router", "source": "tigerai", "role": "router" },
     { "path": "skills/tigerai/sticky-note-to-workflow", "source": "tigerai", "role": "core-executor" },
     { "path": "skills/tigerai/n8n-api-bridge", "source": "tigerai", "role": "io" },
     { "path": "skills/tigerai/tigerai-enterprise-patterns", "source": "tigerai", "role": "enterprise" },
@@ -103,6 +104,7 @@
   },
   "entry_points": {
     "default": "tigerai-qa-mode",
+    "router": "n8n-skill-router",
     "modes": {
       "cookbook_copy": "Direct paste from cookbook/ into n8n; no skill activation needed",
       "qa": "tigerai-qa-mode → sticky-note-to-workflow",

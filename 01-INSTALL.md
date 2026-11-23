@@ -24,7 +24,7 @@ bash install.sh
 - Claude Code：`~/.claude/skills/`
 - Antigravity：`~/.gemini/antigravity/global_skills/`
 
-（兩者皆不存在時 fallback 到 Claude。）重複執行是安全的：已存在的 skill 目錄會移除後重拷。安裝結束自動驗證 **14/14** skill 目錄都到位，缺一個就 exit 非零。
+（兩者皆不存在時 fallback 到 Claude。）重複執行是安全的：已存在的 skill 目錄會移除後重拷。安裝結束自動驗證 **33/33** skill 目錄都到位，缺一個就 exit 非零。
 
 ### 旗標
 
@@ -50,7 +50,7 @@ PowerShell 版本對應的旗標是 `-Target` / `-DryRun` / `-Help`。
 > 「幫我安裝這個 n8n Skill Pack」
 
 腳本實際做的事：
-1. 拷貝 `skills/_vendor/*`（6 個 vendor skills）與 `skills/tigerai/*`（8 個 TigerAI skills）到設定目錄
+1. 拷貝 `skills/_vendor/*`（21 個 vendor skills）與 `skills/tigerai/*`（12 個 TigerAI skills）到設定目錄
 2. 把 `cookbook/`、`spec/`、`research/` 與 02 / 03 / 04 等文件鏡像到設定目錄底下的 `_tigerai-pack-shared/`，供 AI 隨時查閱
 
 腳本**不做**的事（先前文件有寫但實作沒做）：
@@ -62,7 +62,7 @@ PowerShell 版本對應的旗標是 `-Target` / `-DryRun` / `-Help`。
 ```bash
 cp -r skills/_vendor/* ~/.claude/skills/
 cp -r skills/tigerai/* ~/.claude/skills/
-ls ~/.claude/skills/   # 應該看到 14 個目錄（6 vendor + 8 tigerai）
+ls ~/.claude/skills/   # 應該看到 33 個目錄（21 vendor + 12 tigerai）
 ```
 
 ## 環境變數設定
@@ -104,13 +104,13 @@ N8N_API_KEY="你的-n8n-api-key"
 - 透過 `sticky-note-to-workflow` skill 產出符合三層結構的 workflow JSON
 - 透過 `n8n-api-bridge` skill PUT 進你的 n8n（前提：env vars 已設）
 
-若 skill 沒被觸發：重新跑安裝腳本、重啟 Claude Code / Antigravity session、確認 `~/.claude/skills/` 底下有 14 個 skill 目錄（或 Antigravity 對應路徑）。
+若 skill 沒被觸發：重新跑安裝腳本、重啟 Claude Code / Antigravity session、確認 `~/.claude/skills/` 底下有 33 個 skill 目錄（或 Antigravity 對應路徑）。
 
 > 註：舊版文件曾寫「載入 `n8n-mcp-tools-expert` skill」— 本 Pack **沒有**這個 skill，是文案誤植，已移除。
 
 ## 解除安裝
 
-`uninstall.sh` / `uninstall.ps1` 對齊 installer — 一樣支援 `--target` / `--dry-run` / `--help` 旗標。會移除安裝腳本寫入的 **14 個 skill 目錄 + `_tigerai-pack-shared/`**，不存在的會靜默跳過。
+`uninstall.sh` / `uninstall.ps1` 對齊 installer — 一樣支援 `--target` / `--dry-run` / `--help` 旗標。會移除安裝腳本寫入的 **33 個 skill 目錄 + `_tigerai-pack-shared/`**，不存在的會靜默跳過。
 
 ```bash
 # Linux / macOS / WSL
@@ -126,4 +126,4 @@ bash uninstall.sh --dry-run              # 預覽，不動檔案系統
 .\uninstall.ps1 -DryRun                  # 預覽
 ```
 
-要手動拆的話，uninstaller 的 source 裡有明確列出 14 個 skill 名 + `_tigerai-pack-shared` — 直接看那份名單最準。
+要手動拆的話，uninstaller 的 source 裡有明確列出 33 個 skill 名 + `_tigerai-pack-shared` — 直接看那份名單最準。

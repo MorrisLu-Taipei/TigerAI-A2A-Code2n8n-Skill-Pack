@@ -26,7 +26,7 @@ The script writes to **every detected target** under your home directory — cur
 - Claude Code: `~/.claude/skills/`
 - Antigravity: `~/.gemini/antigravity/global_skills/`
 
-(If neither parent directory exists, it defaults to Claude.) Re-running is safe: existing skill folders are removed and recopied. Post-install verifies that **14/14** skill folders landed in each target and exits non-zero if any are missing.
+(If neither parent directory exists, it defaults to Claude.) Re-running is safe: existing skill folders are removed and recopied. Post-install verifies that **33/33** skill folders landed in each target and exits non-zero if any are missing.
 
 ### Flags
 
@@ -52,7 +52,7 @@ Or just tell the AI:
 > "Install this n8n Skill Pack for me."
 
 What the script actually does:
-1. Copies `skills/_vendor/*` (6 vendor skills) and `skills/tigerai/*` (8 TigerAI skills) into your config directory.
+1. Copies `skills/_vendor/*` (21 vendor skills) and `skills/tigerai/*` (12 TigerAI skills) into your config directory.
 2. Mirrors `cookbook/`, `spec/`, `research/`, and supporting docs (02 / 03 / 04) into a `_tigerai-pack-shared/` folder inside the same config directory so the AI can consult them.
 
 What the script **does not** do (despite older copy that said otherwise):
@@ -106,11 +106,11 @@ If installed correctly, the assistant will:
 - Produce a three-layer workflow JSON via `sticky-note-to-workflow` skill
 - PUT the JSON into your n8n via `n8n-api-bridge` skill (requires the env vars above)
 
-If the skills do not trigger: re-run the installer, restart your Claude Code / Antigravity session, and confirm the 14 skill folders appear under `~/.claude/skills/` (or the Antigravity equivalent).
+If the skills do not trigger: re-run the installer, restart your Claude Code / Antigravity session, and confirm the 33 skill folders appear under `~/.claude/skills/` (or the Antigravity equivalent).
 
 ## Uninstall
 
-`uninstall.sh` / `uninstall.ps1` mirror the installer — same `--target` / `--dry-run` / `--help` flags. Both remove the **14 skill folders + `_tigerai-pack-shared/`** the installer wrote, and silently skip anything not present.
+`uninstall.sh` / `uninstall.ps1` mirror the installer — same `--target` / `--dry-run` / `--help` flags. Both remove the **33 skill folders + `_tigerai-pack-shared/`** the installer wrote, and silently skip anything not present.
 
 ```bash
 # Linux / macOS / WSL
@@ -126,6 +126,6 @@ bash uninstall.sh --dry-run              # preview, do not touch the filesystem
 .\uninstall.ps1 -DryRun                  # preview, do not touch the filesystem
 ```
 
-If you prefer to do it by hand, the uninstaller maintains an explicit list of the 14 skill folders + `_tigerai-pack-shared` — read its source for the exact paths.
+If you prefer to do it by hand, the uninstaller maintains an explicit list of the 33 skill folders + `_tigerai-pack-shared` — read its source for the exact paths.
 
 ## Next: [02-USAGE-MODES.en.md](02-USAGE-MODES.en.md)

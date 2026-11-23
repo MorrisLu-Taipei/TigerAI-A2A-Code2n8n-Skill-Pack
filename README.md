@@ -17,6 +17,15 @@
 >
 > The directive gates when you may use the words "validated" / "tested" / "production-ready", what tools you must invoke, what evidence schema you must emit, and what phrases are forbidden until the gate passes. Skipping it produced the v0.27.0 incident captured in [`examples/einvoice-n8n/REFLECTION.md`](examples/einvoice-n8n/REFLECTION.md). Human reviewers use [`docs/code2n8n-vv-checklist.md`](docs/code2n8n-vv-checklist.md) instead.
 
+## Latest update: staged skill routing
+
+**Updated by OpenAI Codex.**
+
+- The [n8n Skill Router](skills/tigerai/n8n-skill-router/SKILL.en.md) selects a task route, then follows plan → execute → release. Troubleshooting is read-only by default.
+- The [pipeline index](skills/tigerai/n8n-skill-router/references/pipeline.json) defines routes, stages, and skills in one place. Layer 3 captures handoff progress, not release approval.
+- Credential placement checks remain in place, with an [offline release-evidence check](docs/release-evidence.md) added. Passing it does not grant write access or publish a workflow; the controlled deployment path remains responsible.
+- The live n8n round-trip is manual and requires explicit confirmation that the credentials target a dedicated test instance; pushing to `main` does not run it.
+
 ## 🆕 What's new — v1.1.0 (2026-11-07): deterministic n8n CI, Portal tooling, advisory-only guardrails, AI review mode
 
 This release turns the Pack from "a brain that writes workflows" into a brain **plus the tooling to check and govern what it writes**. Everything below is **advisory unless stated** — guardrails never block, and your own decisions always win.
@@ -234,9 +243,10 @@ TigerAI-Code2n8n-Skill-Pack/
 ├── cookbook/                  ← 8 copy-paste recipes (each has plain-language + DSL fold)
 │   └── 00-INDEX.md/.en.md
 │
-├── skills/                    ← 32 skills (plugin.json manifest matches on-disk)
+├── skills/                    ← 33 skills (plugin.json manifest matches on-disk)
 │   ├── _vendor/                  21 vendored skills: 6 czlonkowski/n8n-skills (MIT) + 15 n8n-io/skills (Apache-2.0, unmodified)
-│   └── tigerai/                  11 TigerAI skills
+│   └── tigerai/                  12 TigerAI skills
+│       ├── n8n-skill-router/        ← Start here: skill load order and write gates
 │       ├── code-to-workflow/        ← Marquee: existing code / system → n8n
 │       ├── n8n-security-governance/ ← Security + version control + CI/CD + rollback gate
 │       └── n8n-code-to-native/      ← Code node → native n8n nodes

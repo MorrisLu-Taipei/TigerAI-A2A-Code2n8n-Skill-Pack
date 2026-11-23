@@ -45,9 +45,12 @@ $TigerAISkills = @(
   'code-to-workflow',
   'n8n-security-governance',
   'n8n-review-mode',
-  'n8n-code-to-native'
+  'n8n-code-to-native',
+  'external-dependency-security',
+  'code2n8n-pipeline',
+  'n8n-skill-router'
 )
-$ExpectedCount = $VendorSkills.Count + $TigerAISkills.Count   # 29 (21 vendor + 8 TigerAI)
+$ExpectedCount = $VendorSkills.Count + $TigerAISkills.Count   # 33 (21 vendor + 12 TigerAI)
 
 function Show-Usage {
   Write-Host @"

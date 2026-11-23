@@ -1,0 +1,64 @@
+{
+  "name": "ci-fixture advisory draft differs from published",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "mt",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "np",
+      "name": "Next Step",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        260,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Next Step",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "draft-version",
+  "activeVersionId": "published-version",
+  "activeVersion": {
+    "nodes": [
+      {
+        "name": "Next Step",
+        "parameters": {
+          "url": "http://svc.internal/api",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpHeaderAuth",
+          "options": {},
+          "credentials": {
+            "httpHeaderAuth": {
+              "id": "ci-cred-1",
+              "name": "ci-header-auth"
+            }
+          }
+        }
+      }
+    ]
+  }
+}

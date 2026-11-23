@@ -2,6 +2,15 @@
 
 ## 未發布
 
+- **分階段 Skill 路由**：由 `pipeline.json` 集中定義任務路線、規劃／執行／上架和過關條件；除錯預設唯讀。新增 `check-release-evidence.mjs` 離線比對候選版本、R1／R2 與核准資料；工具不授權、不發布。
+- **正式寫入與 CI 分離**：GitHub Actions 的 n8n 實機往返測試改為手動，且須明確確認使用專用測試實例；推送 `main` 不會觸發實機操作。更新者：OpenAI Codex。
+
+- **新增 n8n Skill 入口與載入順序（`n8n-skill-router`）**：原本各 Skill 獨立觸發，官方入口 Skill 只列 14 個 Skill，TigerAI Skill 也沒有指向官方 Skill；AI 走 REST 時常只載入 `n8n-api-bridge`，因而跳過除錯、憑證與「已發佈要先問」的規則。新 Skill 依任務定出載入順序，涵蓋全部 Skill，並規定寫入前後的閘門。官方 Skill 未修改。
+- **修正安裝清單漏項**：`external-dependency-security`、`code2n8n-pipeline` 已登錄在 `plugin.json`，但四支安裝與解除安裝腳本沒有列入，實際從未被安裝。安裝文件的數量同步更新為 33。
+- **`n8n-api-bridge` 新增寫入閘門**（§6.1）：寫入前要載入路線上的 Skill、確認憑證位置、已發佈要先問、`PUT` 只存草稿。此閘門是給 AI 的指示，不會自行阻擋工具呼叫。
+- **CI 新增兩項檢查**：憑證參照寫在 `parameters` 裡時以 `STRUCTURE_INVALID` 阻擋（n8n 可能照樣啟用，執行才報 `Credentials not found`）；匯出檔的 `versionId` 與 `activeVersionId` 不一致時提醒 `workflow:draft-not-published`。
+- 測試：新增 `scripts/__test__/run-skill-routing-tests.mjs`，`plugin.json`、安裝腳本與入口 Skill 不一致時 CI 失敗；新增兩個 CI 夾具。
+
 - **修正 `validate-review.mjs` 的二次方時間（潛在 ReDoS）**：實測 60,000 字元的最壞輸入最久約 4.8 秒（修正前 200,000 字元要數十秒），根因是六處對長字串會二次方回溯或重複掃描的比對：網址的主機加路徑（巢狀量詞）、Markdown 連結（行內與參考式）、HTML 標籤、行首角色前綴（`^\s*` 跨空行）、鍵值對機密與 JWT（每個起點都掃完整段），以及 NFKC 對連續組合記號的標準排序（128,000 個約 4 秒）。前六者改成單趟掃描（語意與原正規表示式一致，原樣式保留在註解與匯出的 `FORBIDDEN`、`SECRET_SHAPES`），`maskSecrets` 同步修正；連續超過 32 個的組合記號在比對用副本截斷（只影響掃描，不影響輸出）。修正後最壞輸入在 200,000 字元內 30 毫秒左右、1,000,000 字元約 0.1 秒。整份輸出 256 KB 上限與 `/v1/review/validate` 的 32,768 字元上限保留，改為第二道防線。行為不變：`run-review-tests.mjs` 新增 §14（17 項），含效能回歸（最壞輸入 200,000 字元於 3 秒內）與修正前後差異測試（保留凍結的舊版 `scripts/__test__/legacy/validate-review.legacy.mjs`，對超過 10 萬筆輸入逐筆比對輸出）；既有測試項數不變（review 636 → 653，其餘 security-scan 179、native-first 82、ci 393、portal 135、eval 971、services 1241 不變）。
 
 - **AI 審查者模式（只給建議，不阻擋）**：新增 `spec/agent-reviewer-mode.md`／`.en.md`（受限審查模式 v1，受限 Agent 模式的兄弟）與 Skill `skills/tigerai/n8n-review-mode`（中英，含系統提示、輸入分隔格式、輸出規則、禁用詞、提示注入防護與正反例）。審查者唯讀、不核准、不合併、不宣稱已通過；輸出是固定 schema 的 JSON（`severity` 只有 `info`、最多 20 則）；workflow 內容一律是不可信資料（帶 nonce 的分隔區塊）；審查準則引用現有規格，並新增「修改記錄與實際變更是否相符」的前後版本比對（原本寫「之後由管線比對」的部分）。新增 `scripts/review/validate-review.mjs`（輸出檢查與 Markdown 呈現：丟棄不合格建議並列原因代碼 `REVIEW_BAD_SCHEMA`、`REVIEW_TOO_LONG`、`REVIEW_FORBIDDEN_WORD`、`REVIEW_URL`、`REVIEW_HTML`、`REVIEW_SECRET_PATTERN`、`REVIEW_TOO_MANY`、`REVIEW_OUTPUT_INVALID`；中英文放行用語與忽略規則的文字整份丟棄並標記疑似遭提示注入；**退出碼永遠是 0，沒有 strict 選項**）、`scripts/review/build-input.mjs`（輸入組裝與遮罩的參考實作）、離線的審查者假模型 `eval/mock-model/review-server.mjs`（只綁 127.0.0.1，含「被注入而放行」的模擬），以及 `docs/ai-review-in-pr.md`（宿主如何接進 PR 與工單）。模型不可用、逾時、輸出無效一律顯示「AI 審查未執行」，不擋流程。目前沒有接任何真實模型，逾時、重試與 token 預算只是建議值，標示【待基準線】；閘道日誌政策標示【待 Portal 決定】。

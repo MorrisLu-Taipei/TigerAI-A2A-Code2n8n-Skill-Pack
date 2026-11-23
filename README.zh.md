@@ -17,6 +17,15 @@
 >
 > 指令明確規範：什麼時候才可以說「驗證通過 / 已測試 / 可上線」、要跑哪些工具、要產什麼 evidence schema、哪些詞彙在通過 gate 前是禁用的。跳過這個 gate 就是 v0.27.0 出事的原因，紀錄在 [`examples/einvoice-n8n/REFLECTION.md`](examples/einvoice-n8n/REFLECTION.md)。**人類** reviewer 改讀 [`docs/code2n8n-vv-checklist.md`](docs/code2n8n-vv-checklist.md)。
 
+## 最新更新：分階段 Skill 路由
+
+**更新者：OpenAI Codex。**
+
+- [n8n Skill Router](skills/tigerai/n8n-skill-router/SKILL.md) 先依任務選路線，再按「規劃 → 執行 → 上架」過關；「打不通」預設只讀排查。
+- [流程索引](skills/tigerai/n8n-skill-router/references/pipeline.json) 是路線、階段與 Skill 的單一來源。Layer 3 可留下交接進度，不當成上架核准。
+- 保留憑證位置檢查，新增[離線上架前證據比對](docs/release-evidence.md)。檢查通過不代表已有寫入權限或已發布；正式發布仍由受控部署管道決定。
+- n8n 實機往返測試改為手動觸發，須明確確認憑證指向專用測試實例；推送 `main` 不會執行該測試。
+
 ## 🆕 最新動態 — v1.1.0（2026-11-07）：n8n 確定性 CI、Portal 工具、只提醒的護欄、AI 審查模式
 
 這一版讓 Pack 從「寫 workflow 的大腦」變成「大腦加上檢查與治理它寫出來的東西的工具」。以下**除非特別註明，一律是建議**：護欄永遠不擋你，你的決定永遠優先。
@@ -85,7 +94,7 @@ Code2n8n **不是逐行把 Python 或 JavaScript 翻成節點**。它做的是�
 
 ### 🧪 案例見證 — 方法論被套用後的樣本，不是 Pack 的賣點
 
-> Pack 的賣點是上方的**方法論 + 32 個 SKILLs + templates + V&V gate（§10 兩層 + A2A 11 語 + §1.6 lexical）+ main/critic 雙 agent 架構**。下面這些案例是**方法論被套到真實程式碼後的樣本**，放在 `examples/` 當參考。每個案例獨立負責自己的 `SECURITY-REVIEW.md`（必要時還有 `REFLECTION.md`）。未來會有更多 GitHub repo 透過 [`code2n8n-pipeline`](skills/tigerai/code2n8n-pipeline/SKILL.md) SKILL 自動加入。
+> Pack 的賣點是上方的**方法論 + 33 個 SKILLs + templates + V&V gate（§10 兩層 + A2A 11 語 + §1.6 lexical）+ main/critic 雙 agent 架構**。下面這些案例是**方法論被套到真實程式碼後的樣本**，放在 `examples/` 當參考。每個案例獨立負責自己的 `SECURITY-REVIEW.md`（必要時還有 `REFLECTION.md`）。未來會有更多 GitHub repo 透過 [`code2n8n-pipeline`](skills/tigerai/code2n8n-pipeline/SKILL.md) SKILL 自動加入。
 
 | 案例 | 上游 → n8n | 方法論套用紀錄 |
 |---|---|---|
@@ -119,7 +128,7 @@ Code2n8n **不是逐行把 Python 或 JavaScript 翻成節點**。它做的是�
 
 ### 你會在這個 repo 看到的 Agentic 痕跡
 
-- **`skills/`** — `plugin.json` 登錄 32 個 Claude Code / Antigravity Skill（21 個收錄 + 11 個 TigerAI，含 v0.30.0 新增 `code2n8n-pipeline` 自動駕駛 SKILL），每個 SKILL.md 都是 AI 與人共筆
+- **`skills/`** — `plugin.json` 登錄 33 個 Claude Code / Antigravity Skill（21 個收錄 + 12 個 TigerAI，含 v0.30.0 新增 `code2n8n-pipeline` 自動駕駛 SKILL），每個 SKILL.md 都是 AI 與人共筆
 - **`.agent/workflows/`** — Antigravity 專屬的 agentic workflow（如 `/install-n8n-pack` 一鍵安裝）
 - **`cookbook/`** — 8 個自然語言 → workflow 的對照範例，示範如何「對 AI 講話」
 - **`spec/sticky-note-three-layer.md`** — 三層結構規範，強制 AI 產出可 review 的 workflow
@@ -234,9 +243,10 @@ TigerAI-Code2n8n-Skill-Pack/
 ├── cookbook/                  ← 8 個照抄範例（每個有自然語言版 + DSL 折疊）
 │   └── 00-INDEX.md
 │
-├── skills/                    ← 32 個 Skill（plugin.json manifest 與磁碟一致）
+├── skills/                    ← 33 個 Skill（plugin.json manifest 與磁碟一致）
 │   ├── _vendor/                  21 個收錄 Skill：6 個 czlonkowski/n8n-skills（MIT）+ 15 個 n8n-io/skills（Apache-2.0，未修改）
-│   └── tigerai/                  11 個 TigerAI Skill
+│   └── tigerai/                  12 個 TigerAI Skill
+│       ├── n8n-skill-router/        ← 先讀這個：Skill 載入順序與寫入閘門
 │       ├── code-to-workflow/        ← 旗艦：既有程式 / 系統 → n8n
 │       ├── n8n-security-governance/ ← 安全、版本控制、CI/CD、回滾閘門
 │       └── n8n-code-to-native/      ← Code node → 原生 n8n node
