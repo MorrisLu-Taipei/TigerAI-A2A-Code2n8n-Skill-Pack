@@ -17,7 +17,7 @@
 >
 > The directive gates when you may use the words "validated" / "tested" / "production-ready", what tools you must invoke, what evidence schema you must emit, and what phrases are forbidden until the gate passes. Skipping it produced the v0.27.0 incident captured in [`examples/einvoice-n8n/REFLECTION.md`](examples/einvoice-n8n/REFLECTION.md). Human reviewers use [`docs/code2n8n-vv-checklist.md`](docs/code2n8n-vv-checklist.md) instead.
 
-## Latest update: staged skill routing
+## Latest update — v1.2.0: staged skill routing
 
 **Updated by OpenAI Codex.**
 

@@ -123,7 +123,7 @@ n8n 的「state」分散在四個地方，全要備：
 每季至少一次：
 
 1. 在 staging 環境用昨日的 Postgres dump + Encryption Key 還原一份 n8n
-2. 隨機抽 3 個 workflow 驗證 import + 試跑 + 對 audit log
+2. 隨機抽 3 個 workflow，檢查匯入、試跑與 audit log
 3. 拿一個 production credential 走輪替演練（旋轉後仍能跑）
 4. 把演練紀錄存到 `runbook/dr-drills/YYYY-Q?.md`
 

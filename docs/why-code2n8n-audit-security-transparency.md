@@ -52,8 +52,8 @@ Codex 給的 7 點修法 + 我 ship v0.34.1：n8n 2.10.3 實機跑 **approve + r
 
 ### 1.5 收尾 — 教訓寫入持久層
 
-- **CHANGELOG v0.34.1** 完整紀錄：Codex 救援、我 6 項錯誤盤點、最關鍵教訓「反覆失敗時先驗證 transport 再驗證 logic」
-- **SECURITY-REVIEW SEC-9 v3 status**：🟡 DRAFTED but not runtime-verified（v0.34.0）→ ✅ FIXED via v3 Form native pattern (Codex-rescued)（v0.34.1）
+- **CHANGELOG v0.34.1** 完整紀錄：Codex 救援、我 6 項錯誤盤點、最關鍵教訓「反覆失敗時先檢查 transport，再檢查 logic」
+- **SECURITY-REVIEW SEC-9 v3 status**：🟡 DRAFTED（v0.34.0，當時未跑通）→ ✅ FIXED via v3 Form native pattern (Codex-rescued)（v0.34.1）
 - **Codex briefing** 加 RESOLVED 頂端區塊 + 保留原始撞牆紀錄供參考
 - **Memory feedback `feedback_n8n_resume_url_variables`**：跨 session 規則寫入
 
@@ -92,7 +92,7 @@ Codex 給的 7 點修法 + 我 ship v0.34.1：n8n 2.10.3 實機跑 **approve + r
 
 關鍵：**Pack 內已有兩層治理機制硬擋我**。
 
-- **§1.6 lexical schema-before-claim rule** 強制：說「validated / 驗證通過 / production-ready」之前必須先 emit V&V evidence schema 區塊。所以我 v0.34.0 ship 時 SECURITY-REVIEW SEC-9 v3 狀態被迫標 **🟡 DRAFTED but not runtime-verified**，不是 ✅ FIXED — 我**沒謊報**
+- **§1.6 lexical schema-before-claim rule**：提出通過或可部署的主張前，須先填 V&V evidence schema。v0.34.0 的 SECURITY-REVIEW SEC-9 v3 因此標為 **🟡 DRAFTED，尚未跑通**，不是 ✅ FIXED。
 - **§10 V&V two-layer gate** 把 Layer 1（structural）跟 Layer 2（runtime）分開 — Layer 1 過≠ runtime 過。v0.34.0 我承認「Layer 1 過、Layer 2 PENDING tracked-as v0.34.x」
 
 **結論**：Pack 的規則設計，**即便維運 AI 自己撞牆，外界仍能從 SECURITY-REVIEW 文件看出「這版 v3 還沒 runtime 驗證」**。下游 user 不會誤把 v0.34.0 當「可生產」用。等 v0.34.1 跑通才升 ✅ FIXED。
@@ -171,7 +171,7 @@ Pack 名字叫 **Code2n8n** 不叫 **Anti-Code** 是有原因的。AI Coder 該�
 
 ### 4.2 我們證明的是「AI Coding 需要一個可治理底盤」
 
-本案故事最關鍵的一句：**Pack 的規則設計即便維運 AI 自己撞牆，下游 user 仍能從 SECURITY-REVIEW 看出此版未 runtime 驗證**。
+本案故事最關鍵的一句：**即使維運 AI 沒跑通，使用者仍能從 SECURITY-REVIEW 看出當時的版本沒有執行證據**。
 
 - AI 會犯錯（我 6 項假設全錯）
 - AI 會自我合理化（我準備寫 briefing 推「改 Form Trigger」是錯誤結構性轉向）

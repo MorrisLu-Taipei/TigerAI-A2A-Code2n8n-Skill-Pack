@@ -12,14 +12,14 @@
   },
   "//security": "v0.36.0 SEC-017: exact pins (no caret) on all deps. package-lock.json is the canonical lock; manual review required before bumping. See docs/external-package-security-posture.md.",
   "dependencies": {
-    "@hono/node-server": "1.13.0",
-    "@paid-tw/einvoice": "0.3.0",
-    "@paid-tw/einvoice-amego": "0.3.0",
-    "@paid-tw/einvoice-ecpay": "0.3.0",
-    "@paid-tw/einvoice-ezpay": "0.3.0",
-    "@paid-tw/einvoice-ezpay-crossborder": "0.1.1",
-    "@paid-tw/einvoice-ezreceipt": "0.1.1",
-    "hono": "4.6.0"
+    "@hono/node-server": "2.1.11",
+    "@paid-tw/einvoice": "0.5.0",
+    "@paid-tw/einvoice-amego": "0.6.0",
+    "@paid-tw/einvoice-ecpay": "0.5.2",
+    "@paid-tw/einvoice-ezpay": "0.5.0",
+    "@paid-tw/einvoice-ezpay-crossborder": "0.2.2",
+    "@paid-tw/einvoice-ezreceipt": "0.2.3",
+    "hono": "4.13.21"
   },
   "devDependencies": {
     "@types/node": "20.12.0",

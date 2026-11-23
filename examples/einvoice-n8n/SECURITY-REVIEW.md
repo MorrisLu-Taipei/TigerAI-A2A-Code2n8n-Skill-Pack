@@ -13,6 +13,21 @@
 
 ## 1. Trust boundaries
 
+### Dependency updates for the 2026-11-24 release
+
+The earlier runtime evidence applies to the earlier SDK versions. These pins are evaluated with the lockfile, production dependency scan, compilation, and local checks; they do not inherit vendor-sandbox results.
+
+| Dependency entry | Reason for update |
+| --- | --- |
+| SEC-DEP-hono-4.13.21 | Runtime web framework security updates identified by the dependency audit. |
+| SEC-DEP-hono-node-server-2.1.11 | Updated the Node adapter to the audited version; supports Hono 4 and requires Node 20 or newer. |
+| SEC-DEP-paid-tw-einvoice-0.5.0 | Updated SDK core and schema dependency to address the audit finding. |
+| SEC-DEP-paid-tw-einvoice-amego-0.6.0 | Compatible provider package for SDK core 0.5.0. |
+| SEC-DEP-paid-tw-einvoice-ecpay-0.5.2 | Compatible provider package for SDK core 0.5.0. |
+| SEC-DEP-paid-tw-einvoice-ezpay-0.5.0 | Compatible provider package for SDK core 0.5.0. |
+| SEC-DEP-paid-tw-einvoice-ezpay-crossborder-0.2.2 | Compatible provider package for SDK core 0.5.0. |
+| SEC-DEP-paid-tw-einvoice-ezreceipt-0.2.3 | Compatible provider package for SDK core 0.5.0. |
+
 ```
 ┌──────────────────────┐  HTTP(S)   ┌──────────────────────┐
 │ Caller (order / CS / │  Bearer    │ n8n workflows        │

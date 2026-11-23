@@ -11,6 +11,8 @@
 
 ## 1. Review metadata
 
+**2026-11-24 dependency note — SEC-DEP-qdrant-js-client-rest-1.18.0:** The example now pins the Qdrant client to a release that supports its Node 20 container and resolves patched Undici in the 6.x series. The container build uses the committed lockfile. This does not supersede the example's existing deployment restrictions or imply a live integration retest.
+
 | Field | Value |
 | --- | --- |
 | **Review target** | `examples/line-ai-customer-service-onprem/` — the on-prem (Docker) variant of the LINE AI customer service system |

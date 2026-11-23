@@ -2,6 +2,10 @@
 
 ## 未發布
 
+## v1.2.0 — 2026-11-24
+
+- **發版檢查**：補上地端 LINE 範例鎖定檔、更新範例依賴、修正 Trivy Action 引用及 CycloneDX SBOM 產出；不降低既有 HIGH／CRITICAL 門檻。舊版實機案例證據不適用於此次升級後的 SDK。
+
 - **分階段 Skill 路由**：由 `pipeline.json` 集中定義任務路線、規劃／執行／上架和過關條件；除錯預設唯讀。新增 `check-release-evidence.mjs` 離線比對候選版本、R1／R2 與核准資料；工具不授權、不發布。
 - **正式寫入與 CI 分離**：GitHub Actions 的 n8n 實機往返測試改為手動，且須明確確認使用專用測試實例；推送 `main` 不會觸發實機操作。更新者：OpenAI Codex。
 

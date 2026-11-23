@@ -123,10 +123,10 @@ v0.38.0 Pack CI 暫**不**強制 `--audit-signatures`，但本 Skill 寫進 SOP 
 
 ```bash
 # ❌ 錯：讀 main 分支，下次內容可能變
-curl https://raw.githubusercontent.com/paid-tw/einvoice/main/README.md
+curl "https://<raw-github-host>/paid-tw/einvoice/main/README.md"
 
 # ✅ 對：鎖具體 commit
-curl https://raw.githubusercontent.com/paid-tw/einvoice/abc123def456.../README.md
+curl "https://<raw-github-host>/paid-tw/einvoice/<full-commit-sha>/README.md"
 ```
 
 抓回來的內容如要拿來生程式碼或寫文件，**commit message 或 SECURITY-REVIEW 必須記錄該 commit sha**：

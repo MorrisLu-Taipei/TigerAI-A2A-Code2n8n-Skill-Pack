@@ -17,7 +17,7 @@
 >
 > 指令明確規範：什麼時候才可以說「驗證通過 / 已測試 / 可上線」、要跑哪些工具、要產什麼 evidence schema、哪些詞彙在通過 gate 前是禁用的。跳過這個 gate 就是 v0.27.0 出事的原因，紀錄在 [`examples/einvoice-n8n/REFLECTION.md`](examples/einvoice-n8n/REFLECTION.md)。**人類** reviewer 改讀 [`docs/code2n8n-vv-checklist.md`](docs/code2n8n-vv-checklist.md)。
 
-## 最新更新：分階段 Skill 路由
+## 最新更新 — v1.2.0：分階段 Skill 路由
 
 **更新者：OpenAI Codex。**
 
@@ -84,7 +84,7 @@ MIT 授權讓本 Pack 能把 SDK 包成 svc + n8n 治理層對外發布 — 是 
 
 路徑 B：移植既有系統
 Apps Script / Express / Lambda / Netlify Functions / Docker stack
-  → code-to-workflow（盤點、獨立安全閘門、分區、移植、驗證、版本與回滾證據）
+  → code-to-workflow（盤點、獨立安全閘門、分區、移植、檢查、版本與回滾證據）
   → 程式模組 + n8n Workflow + 移植文件
 ```
 
@@ -173,11 +173,11 @@ AI ──> 你：✅ 已產生 workflow.json（Schedule → Shopify → Code →
             ✅ 已透過 n8n API 部署到你的環境，webhook URL：https://...
 ```
 
-> 🎯 **核心精神**：使用者不需要先背熟 n8n 節點語法，只要能說清楚需求，就能產出有結構、可 review、可維護的 workflow。要宣稱可上線，仍必須完成 credential 設定、真實執行驗證與安全審查。
+> 🎯 **核心精神**：使用者不需要先背熟 n8n 節點語法，只要能說清楚需求，就能產出有結構、可 review、可維護的 workflow。正式部署之前，仍須設定憑證、完成實際執行測試與安全審查。
 
 如果你已經有程式，不要先改寫成便利貼。直接說：
 
-> 「請用 `code-to-workflow` 盤點這個專案，判斷哪些邏輯留在程式、哪些應移到 n8n；先做安全審查，再產出 SDD、workflow 與驗證結果。」
+> 「請用 `code-to-workflow` 盤點這個專案，判斷哪些邏輯留在程式、哪些應移到 n8n；先做安全審查，再產出 SDD、workflow 與檢查結果。」
 
 詳見 [`02-USAGE-MODES.md`](02-USAGE-MODES.md)（三種從零使用模式）與 [`03-FIRST-WORKFLOW.md`](03-FIRST-WORKFLOW.md)（15 分鐘手把手）；既有程式移植則直接使用 [`code-to-workflow`](skills/tigerai/code-to-workflow/SKILL.md)。
 
@@ -297,7 +297,7 @@ TigerAI-Code2n8n-Skill-Pack/
 1. 先讀 [`CODE2N8N.md`](CODE2N8N.md) 理解「保留程式 + 上升流程」的分工
 2. 用 [`code-to-workflow`](skills/tigerai/code-to-workflow/SKILL.md) 做 source inventory、分區與 Step 1.5 安全審查
 3. 對照三個實證案例：Google Workspace、LINE 雲端版、LINE 地端版
-4. 通過靜態 lint、n8n REST import，再使用真實 credential 做端到端驗證
+4. 執行靜態 lint；在獲准的測試環境匯入 workflow，使用測試憑證做端到端檢查
 
 ### 我要分發給內部團隊用
 1. 本檔 → `01-INSTALL.md` 跑通

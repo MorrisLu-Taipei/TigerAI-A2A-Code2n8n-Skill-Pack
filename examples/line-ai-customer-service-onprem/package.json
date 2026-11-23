@@ -12,7 +12,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.2.0",
     "@line/bot-sdk": "^9.0.0",
-    "@qdrant/js-client-rest": "^1.17.0",
+    "@qdrant/js-client-rest": "1.18.0",
     "@supabase/supabase-js": "^2.39.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",

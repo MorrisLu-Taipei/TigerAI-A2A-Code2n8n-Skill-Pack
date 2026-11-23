@@ -196,7 +196,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Trivy filesystem scan — ${{ matrix.target.name }}
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: ${{ matrix.target.scan-type }}
           scan-ref: ${{ matrix.target.scan-ref }}
@@ -322,9 +322,8 @@ jobs:
       - name: GitHub raw URLs must use commit sha (not branch)
         run: |
           set -e
-          # Pattern: raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>
-          # If <ref> is not a 40-char hex sha, fail.
-          OFFENDERS=$(git ls-files | xargs grep -hoE 'raw\.githubusercontent\.com/[^/]+/[^/]+/[^/[:space:]"'"'"']+' 2>/dev/null | \
+          # Match concrete download URLs, not schematic paths with placeholders.
+          OFFENDERS=$(git ls-files -z | xargs -0 grep -hoE 'raw\.githubusercontent\.com/[[:alnum:]_-]+/[[:alnum:]_.-]+/[^/[:space:]<>"]+/[^[:space:]<>"]+' 2>/dev/null | \
             sort -u | \
             grep -vE 'raw\.githubusercontent\.com/[^/]+/[^/]+/[a-f0-9]{40}/' || true)
           if [ -n "$OFFENDERS" ]; then
@@ -386,9 +385,9 @@ jobs:
             echo "No package.json — skip."
             exit 0
           fi
-          npm install --omit=dev --omit=optional --no-audit --no-fund
-          npx --yes @cyclonedx/cyclonedx-npm@^1.19 --output-format json --output-file sbom.json
-          echo "=== SBOM (CycloneDX 1.5) ==="
+          npm ci --ignore-scripts --omit=dev --omit=optional --no-audit --no-fund
+          npx --yes @cyclonedx/cyclonedx-npm@7.0.1 --omit dev --omit optional --output-format json --output-file sbom.json
+          echo "=== SBOM (CycloneDX) ==="
           jq '{spec: .specVersion, version: .version, components: (.components | length)}' sbom.json
       - name: Upload SBOM artifact
         uses: actions/upload-artifact@v4
