@@ -104,6 +104,9 @@ service and each author's template-sharing terms.
   and error-handling rates) and a small number of cited template IDs.
 - **What is not in this repo**: the template JSON files, the full title index, and
   any author personal data (names, bios, avatars, links).
+- **Who did the collection and statistics**: the AI coding session named
+  `TG-Srv01-SysAdm` (a Claude Code session operated by the repository owner),
+  2026-11-05 to 2026-11-07, working through the official template API only.
 
 ---
 
